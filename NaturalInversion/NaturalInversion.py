@@ -29,11 +29,10 @@ import itertools
 from tqdm import tqdm
 from NaturalInversion.network import Generator, Feature_Decoder
 
-sys.path.insert(0,'../iCaRL')
-from ResNet import resnet34_cbam as ResNet34
+sys.path.insert(0,'..')
+from iCaRL.ResNet import resnet34_cbam as ResNet34
 #from models.resnet import ResNet34
 #import learners
-import NaturalInversion.vgg
 
 sys.path.insert(0,os.path.abspath('..'))
 
@@ -258,126 +257,3 @@ def save_finalimages(images, targets, num_generations, prefix, exp_descr):
             os.makedirs(save_pth)
 
         vutils.save_image(image, os.path.join(prefix, 'final_images/s{}/{}_output_{}_'.format(class_id, num_generations, id)) + exp_descr + '.png', normalize=True, scale_each=True, nrow=1)
-
-
-def test(net):
-    print('==> Teacher validation')
-    net.eval()
-    test_loss = 0
-    correct = 0
-    total = 0
-
-    with torch.no_grad():
-        for batch_idx, (inputs, targets) in enumerate(testloader):
-            inputs, targets = inputs.to(device), targets.to(device)
-            outputs = net(inputs)
-            loss = criterion(outputs, targets)
-
-            test_loss += loss.item()
-            _, predicted = outputs.max(1)
-            total += targets.size(0)
-            correct += predicted.eq(targets).sum().item()
-
-    print('Loss: %.3f | Acc: %.3f%% (%d/%d)'
-          % (test_loss / (batch_idx + 1), 100. * correct / total, correct, total))
-
-
-def main(args):
-    print("loading pre-trained classifier")
-    net_teacher = ResNet34()
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    net_teacher = net_teacher.to(device)
-    criterion = nn.CrossEntropyLoss()
-
-    # for reproducability
-    random_seed(777)
-    
-    num_classes = 10 if args.dataset=='cifar10' else 100
-    
-    arch = {'vgg11' : vgg.__dict__['vgg11_bn'](num_classes=num_classes),
-            'vgg16' : vgg.__dict__['vgg16_bn'](num_classes=num_classes),
-            'resnet34' : ResNet34(num_classes=num_classes)
-            }
-
-    net_teacher = arch[args.arch].to(device)
-    #checkpoint = torch.load(args.teacher_weights)
-    #net_teacher.load_state_dict(checkpoint)
-    net_teacher.eval()
-    
-    cudnn.benchmark = True
-    
-    prefix_ = args.exp_name
-    prefix = os.path.join(prefix_, str(args.global_iter)+"/")
-
-    for create_folder in [prefix, prefix+"/final_images/"]:
-        if not os.path.exists(create_folder):
-            os.makedirs(create_folder)
-
-    if 0:
-        # for check teacher accuracy
-        transform_test = transforms.Compose([
-         transforms.ToTensor(),
-         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-        ])
-
-        testset = torchvision.datasets.CIFAR10(root='../data/CIFAR10', train=False, transform=transform_test)
-        testloader = torch.utils.data.DataLoader(testset, batch_size=args.bs, shuffle=True, num_workers=6,
-                                             drop_last=True)
-        # Checking teacher accuracy
-        print("Checking teacher accuracy")
-        test(net_teacher)
-
-    print("Starting model inversion")
-    inputs, targets = get_images(net=net_teacher, 
-                                num_classes=num_classes,
-                                bs=args.bs, 
-                                epochs=args.iters_mi, 
-                                prefix=prefix, 
-                                global_iteration=args.global_iter, 
-                                bn_reg_scale=args.r_feature_weight,
-                                g_lr=args.G_lr,
-                                d_lr=args.D_lr,
-                                a_lr=args.A_lr,
-                                var_scale=args.var_scale, 
-                                l2_coeff=args.l2_scale
-                                )
-    
-    save_finalimages(inputs, targets, args.global_iter, prefix_, args.exp_descr)
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='PyTorch CIFAR10/100 Inversion')
-    parser.add_argument('--ngpu', type=str, default='0',
-                        help='device number') 
-    parser.add_argument('--dataset', type=str, 
-                        choices=['cifar10', 'cifar100'], help='dataset to invert [cifar10/cifar100]')
-    parser.add_argument('--arch', default='resnet34',type=str, 
-                        choices=['vgg11', 'vgg16', 'resnet34'], 
-                        help='set the pre-trained teacher network architecture [vgg11, vgg16, resnet34]')
-    parser.add_argument('--bs', default=256, type=int, \
-                        help='batch size')
-    parser.add_argument('--iters_mi', default=2000, type=int, 
-                        help='number of iterations for model inversion')
-    parser.add_argument('--G_lr', default=0.001, type=float, 
-                        help='lr for deep inversion')
-    parser.add_argument('--D_lr', default=0.0005, type=float, 
-                        help='lr for deep inversion')
-    parser.add_argument('--A_lr', default=0.05, type=float, 
-                        help='lr for deep inversion')
-    parser.add_argument('--var_scale', default=6.0e-3, type=float,
-                        help='TV L2 regularization coefficient')
-    parser.add_argument('--l2_scale', default=1.5e-5, type=float, 
-                        help='L2 regularization coefficient')
-    parser.add_argument('--r_feature_weight', default=10.0, type=float, 
-                        help='weight for BN regularization statistic')
-    parser.add_argument('--teacher_weights', default='./pretrained/resnet34.pt', type=str, 
-                        help='path to load weights of the model')
-    parser.add_argument('--exp_name', default='sample_image',type=str, 
-                        help='path to save final inversion images')
-    parser.add_argument('--global_iter', type=int, 
-                        help='global itertation number')
-    args = parser.parse_args()
-    
-    os.environ["CUDA_VISIBLE_DEVICES"] = args.ngpu
-
-    main(args)
