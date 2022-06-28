@@ -4,6 +4,11 @@ from PIL import Image
 import sys
 import os
 import torch
+import sys
+
+sys.path.append('..')
+from inversion_model.inversion_eeil import data_augmentation_e2e
+from NaturalInversion.NaturalInversion import get_images
 
 class iCIFAR100(CIFAR100):
     def __init__(self,root='./data/',
@@ -12,7 +17,8 @@ class iCIFAR100(CIFAR100):
                  target_transform=None,
                  test_transform=None,
                  target_test_transform=None,
-                 download=False):
+                 download=False,
+                 eeil_aug=False):
         super(iCIFAR100,self).__init__(root,
                                        train=train,
                                        transform=transform,
@@ -21,6 +27,7 @@ class iCIFAR100(CIFAR100):
 
         self.target_test_transform=target_test_transform
         self.test_transform=test_transform
+        self.eeil_aug=eeil_aug
         self.TrainData = []
         self.TrainLabels = []
         self.TestData = []
@@ -52,7 +59,6 @@ class iCIFAR100(CIFAR100):
         datas,labels=[],[]
         prefix = prefix+str(task_size)+'/task_'+str(task_id)
         sys.path.insert(0,os.path.abspath('..'))
-        from NaturalInversion.NaturalInversion import get_images
 
         if task_id != 0:
             gen_inputs, inv_labels = get_images(net=old_model,task=task_id,num_classes=classes,bs=batchsize,filename=filename,targets = None,epochs=2000,prefix=prefix,global_iteration=task_id,bn_reg_scale=3,g_lr=0.001,d_lr=0.0005,a_lr=0.05,var_scale=0.001,l2_coeff=0.00001)
@@ -75,10 +81,14 @@ class iCIFAR100(CIFAR100):
             data=self.data[np.array(self.targets)==label]
             datas.append(data)
             labels.append(np.full((data.shape[0]),label))
+        
             
-        print("data list ",len(datas))
-        print("labels list",len(labels))
         self.TrainData,self.TrainLabels=self.concatenate(datas,labels)
+        if self.eeil_aug:
+            print("the train data size of train set is %s"%(str(self.TrainData.shape)))
+            print("the train label size of train label is %s"%str(self.TrainLabels.shape))
+            print("Conduct EEIL Augmentation")
+            self.TrainData,self.TrainLabels=data_augmentation_e2e(self.TrainData,self.TrainLabels)
         print("the train data size of train set is %s"%(str(self.TrainData.shape)))
         print("the train label size of train label is %s"%str(self.TrainLabels.shape))
 

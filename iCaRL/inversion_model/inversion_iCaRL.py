@@ -5,7 +5,7 @@ import numpy as np
 from torch.nn import functional as F
 from PIL import Image
 import torch.optim as optim
-from myNetwork import network
+
 from inversion_CIFAR100 import iCIFAR100
 from torch.utils.data import DataLoader
 from ResNet import resnet34_cbam
@@ -14,6 +14,33 @@ import os
 import sys
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+class network(nn.Module):
+
+    def __init__(self, numclass, feature_extractor):
+        super(network, self).__init__()
+        self.feature = feature_extractor
+        self.fc = nn.Linear(feature_extractor.fc.in_features, numclass, bias=True)
+
+    def forward(self, input):
+        x,_,_,_,_,_ = self.feature(input)
+        x = self.fc(x)
+        return x,_,_,_,_,_
+
+    def Incremental_learning(self, numclass):
+        weight = self.fc.weight.data
+        bias = self.fc.bias.data
+        in_feature = self.fc.in_features
+        out_feature = self.fc.out_features
+
+        self.fc = nn.Linear(in_feature, numclass, bias=True)
+        self.fc.weight.data[:out_feature] = weight
+        self.fc.bias.data[:out_feature] = bias
+
+    def feature_extractor(self,inputs):
+        out,_,_,_,_,_=self.feature(inputs)
+        return out
+
 def get_one_hot(target,num_class):
     one_hot=torch.zeros(target.shape[0],num_class).to(device)
     one_hot=one_hot.scatter(dim=1,index=target.long().view(-1,1),value=1.)
@@ -21,15 +48,14 @@ def get_one_hot(target,num_class):
 
 class iCaRLmodel:
 
-    def __init__(self,numclass,feature_extractor,batch_size,task_size,memory_size,epochs,learning_rate,prefix):
-
+    def __init__(self,feature_extractor,configs):
         super(iCaRLmodel, self).__init__()
-        self.epochs=epochs
-        self.learning_rate=learning_rate
-        self.model = network(numclass,feature_extractor)
+        self.configs=configs
+        self.numclass=configs['numclass']
+        self.learning_rate=configs['lr']
+        self.model = network(self.numclass,feature_extractor)
         self.exemplar_set = []
         self.class_mean_set = []
-        self.numclass = numclass
         self.transform = transforms.Compose([#transforms.Resize(img_size),
                         transforms.ToTensor(),
                         transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))])
@@ -57,19 +83,20 @@ class iCaRLmodel:
                             #transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))])
                             transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
 
-        
-        self.train_dataset = iCIFAR100('dataset', transform=self.train_transform, download=True)
-        self.test_dataset = iCIFAR100('dataset', test_transform=self.test_transform, train=False, download=True)
+        dataset_path=configs['dataset_path']
+        self.train_dataset = iCIFAR100(os.path.join(dataset_path,'cifar100'), transform=self.train_transform, download=True,eeil_aug=self.configs['eeil_aug'])
+        self.test_dataset = iCIFAR100(os.path.join(dataset_path,'cifar100'), test_transform=self.test_transform, train=False, download=True,eeil_aug=False)
 
-        self.batchsize = batch_size
-        self.memory_size=memory_size
-        self.task_size=task_size
+        self.batchsize = configs['batch_size']
+        self.memory_size=configs['mem_size']
+        self.task_size=configs['task_size']
+        self.epochs=configs['epochs']
 
         self.train_loader=None
         self.test_loader=None
         self.filename = None
         self.accuracies = []
-        self.prefix = prefix
+        self.prefix = configs['prefix']
         self.best_acc = 0.0
 
     # get incremental train data
@@ -106,33 +133,24 @@ class iCaRLmodel:
         for epoch in range(self.epochs):
             if epoch == 48:
                 if self.numclass==self.task_size:
-                     print(1)
-                     opt = optim.SGD(self.model.parameters(), lr=1.0/5, weight_decay=0.00001)
+                    print(1)
+                    opt = optim.SGD(self.model.parameters(), lr=1.0/5, weight_decay=0.00001)
                 else:
-                     for p in opt.param_groups:
-                         p['lr'] =self.learning_rate/ 5.0
+                    for p in opt.param_groups:
+                        p['lr'] =self.learning_rate/ 5.0
                 print("--------------------------")
                 print("change learning rate:%.3f" % (self.learning_rate / 5))
                 print("--------------------------")
             elif epoch == 62:
                 if self.numclass>self.task_size:
-                     for p in opt.param_groups:
-                         p['lr'] =self.learning_rate/ 25
-                         print("learning rate : ",p['lr'])
+                    for p in opt.param_groups:
+                        p['lr'] =self.learning_rate/ 25
+                        print("learning rate : ",p['lr'])
                 else:
                      opt = optim.SGD(self.model.parameters(), lr=1.0/25, weight_decay=0.00001)
                 print("--------------------------")
                 print("change learning rate:%.3f" % (self.learning_rate / 25))
                 print("--------------------------")
-
-            #elif epoch == 80:
-            elif epoch ==100:
-                  if self.numclass==self.task_size:
-                     opt = optim.SGD(self.model.parameters(), lr=1.0 /125, weight_decay=0.00001)
-                  else:
-                     for p in opt.param_groups:
-                         p['lr'] =self.learning_rate/ 125
-                  print("change learning rate:%.3f" % (self.learning_rate / 100.0))
 
             for step, (indexs, images, target) in enumerate(self.train_loader):
                 images, target = images.to(device), target.to(device)
@@ -143,12 +161,12 @@ class iCaRLmodel:
                 opt.step()
                 if epoch == 69:
                     print("target: ",target)
-                print('epoch:%d,step:%d,loss:%.3f' % (epoch, step, loss_value.item()))
+                print('\repoch:%3d,step:%2d,loss:%4.3f' % (epoch, step, loss_value.item()),end='')
             accuracy = self._test(self.test_loader, 1)
-
-            print("*****************************")
-            print('* epoch:%d,normal accuracy:%.3f *' % (epoch, accuracy))
-            print("*****************************")
+            print("")
+            print("***************************************")
+            print('* epoch:%3d,normal accuracy:%6.3f *' % (epoch, accuracy))
+            print("***************************************")
 
         return accuracy
 
