@@ -23,9 +23,9 @@ class network(nn.Module):
         self.fc = nn.Linear(feature_extractor.fc.in_features, numclass, bias=True)
 
     def forward(self, input):
-        x,_,_,_,_,_ = self.feature(input)
+        x,f4,f3,f2,f1,f0 = self.feature(input)
         x = self.fc(x)
-        return x,_,_,_,_,_
+        return x,f4,f3,f2,f1,f0 
 
     def Incremental_learning(self, numclass):
         weight = self.fc.weight.data
@@ -38,8 +38,7 @@ class network(nn.Module):
         self.fc.bias.data[:out_feature] = bias
 
     def feature_extractor(self,inputs):
-        out,_,_,_,_,_=self.feature(inputs)
-        return out
+        return self.feature(inputs)
 
 def get_one_hot(target,num_class):
     one_hot=torch.zeros(target.shape[0],num_class).to(device)
