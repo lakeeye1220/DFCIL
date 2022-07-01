@@ -102,7 +102,7 @@ class EEIL(ICARL):
                     bft_images=[]
                     for img in images:
                         bft_images.append(Image.fromarray(img))
-                    bft_dataset=self.dataset_class(images,labels,self.datasetloader.train_transform)
+                    bft_dataset=self.dataset_class(bft_images,labels,self.datasetloader.train_transform)
                 elif self.configs['dataset'] in ['tiny-imagenet','imagenet']:
                     bft_dataset=self.dataset_class(bft_train_dataset,self.datasetloader.train_transform)
                     raise Warning('FineTuning is not supported for {} dataset'.format(self.configs['dataset']))
@@ -130,7 +130,7 @@ class EEIL(ICARL):
                 self.compute_exemplar_class_mean()
                 KNN_accuracy = self._eval(
                     valid_loader, epoch, task_num)['accuracy']
-                self.logger.info("NMS accuracy: "+str(KNN_accuracy))
+                self.logger.info("NMS accuracy: {}".format(str(KNN_accuracy)))
 
             
             self.current_num_classes += self.task_step
@@ -141,9 +141,9 @@ class EEIL(ICARL):
         print('Total Learning Time: {:2d}h {:2d}m {:2d}s'.format(
             h,m,s))
         str_acc=' '.join("{:.2f}".format(x) for x in tasks_acc)
-        self.logger.info("Task Accs:",str_acc)
+        self.logger.info("Task Accs: {}".format(str_acc))
         str_acc=' '.join("{:.2f}".format(x) for x in finetune_acc)
-        self.logger.info("Finetune Accs:",str_acc)
+        self.logger.info("Finetune Accs: {}".format(str_acc))
 
         ############## info save #################
         import copy
