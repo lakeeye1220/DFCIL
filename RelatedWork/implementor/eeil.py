@@ -1,3 +1,5 @@
+from RelatedWork.data.custom_dataset import ImageDatasetFromData
+from utils.NaturalInversion.NaturalInversion import get_inversion_images
 from data.cil_data_load import CILDatasetLoaderv2
 from data.custom_dataset import ImageDataset
 from data.data_load import DatasetLoader
@@ -57,8 +59,13 @@ class EEIL(ICARL):
                 optimizer, self.configs['lr_steps'], self.configs['gamma'])
             adding_classes_list = [self.task_step *
                                     (task_num-1), self.task_step*task_num]
-            self.datasetloader.train_data.update(
-                adding_classes_list, self.exemplar_set) # update for class incremental style #
+            if self.configs['natural_inversion'] and task_num>1:
+                for img,lbl in zip(inv_images,inv_labels):
+                    self.datasetloader.train_data.data.append(img)
+                    self.datasetloader.train_data.targets.append(lbl)
+            else:
+                self.datasetloader.train_data.update(
+                    adding_classes_list, self.exemplar_set) # update for class incremental style #
             self.datasetloader.test_data.update(
                 adding_classes_list, self.exemplar_set) # Don't need to update loader
             ###################
@@ -102,9 +109,9 @@ class EEIL(ICARL):
                     bft_images=[]
                     for img in images:
                         bft_images.append(Image.fromarray(img))
-                    bft_dataset=self.dataset_class(bft_images,labels,self.datasetloader.train_transform)
+                    bft_dataset=self.dataset_class(bft_images,labels,self.datasetloader.train_transform,return_idx=True)
                 elif self.configs['dataset'] in ['tiny-imagenet','imagenet']:
-                    bft_dataset=self.dataset_class(bft_train_dataset,self.datasetloader.train_transform)
+                    bft_dataset=self.dataset_class(bft_train_dataset,self.datasetloader.train_transform,return_idx=True)
                     raise Warning('FineTuning is not supported for {} dataset'.format(self.configs['dataset']))
                 else:
                     raise NotImplementedError
@@ -116,21 +123,25 @@ class EEIL(ICARL):
             #######################################
 
             ## after train- process exemplar set ##
-            self.model.eval()
-            print('')
-            with torch.no_grad():
-                m = int(self.configs['memory_size']/self.current_num_classes)
-                self._reduce_exemplar_sets(m)  # exemplar reduce
-                # for each class
-                for class_id in range(self.task_step*(task_num-1), self.task_step*(task_num)):
-                    print('\r Construct class %s exemplar set...' %
-                        (class_id), end='')
-                    self._construct_exemplar_set(class_id, m)
+            if self.configs['natural_inversion']:
+                prefix=os.path.join(self.save_path, self.time_data)
+                inv_images,inv_labels=get_inversion_images(self.model,self.current_num_classes,task_num,epochs=self.configs['inversion_epochs'],prefix=prefix,global_iteration=task_num,bn_reg_scale=3,g_lr=0.001,d_lr=0.0005,a_lr=0.05,var_scale=0.001,l2_coeff=0.00001,num_generate_images=self.configs['memory_size'])
+            else:
+                self.model.eval()
+                print('')
+                with torch.no_grad():
+                    m = int(self.configs['memory_size']/self.current_num_classes)
+                    self._reduce_exemplar_sets(m)  # exemplar reduce
+                    # for each class
+                    for class_id in range(self.task_step*(task_num-1), self.task_step*(task_num)):
+                        print('\r Construct class %s exemplar set...' %
+                            (class_id), end='')
+                        self._construct_exemplar_set(class_id, m)
 
-                self.compute_exemplar_class_mean()
-                KNN_accuracy = self._eval(
-                    valid_loader, epoch, task_num)['accuracy']
-                self.logger.info("NMS accuracy: {}".format(str(KNN_accuracy)))
+                    self.compute_exemplar_class_mean()
+                    KNN_accuracy = self._eval(
+                        valid_loader, epoch, task_num)['accuracy']
+                    self.logger.info("NMS accuracy: {}".format(str(KNN_accuracy)))
 
             
             self.current_num_classes += self.task_step
