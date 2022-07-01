@@ -1,1 +1,0 @@
-[07-01 10:57:19] main.py train --train_mode eeil --lr 0.1 --epochs 3

@@ -1,7 +1,0 @@
-[07-01 11:26:46] main.py train --train_mode eeil --lr 0.1 --epochs 3 --task_size 20
-[07-01 11:26:59] [train] Loss: 1.8840 | top1: 24.1200 | top5: 100.0000 | time: 9.286
-[07-01 11:27:04] [eval] [  1 epoch] Loss: 1.8680 | top1: 23.8000 | top5: 100.0000
-[07-01 11:27:12] [train] Loss: 1.5433 | top1: 29.3200 | top5: 100.0000 | time: 8.129
-[07-01 11:27:17] [eval] [  2 epoch] Loss: 1.9425 | top1: 33.6000 | top5: 100.0000
-[07-01 11:27:26] [train] Loss: 1.5178 | top1: 33.4800 | top5: 100.0000 | time: 8.506
-[07-01 11:27:31] [eval] [  3 epoch] Loss: 1.5234 | top1: 35.4000 | top5: 100.0000
