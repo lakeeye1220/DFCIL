@@ -15,11 +15,16 @@ parser.add_argument('--batch_size', type=int, default=200)
 parser.add_argument('--task_size', type=int, default=20, help='dataset balancing')
 parser.add_argument('--mem_size', type=int, default=2000, help="size of memory for replay")
 parser.add_argument('--epochs', type=int, default=1,help="traning epochs per each tasks")
-parser.add_argument('--lr', type=float, default=2.0, help="start learning rate per each task")
+parser.add_argument('--lr', type=float, default=1.0, help="start learning rate per each task")
 parser.add_argument('--prefix',type=str,default="Buffer_",help="directory name ")
 parser.add_argument('--dataset_path',type=str,default="../../data/dataset/",help="dataset directory name ")
 parser.add_argument('--model',type=str,default="icarl",help="directory name ")
 parser.add_argument('--eeil_aug',type=bool,default=False,help="Apply EEIL Aug")
+parser.add_argument('--lr_steps', help='lr decaying epoch determination', default=[48,62,100],
+                        type=lambda s: [int(item) for item in s.split(',')])
+parser.add_argument('--lr_decay', type=float, default=0.5, help='lr decaying rate')
+parser.add_argument('--momentum', default='0.9', type=float, help='momentum')
+
 #parser=create_args()
 args = parser.parse_args()
 

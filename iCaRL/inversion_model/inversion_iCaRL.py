@@ -1,3 +1,4 @@
+from re import L
 import torch.nn as nn
 import torch
 from torchvision import transforms
@@ -128,28 +129,9 @@ class iCaRLmodel:
     # evaluate model
     def train(self):
         accuracy = 0.0
-        opt = optim.SGD(self.model.parameters(), lr=self.learning_rate,weight_decay=0.00001)
+        opt = optim.SGD(self.model.parameters(), lr=self.learning_rate,weight_decay=0.00001,momentum=self.configs['momentum'])
+        lr_scheduler= optim.lr_scheduler.MultiStepLR(opt, milestones=self.configs['lr_steps'], gamma=self.configs['lr_decay'])
         for epoch in range(self.epochs):
-            if epoch == 48:
-                if self.numclass==self.task_size:
-                    print(1)
-                    opt = optim.SGD(self.model.parameters(), lr=1.0/5, weight_decay=0.00001)
-                else:
-                    for p in opt.param_groups:
-                        p['lr'] =self.learning_rate/ 5.0
-                print("--------------------------")
-                print("change learning rate:%.3f" % (self.learning_rate / 5))
-                print("--------------------------")
-            elif epoch == 62:
-                if self.numclass>self.task_size:
-                    for p in opt.param_groups:
-                        p['lr'] =self.learning_rate/ 25
-                        print("learning rate : ",p['lr'])
-                else:
-                     opt = optim.SGD(self.model.parameters(), lr=1.0/25, weight_decay=0.00001)
-                print("--------------------------")
-                print("change learning rate:%.3f" % (self.learning_rate / 25))
-                print("--------------------------")
 
             for step, (indexs, images, target) in enumerate(self.train_loader):
                 images, target = images.to(device), target.to(device)
@@ -158,10 +140,13 @@ class iCaRLmodel:
                 opt.zero_grad()
                 loss_value.backward()
                 opt.step()
-                if epoch == 69:
-                    print("target: ",target)
                 print('\repoch:%3d,step:%2d,loss:%4.3f' % (epoch, step, loss_value.item()),end='')
+            if epoch in self.configs['lr_steps']:
+                print("--------------------------")
+                print("change learning rate:%.3f" % (opt.param_groups[0]['lr']))
+                print("--------------------------")
             accuracy = self._test(self.test_loader, 1)
+            lr_scheduler.step()
             print("")
             print("***************************************")
             print('* epoch:%3d,normal accuracy:%6.3f *' % (epoch, accuracy))
