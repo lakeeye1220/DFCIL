@@ -99,6 +99,9 @@ class EEIL(ICARL):
                 bft_train_dataset = self.datasetloader.train_data.get_bft_data()
                 if 'cifar' in self.configs['dataset']:
                     images,labels=data_augmentation_e2e(bft_train_dataset[0],bft_train_dataset[1])
+                    bft_images=[]
+                    for img in images:
+                        bft_images.append(Image.fromarray(img))
                     bft_dataset=self.dataset_class(images,labels,self.datasetloader.train_transform)
                 elif self.configs['dataset'] in ['tiny-imagenet','imagenet']:
                     bft_dataset=self.dataset_class(bft_train_dataset,self.datasetloader.train_transform)
