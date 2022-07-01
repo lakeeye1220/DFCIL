@@ -139,7 +139,7 @@ class CILDatasetLoader(DatasetLoader):
         return data_loader
 
 
-class DatasetLoaderv2:
+class CILDatasetLoaderv2:
     def __init__(self, configs, dataset_path, device):
         self.configs = configs
         self.dataset_path = dataset_path
@@ -268,39 +268,29 @@ class DatasetLoaderv2:
                 dataset_path = '\dataset'
         else:
             dataset_path = self.dataset_path # parent directory
-                
-        if dataset_name =='imagenet200':
-            dataset_path = os.path.join(dataset_path, 'imagenet')
-        else:
-            dataset_path = os.path.join(dataset_path, dataset_name)
 
+        dataset_path=os.path.join(dataset_path,dataset_name)
+        
         if dataset_name == 'cifar100':
-            train_data = datasets.CIFAR100(root=dataset_path, train=True,
+            train_data = iCIFAR100(root=dataset_path, train=True,
                                            download=True, transform=train_transform)
-            test_data = datasets.CIFAR100(root=dataset_path, train=False,
+            test_data = iCIFAR100(root=dataset_path, train=False,
                                           download=False, transform=test_transform)
-
-        elif dataset_name == 'cifar10':
-            train_data = datasets.CIFAR10(root=dataset_path, train=True,
-                                          download=True, transform=train_transform)
-            test_data = datasets.CIFAR10(root=dataset_path, train=False,
-                                         download=False, transform=test_transform)
-
         elif dataset_name == 'imagenet':
             traindata_save_path = os.path.join(dataset_path, 'train')
             testdata_save_path = os.path.join(dataset_path, 'val3')
-            train_data = torchvision.datasets.ImageFolder(
-                root=traindata_save_path, transform=train_transform)
-            test_data = torchvision.datasets.ImageFolder(
-                root=testdata_save_path, transform=test_transform)
-
+            train_data = iImageNet(
+                root=traindata_save_path,train=True, transform=train_transform)
+            test_data = iImageNet(
+                root=testdata_save_path,train=False, transform=test_transform)
+        
         elif dataset_name == 'tiny-imagenet':
             traindata_save_path = os.path.join(dataset_path, 'train')
             testdata_save_path = os.path.join(dataset_path, 'val')
-            train_data = torchvision.datasets.ImageFolder(
-                root=traindata_save_path, transform=train_transform)
-            test_data = torchvision.datasets.ImageFolder(
-                root=testdata_save_path, transform=test_transform)
+            train_data = iTinyImageNet(
+                root=traindata_save_path,train=True, transform=train_transform)
+            test_data = iTinyImageNet(
+                root=testdata_save_path,train=False, transform=test_transform)
         return train_data, test_data
     
     def get_dataloader(self,dataset,shuffle=False):
@@ -317,8 +307,8 @@ class DatasetLoaderv2:
 
     def get_settled_dataloader(self):
         mean,std=self.get_normalization_mean_std(self.configs['dataset'])
-        train_transform,test_transform=self.get_transforms(self.configs['dataset'],mean,std)
-        self.train_data,self.test_data=self.get_dataset(self.configs['dataset'],train_transform,test_transform)
+        self.train_transform,self.test_transform=self.get_transforms(self.configs['dataset'],mean,std)
+        self.train_data,self.test_data=self.get_dataset(self.configs['dataset'],self.train_transform,self.test_transform)
         self.train_loader=self.get_dataloader(self.train_data,shuffle=True)
         self.test_loader=self.get_dataloader(self.test_data,shuffle=False)
         return self.train_loader,self.test_loader

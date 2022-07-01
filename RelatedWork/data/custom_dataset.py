@@ -1,6 +1,6 @@
 from torch.utils.data.dataset import Dataset
 from torchvision.datasets.folder import default_loader
-
+from PIL import Image
 class ImageDataset(Dataset):
     def __init__(self, images, labels=None, transform=None,target_transform=None,no_return_target=False,return_index=False):
         self.X = images
@@ -99,8 +99,8 @@ class ImageDatasetFromData(Dataset):
         return (len(self.X))
     
     def __getitem__(self, i):
-        data = self.X[i]
-
+        data=self.X[i]
+        
         if self.transform:
             data = self.transform(data)
         

@@ -4,6 +4,8 @@ import numpy as np
 from PIL import Image
 import copy
 
+from utils.eeil_aug import data_augmentation_e2e
+
 
 class iCIFAR100(datasets.CIFAR100):
     def __init__(self, root,
@@ -20,6 +22,9 @@ class iCIFAR100(datasets.CIFAR100):
         self.original_labels = copy.deepcopy(self.targets)
         self.bft_data=None
         self.bft_label=None
+        self.eeil_aug=eeil_aug
+        if self.eeil_aug:
+            self.data,self.targets=data_augmentation_e2e(self.data,self.targets)
 
     def concatenate(self, datas, labels):
         con_data = datas[0]
@@ -49,7 +54,8 @@ class iCIFAR100(datasets.CIFAR100):
                 datas.append(data)
                 labels.append(np.full((data.shape[0]), label))
             self.data, self.targets = self.concatenate(datas, labels)
-            
+            if self.eeil_aug:
+                self.data,self.targets=data_augmentation_e2e(self.data,self.targets)
         else:
             datas, labels = [], []
             for label in range(classes[0], classes[1]):
@@ -97,4 +103,4 @@ class iCIFAR100(datasets.CIFAR100):
             img, target = Image.fromarray(self.bft_data[index]), self.bft_label[index]
             self.bft_datas.append(img)
             self.bft_labels.append(target)
-        return (self.bft_datas, self.bft_labels)
+        return (np.stack(self.bft_datas,axis=0), self.bft_labels)

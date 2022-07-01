@@ -1,4 +1,4 @@
-from data.cil_data_load import CILDatasetLoader
+from data.cil_data_load import CILDatasetLoaderv2
 from data.custom_dataset import ImageDataset
 from data.data_load import DatasetLoader
 from implementor.baseline import Baseline
@@ -16,6 +16,7 @@ from PIL import Image
 from torch.utils.data import DataLoader
 import copy
 from utils.onehot import get_one_hot
+from utils.eeil_aug import data_augmentation_e2e
 
 class EEIL(ICARL):
     def __init__(self, model, time_data, save_path, device, configs):
@@ -23,9 +24,9 @@ class EEIL(ICARL):
             model, time_data, save_path, device, configs)
 
     def run(self, dataset_path):
-        self.datasetloader = CILDatasetLoader(
+        self.datasetloader = CILDatasetLoaderv2(
             self.configs, dataset_path, self.device)
-        train_loader, valid_loader = self.datasetloader.get_dataloader() #init for once
+        train_loader, valid_loader = self.datasetloader.get_settled_dataloader() #init for once
 
         ## Hyper Parameter setting ##
         self.criterion = nn.CrossEntropyLoss().to(self.device)
@@ -40,11 +41,6 @@ class EEIL(ICARL):
 
         # Task Init loader #
         self.model.eval()
-        adding_classes_list = [self.task_step *
-                                0, self.task_step]
-        train_loader, valid_loader = self.datasetloader.get_updated_dataloader(
-            adding_classes_list, self.exemplar_set) # update for class incremental style #
-        ####################
 
         for task_num in range(1, self.configs['task_size']+1):
             task_tik = time.time()
@@ -59,7 +55,14 @@ class EEIL(ICARL):
             ), self.configs['lr'], self.configs['momentum'], weight_decay=self.configs['weight_decay'], nesterov=self.configs['nesterov'])
             lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
                 optimizer, self.configs['lr_steps'], self.configs['gamma'])
+            adding_classes_list = [self.task_step *
+                                    (task_num-1), self.task_step*task_num]
+            self.datasetloader.train_data.update(
+                adding_classes_list, self.exemplar_set) # update for class incremental style #
+            self.datasetloader.test_data.update(
+                adding_classes_list, self.exemplar_set) # Don't need to update loader
             ###################
+
             task_best_valid_acc=0
             for epoch in range(1, self.configs['epochs'] + 1):
                 epoch_tik = time.time()
@@ -91,6 +94,23 @@ class EEIL(ICARL):
             tasks_acc.append(task_best_valid_acc)
             #####################
 
+            # End of regular learning: FineTuning #
+            if task_num>1:
+                bft_train_dataset = self.datasetloader.train_data.get_bft_data()
+                if 'cifar' in self.configs['dataset']:
+                    images,labels=data_augmentation_e2e(bft_train_dataset[0],bft_train_dataset[1])
+                    bft_dataset=self.dataset_class(images,labels,self.datasetloader.train_transform)
+                elif self.configs['dataset'] in ['tiny-imagenet','imagenet']:
+                    bft_dataset=self.dataset_class(bft_train_dataset,self.datasetloader.train_transform)
+                    raise Warning('FineTuning is not supported for {} dataset'.format(self.configs['dataset']))
+                else:
+                    raise NotImplementedError
+                bft_train_loader = self.datasetloader.get_dataloader(bft_dataset,True)
+                valid_info=self.balance_fine_tune(bft_train_loader, valid_loader,task_num)
+                self.logger.info("Fine-tune accuracy: %.2f" % valid_info['accuracy'])
+            finetune_acc.append(valid_info['accuracy'])
+            self.update_old_model()
+            #######################################
 
             ## after train- process exemplar set ##
             self.model.eval()
@@ -109,20 +129,8 @@ class EEIL(ICARL):
                     valid_loader, epoch, task_num)['accuracy']
                 self.logger.info("NMS accuracy: "+str(KNN_accuracy))
 
-            # get finetuned data #
-            train_loader, valid_loader = self.datasetloader.get_updated_dataloader(
-                (self.current_num_classes-self.task_step,self.current_num_classes), self.exemplar_set)
-            # End of regular learning: FineTuning #
-            bft_train_loader, bft_valid_loader = self.datasetloader.get_bft_dataloader()
-            valid_info=self.balance_fine_tune(bft_train_loader, bft_valid_loader,task_num)
-            self.logger.info("Fine-tune accuracy: %.2f" % valid_info['accuracy'])
-            finetune_acc.append(valid_info['accuracy'])
-            self.update_old_model()
-            #######################################
             
             self.current_num_classes += self.task_step
-            train_loader, valid_loader = self.datasetloader.get_updated_dataloader(
-                (self.current_num_classes-self.task_step,self.current_num_classes), self.exemplar_set)
             #######################################
 
         tok = time.time()
@@ -240,10 +248,6 @@ class EEIL(ICARL):
         self.old_model.eval()
         self.model=self.fix_feature(self.model,True)
         self.model.train()
-        print("Fixlist","======"*4)
-        for param in self.model.parameters():
-            print(param.requires_grad)
-        print("Fixlist")
         optimizer = torch.optim.SGD(self.model.parameters(
         ), lr=self.configs['lr']/10.0, momentum=self.configs['momentum'], weight_decay=self.configs['weight_decay'])
 
@@ -276,3 +280,71 @@ class EEIL(ICARL):
         print('Finetune finished')
         self.model=self.fix_feature(self.model,False)
         return valid_info
+
+    def _reduce_exemplar_sets(self, m):
+        print("Reducing exemplar sets!")
+        for index in range(len(self.exemplar_set)):
+            self.exemplar_set[index] = self.exemplar_set[index][:m]
+            print('\rThe size of class %d examplar: %s' % (index, str(len(self.exemplar_set[index]))),end='')
+
+
+    def _construct_exemplar_set(self, class_id, m):
+        cls_images = self.datasetloader.train_data.get_class_images(
+            class_id)
+        cls_dataset=self.dataset_class(cls_images,transform=self.datasetloader.test_transform)
+
+        cls_dataloader=self.datasetloader.get_dataloader(cls_dataset,shuffle=False)
+        class_mean, feature_extractor_output = self.compute_class_mean(
+            cls_dataloader)
+        exemplar = []
+        now_class_mean = np.zeros((1, feature_extractor_output.shape[1]))
+
+        for i in range(m):
+            # shape：batch_size*512
+            x = class_mean - (now_class_mean +
+                              feature_extractor_output) / (i + 1)
+            # shape：batch_size
+            x = np.linalg.norm(x, axis=1)
+            index = np.argmin(x)
+            now_class_mean += feature_extractor_output[index]
+            exemplar.append(cls_images[index])
+
+        print("The size of exemplar :%s" % (str(len(exemplar))), end='')
+        self.exemplar_set.append(exemplar)
+
+    def compute_class_mean(self, cls_dataloader):
+        with torch.no_grad():
+            feature_extractor_outputs = []
+
+            for datas in cls_dataloader:
+                if type(datas)==tuple and len(datas)==1:
+                    images=datas[0]
+                elif type(datas)==tuple and len(datas)==2:
+                    images,_=datas
+                else:
+                    images=datas
+                images = images.to(self.device)
+                _, features = self.model(images)
+                feature_extractor_outputs.append(
+                    F.normalize(features[-1]).cpu())
+        feature_extractor_outputs = torch.cat(
+            feature_extractor_outputs, dim=0).numpy()
+        class_mean = np.mean(feature_extractor_outputs,
+                             axis=0, keepdims=True)  # (feature, nclasses)
+        return class_mean, feature_extractor_outputs
+
+    def compute_exemplar_class_mean(self):
+        self.class_mean_set = []
+        print("")
+        for index in range(len(self.exemplar_set)):
+            print("\r Compute the class mean of {:2d}".format(index), end='')
+            exemplar = self.exemplar_set[index]
+
+            # why? transform differently #
+            exemplar_dataset = self.dataset_class(
+                exemplar, transform=self.datasetloader.test_transform)
+            exemplar_dataloader = self.datasetloader.get_dataloader(exemplar_dataset,False)
+            class_mean, _ = self.compute_class_mean(exemplar_dataloader)
+            self.class_mean_set.append(class_mean)
+        print("")
+    
