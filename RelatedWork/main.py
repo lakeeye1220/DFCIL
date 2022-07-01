@@ -59,7 +59,7 @@ def parse_args(args):
     parser.add_argument('--dataset_path', help='dataset path (None: /data or .\\data\\dataset\\)', default=None)
     parser.add_argument('--natural_inversion','-ni', default=False,help='natural inversion')
     if parser.parse_known_args(args)[0].natural_inversion:
-        parser.add_argument('--inversion_epochs', default=10, type=int, help='natural inversion epoch')
+        parser.add_argument('--inversion_epochs', default=2000, type=int, help='natural inversion epoch')
 
     if parser.parse_known_args(args)[0].mode.lower() == 'train':
         parser.add_argument(

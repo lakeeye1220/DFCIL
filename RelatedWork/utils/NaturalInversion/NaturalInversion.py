@@ -9,33 +9,16 @@ import torch
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
 import torch.optim as optim
-from torch.autograd import Variable
-import torch.nn.functional as F
-import torchvision
-import torchvision.transforms as transforms
 import torchvision.utils as vutils
 
 import math
-import numbers
 import numpy as np
 import os
-import glob
 import collections
-from PIL import Image
 import sys 
-import pickle
 import os
-import itertools
 from tqdm import tqdm
-from NaturalInversion.network import Generator, Feature_Decoder
-
-sys.path.insert(0,'..')
-from iCaRL.ResNet import resnet34_cbam as ResNet34
-#from models.resnet import ResNet34
-#import learners
-
-sys.path.insert(0,os.path.abspath('..'))
-
+from utils.naturalinversion.network import Generator, Feature_Decoder
 NUM_CLASSES = 100
 ALPHA=1.0
 image_list=[]
@@ -43,17 +26,6 @@ target_list=[]
 
 debug_output = False
 debug_output = True
-
-# To fix Seed
-def random_seed(seed):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.benchmark = True
-    torch.backends.cudnn.deterministic = True
-    np.random.seed(seed)
-    random.seed(seed)
-
 
 class NaturalInversionFeatureHook():
     def __init__(self, module, rs, mean=None, var= None):

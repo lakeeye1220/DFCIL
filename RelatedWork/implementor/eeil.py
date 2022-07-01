@@ -1,5 +1,5 @@
-from RelatedWork.data.custom_dataset import ImageDatasetFromData
-from utils.NaturalInversion.NaturalInversion import get_inversion_images
+from data.custom_dataset import ImageDatasetFromData
+from utils.naturalinversion.naturalinversion import get_inversion_images
 from data.cil_data_load import CILDatasetLoaderv2
 from data.custom_dataset import ImageDataset
 from data.data_load import DatasetLoader
@@ -68,6 +68,17 @@ class EEIL(ICARL):
                     adding_classes_list, self.exemplar_set) # update for class incremental style #
             self.datasetloader.test_data.update(
                 adding_classes_list, self.exemplar_set) # Don't need to update loader
+                
+            print("Before EEIL Len: {}".format(len(self.datasetloader.train_data.data)))
+            images,labels=data_augmentation_e2e(self.datasetloader.train_data.data,self.datasetloader.train_data.targets)
+            self.datasetloader.train_data.data=images
+            self.datasetloader.train_data.targets=labels
+            print("After EEIL Len: {}".format(len(self.datasetloader.train_data.data)))
+            #############################################################################
+            
+            bft_images=[]
+            for img in images:
+                bft_images.append(Image.fromarray(img))
             ###################
 
             task_best_valid_acc=0
@@ -105,7 +116,9 @@ class EEIL(ICARL):
             if task_num>1:
                 bft_train_dataset = self.datasetloader.train_data.get_bft_data()
                 if 'cifar' in self.configs['dataset']:
+                    print("Len bft data: {}".format(len(bft_train_dataset[0])))
                     images,labels=data_augmentation_e2e(bft_train_dataset[0],bft_train_dataset[1])
+                    print("After EEIL Len: {}".format(len(bft_train_dataset[0])))
                     bft_images=[]
                     for img in images:
                         bft_images.append(Image.fromarray(img))
