@@ -57,7 +57,7 @@ class ImageDatasetFromLoc(Dataset):
         self.transform = transform
         self.target_transform = target_transform
         self.loader=default_loader
-        self.return_index=return_idx
+        self.return_idx=return_idx
 
     def __len__(self):
         return (len(self.X))
@@ -78,22 +78,22 @@ class ImageDatasetFromLoc(Dataset):
             if self.target_transform is not None:
                 target = self.target_transform(target)
 
-            if self.return_index:
+            if self.return_idx:
                 return sample, target, index
             return sample, target
         else:
-            if self.return_index:
+            if self.return_idx:
                 return sample, index
             return sample
 
 
 class ImageDatasetFromData(Dataset):
-    def __init__(self, images, labels=None, transform=None,target_transform=None, return_index=False):
+    def __init__(self, images, labels=None, transform=None,target_transform=None, return_idx=False):
         self.X = images
         self.y = labels
         self.transform = transform
         self.target_transform = target_transform
-        self.return_index=return_index
+        self.return_idx=return_idx
          
     def __len__(self):
         return (len(self.X))
@@ -108,10 +108,10 @@ class ImageDatasetFromData(Dataset):
             target = self.target_transform(target)
 
         if self.y is not None:
-            if self.return_index:
+            if self.return_idx:
                 return data, self.y[i], i
             return (data, self.y[i])
         else:
-            if self.return_index:
+            if self.return_idx:
                 return data, i
             return data
