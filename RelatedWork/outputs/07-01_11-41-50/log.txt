@@ -1,0 +1,1 @@
+[07-01 11:41:51] main.py train --train_mode eeil --lr 0.1 --epochs 3 --task_size 20
