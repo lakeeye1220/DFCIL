@@ -255,7 +255,7 @@ class ICARL(Baseline):
                 output, feature = self.model(images)
 
                 features = F.normalize(feature[-1])
-                if task_num != 1:
+                if task_num > 1 and ~(self.configs['natural_inversion'] and self.configs['generative_inversion']):
                     # (nclasses,1,feature_dim)
                     class_mean_set = np.array(self.class_mean_set)
                     tensor_class_mean_set = torch.from_numpy(class_mean_set).to(

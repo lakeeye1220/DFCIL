@@ -71,6 +71,6 @@ class Feature_Decoder(nn.Module):
         out_ = self.conv4(out)
         out = (x + out_)
         out = self.conv6(out)
-        out = F.tanh(out)
+        out = torch.tanh(out)
         
         return out, out_
