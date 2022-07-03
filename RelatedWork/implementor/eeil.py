@@ -15,6 +15,8 @@ import torch.nn.functional as F
 import numpy as np
 import torchvision.transforms as transforms
 from utils.eeil_aug import data_augmentation_e2e
+from utils.onehot import get_one_hot
+import copy
 
 class EEIL(ICARL):
     def __init__(self, model, time_data, save_path, device, configs):
