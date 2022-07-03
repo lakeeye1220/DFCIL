@@ -22,7 +22,6 @@ import sys
 import os
 from tqdm import tqdm
 
-from RelatedWork.model.generative_model.network_v2 import Feature_Decoder
 NUM_CLASSES = 100
 ALPHA=1.0
 image_list=[]
@@ -111,6 +110,10 @@ def get_inversion_images(net,
             from model.generative_model.network_v2 import Generator,Feature_Decoder
             generator = Generator(8,latent_dim,3).to(device)
             #### Feature_Map Decoder
+            feature_decoder = Feature_Decoder().to(device)
+        elif configs['network_ver']==3:
+            from model.generative_model.network_v3 import Generator,Feature_Decoder
+            generator = Generator(8,latent_dim,3).to(device)
             feature_decoder = Feature_Decoder().to(device)
 
         optimizer_g = optim.Adam(generator.parameters(), lr=g_lr)

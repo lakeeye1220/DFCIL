@@ -1,5 +1,4 @@
 from data.custom_dataset import ImageDatasetFromData
-from utils.naturalinversion.naturalinversion import get_inversion_images
 from data.cil_data_load import CILDatasetLoaderv2
 from data.custom_dataset import ImageDataset
 from data.data_load import DatasetLoader
@@ -69,16 +68,16 @@ class EEIL(ICARL):
             self.datasetloader.test_data.update(
                 adding_classes_list, self.exemplar_set) # Don't need to update loader
                 
-            print("Before EEIL Len: {}".format(len(self.datasetloader.train_data.data)))
-            images,labels=data_augmentation_e2e(self.datasetloader.train_data.data,self.datasetloader.train_data.targets)
-            self.datasetloader.train_data.data=images
-            self.datasetloader.train_data.targets=labels
-            print("After EEIL Len: {}".format(len(self.datasetloader.train_data.data)))
+            # print("Before EEIL Len: {}".format(len(self.datasetloader.train_data.data)))
+            # images,labels=data_augmentation_e2e(self.datasetloader.train_data.data,self.datasetloader.train_data.targets)
+            # self.datasetloader.train_data.data=images
+            # self.datasetloader.train_data.targets=labels
+            # print("After EEIL Len: {}".format(len(self.datasetloader.train_data.data)))
             #############################################################################
             
-            bft_images=[]
-            for img in images:
-                bft_images.append(Image.fromarray(img))
+            # bft_images=[]
+            # for img in images:
+            #     bft_images.append(Image.fromarray(img))
             ###################
 
             task_best_valid_acc=0
@@ -134,6 +133,11 @@ class EEIL(ICARL):
 
             ## after train- process exemplar set ##
             if self.configs['natural_inversion']:
+                from utils.naturalinversion.naturalinversion import get_inversion_images
+                prefix=os.path.join(self.save_path, self.time_data)
+                inv_images,inv_labels=get_inversion_images(self.model,[self.current_num_classes,self.current_num_classes+self.task_step],task_num,epochs=self.configs['inversion_epochs'],prefix=prefix,global_iteration=task_num,bn_reg_scale=3,g_lr=0.001,d_lr=0.0005,a_lr=0.05,var_scale=0.001,l2_coeff=0.00001,num_generate_images=self.configs['memory_size'],latent_dim=self.configs['latent_dim'],configs=self.configs)
+            elif self.configs['generative_inversion']:
+                from model.generative_model.generative_network import get_inversion_images
                 prefix=os.path.join(self.save_path, self.time_data)
                 inv_images,inv_labels=get_inversion_images(self.model,[self.current_num_classes,self.current_num_classes+self.task_step],task_num,epochs=self.configs['inversion_epochs'],prefix=prefix,global_iteration=task_num,bn_reg_scale=3,g_lr=0.001,d_lr=0.0005,a_lr=0.05,var_scale=0.001,l2_coeff=0.00001,num_generate_images=self.configs['memory_size'],latent_dim=self.configs['latent_dim'],configs=self.configs)
             else:
