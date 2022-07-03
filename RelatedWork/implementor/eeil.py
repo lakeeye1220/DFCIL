@@ -310,7 +310,7 @@ class EEIL(ICARL):
         for index in range(len(self.exemplar_set)):
             self.exemplar_set[index] = self.exemplar_set[index][:m]
             print('\rThe size of class %d examplar: %s' % (index, str(len(self.exemplar_set[index]))),end='')
-
+            
 
     def _construct_exemplar_set(self, class_id, m):
         cls_images = self.datasetloader.train_data.get_class_images(
@@ -335,6 +335,8 @@ class EEIL(ICARL):
 
         print("The size of exemplar :%s" % (str(len(exemplar))), end='')
         self.exemplar_set.append(exemplar)
+        self.size_of_exemplar=len(exemplar)
+
 
     def compute_class_mean(self, cls_dataloader):
         with torch.no_grad():
