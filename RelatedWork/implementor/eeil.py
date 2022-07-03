@@ -61,6 +61,7 @@ class EEIL(ICARL):
                 if 'cifar' in self.configs['dataset']:
                     inv_images=np.concatenate(inv_images,axis=0) # list (np.array(bsz,3,32,32))
                     inv_images = np.transpose(inv_images,(0, 2, 3, 1))
+                    inv_labels= np.concatenate(inv_labels,axis=0)
                     self.datasetloader.train_data.data=np.concatenate((self.datasetloader.train_data.data,inv_images),axis=0)
                     self.datasetloader.train_data.targets=np.concatenate((self.datasetloader.train_data.targets,inv_labels),axis=0)
                 else:
