@@ -1,3 +1,4 @@
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -48,29 +49,55 @@ class Feature_Decoder(nn.Module):
         super(Feature_Decoder, self).__init__()
         self.upsample = nn.Upsample(scale_factor = 2)
         self.conv1 = nn.Conv2d(512, 256, 1, stride = 1, padding = 0)
+        self.bn1 = nn.BatchNorm2d(256)
         self.conv2 = nn.Conv2d(256, 128, 1, stride = 1, padding = 0)
+        self.bn2 = nn.BatchNorm2d(128)
         self.conv3 = nn.Conv2d(128, 64, 1, stride = 1, padding = 0)
+        self.bn3 = nn.BatchNorm2d(64)
         self.conv4 = nn.Conv2d(64, 3, 1, stride = 1, padding = 0)
-        self.conv5 = nn.Conv2d(64, 3, 1, stride = 1, padding = 0)
-        self.conv6 = nn.Conv2d(3, 3, 1, stride = 1, padding = 0)
+        self.bn4 = nn.BatchNorm2d(3)
+        self.conv5 = nn.Conv2d(3, 3, 1, stride = 1, padding = 0)
+        self.bn5 = nn.BatchNorm2d(3)
         self.conv_31 = nn.Conv2d(256, 256, 3, stride=1, padding=1)
+        self.bn_31 = nn.BatchNorm2d(256)
         self.conv_32 = nn.Conv2d(128, 128, 3, stride=1, padding=1)
+        self.bn_32 = nn.BatchNorm2d(128)
         self.conv_33 = nn.Conv2d(64, 64, 3, stride=1, padding=1)
-        self.conv_34 = nn.Conv2d(3, 3, 3, stride=1, padding=1)
+        self.bn_33 = nn.BatchNorm2d(64)
+        self.relu= nn.ReLU()
 
     def forward(self, x, features):
-        out = self.conv1(self.upsample(features[-1]))
-        out = self.conv_31(out + features[-2])
+        out = self.conv1(self.upsample(features[-2]))
+        out = self.bn1(out)
+        out = self.relu(out)
+        out = self.conv_31(out)# + features[-3]) #no ftp
+        out = self.bn_31(out)
+        out = self.relu(out)
         
         out = self.conv2(self.upsample(out))
-        out = self.conv_32(out + features[-3])
+        out = self.bn2(out)
+        out = self.relu(out)
+
+        out = self.conv_32(out)# + features[-4]) # no ftp
+        out = self.bn_32(out)
+        out = self.relu(out)
         
         out = self.conv3(self.upsample(out))
-        out = self.conv_33(out + features[-4])
+        out = self.bn3(out)
+        out = self.relu(out)
+
+        out = self.conv_33(out) # + features[-5]) # no ftp
+        out = self.bn_33(out)
+        out = self.relu(out)
+
         
         out_ = self.conv4(out)
+        out_ = self.bn4(out_)
         out = (x + out_)
-        out = self.conv6(out)
+        out_ = self.relu(out_)
+        out = self.conv5(out)
+        out = self.bn5(out)
         out = F.tanh(out)
         
         return out, out_
+

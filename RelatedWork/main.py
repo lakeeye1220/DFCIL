@@ -58,8 +58,12 @@ def parse_args(args):
                         type=lambda s: [int(item) for item in s.split(',')])
     parser.add_argument('--dataset_path', help='dataset path (None: /data or .\\data\\dataset\\)', default=None)
     parser.add_argument('--natural_inversion','-ni', default=False,help='natural inversion')
-    if parser.parse_known_args(args)[0].natural_inversion:
+    parser.add_argument('--generative_inversion','-gi', default=False,help='natural inversion')
+    if parser.parse_known_args(args)[0].natural_inversion or parser.parse_known_args(args)[0].generative_inversion:
         parser.add_argument('--inversion_epochs', default=2000, type=int, help='natural inversion epoch')
+        parser.add_argument('--latent_dim', default=1024, type=int, help='Dimension of latent vector')
+        parser.add_argument('--network_ver', default=1, type=int, help='inversion epoch')
+
 
     if parser.parse_known_args(args)[0].mode.lower() == 'train':
         parser.add_argument(

@@ -1,3 +1,6 @@
+import torch
+import torch.nn as nn
+
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -18,6 +21,8 @@ import collections
 import sys 
 import os
 from tqdm import tqdm
+
+from RelatedWork.model.generative_model.network_v2 import Feature_Decoder
 NUM_CLASSES = 100
 ALPHA=1.0
 image_list=[]
@@ -110,17 +115,16 @@ def get_inversion_images(net,
 
         optimizer_g = optim.Adam(generator.parameters(), lr=g_lr)
         optimizer_f = torch.optim.Adam(feature_decoder.parameters(), lr=d_lr)
-
         # Learnable Scale Parameter
-        alpha = torch.empty((bs,3,1,1), requires_grad=True, device=device)
-        torch.nn.init.normal_(alpha, 5.0, 1)
-        optimizer_alpha = torch.optim.Adam([alpha], lr=a_lr)
+        # alpha = torch.empty((bs,3,1,1), requires_grad=True, device=device)
+        # torch.nn.init.normal_(alpha, 5.0, 1)
+        # optimizer_alpha = torch.optim.Adam([alpha], lr=a_lr)
 
         # set up criteria for optimization
         criterion = nn.CrossEntropyLoss()
         optimizer_g.state = collections.defaultdict(dict)
         optimizer_f.state = collections.defaultdict(dict)  # Reset state of optimizer
-        optimizer_alpha.state = collections.defaultdict(dict)
+        # optimizer_alpha.state = collections.defaultdict(dict)
         print("----------------------------------------num_classes[0] : ",num_classes[0])
         np_targets = np.random.choice(num_classes[0],bs)
         targets = torch.LongTensor(np_targets).to('cuda')
@@ -154,8 +158,8 @@ def get_inversion_images(net,
         
             inputs_jit, addition = feature_decoder(inputs_jit, features)
 
-            ##### step3
-            inputs_jit = inputs_jit * alpha
+            ##### step3 ACS
+            # inputs_jit = inputs_jit * alpha
             inputs_for_save = inputs_jit.data.clone()
 
             # apply random jitter offsets
@@ -204,18 +208,18 @@ def get_inversion_images(net,
                     best_inputs = generator(z)
                     _, features = net(best_inputs)
                     best_inputs, addition = feature_decoder(best_inputs, features)
-                    best_inputs *= alpha
+                    # best_inputs *= alpha
         
             optimizer_g.zero_grad()
             optimizer_f.zero_grad()
-            optimizer_alpha.zero_grad()
+            # optimizer_alpha.zero_grad()
 
             # backward pass
             loss.backward()
 
             optimizer_g.step()
             optimizer_f.step()
-            optimizer_alpha.step()
+            # optimizer_alpha.step()
 
         best_inputs_list.append(best_inputs.cpu().detach().numpy())
         best_targets_list.append(targets.cpu().detach().numpy())
@@ -239,3 +243,6 @@ def save_finalimages(images, targets, num_generations, prefix, exp_descr):
             os.makedirs(save_pth)
 
         vutils.save_image(image, os.path.join(prefix, 'final_images/s{}/{}_output_{}_'.format(class_id, num_generations, id)) + exp_descr + '.png', normalize=True, scale_each=True, nrow=1)
+
+
+
