@@ -281,7 +281,7 @@ class ICARL(Baseline):
                 batch_time.update(time.time() - end)
                 end = time.time()
                 i += 1
-        if task_num == 1:
+        if task_num == 1 or (self.configs['natural_inversion'] or self.configs['generative_inversion']):
             self.logger.info('[eval] [{:3d} epoch] Loss: {:.4f} | top1: {:.4f} | top5: {:.4f}'.format(epoch, losses.avg, top1.avg, top5.avg))
         else:
             self.logger.info('[eval] [{:3d} epoch] Loss: {:.4f} | top1: {:.4f} | top5: {:.4f} | NMS: {:.4f}'.format(epoch, losses.avg, top1.avg, top5.avg, 100.*nms_correct/all_total))
