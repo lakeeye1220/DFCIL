@@ -267,8 +267,8 @@ class ICARL(Baseline):
                     nms_results = x.cpu()
                     # nms_results = torch.stack([nms_results] * images.size(0))
                     nms_correct += (nms_results == target.cpu()).sum()
-                    all_total += len(target)
 
+                all_total += len(target)
                 loss = self.criterion(output, target)
 
                 # measure accuracy and record loss
