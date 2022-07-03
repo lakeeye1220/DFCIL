@@ -58,10 +58,14 @@ class EEIL(ICARL):
                 optimizer, self.configs['lr_steps'], self.configs['gamma'])
             adding_classes_list = [self.task_step *
                                     (task_num-1), self.task_step*task_num]
-            if self.configs['natural_inversion'] and task_num>1:
-                for img,lbl in zip(inv_images,inv_labels):
-                    self.datasetloader.train_data.data.append(img)
-                    self.datasetloader.train_data.targets.append(lbl)
+            if (self.configs['natural_inversion'] or self.configs['generative_inversion']) and task_num>1:
+                if 'cifar' in self.configs['dataset']:
+                    inv_images = inv_images.permute(0, 2, 3, 1)
+                    self.datasetloader.train_data.data=np.concatenate((self.datasetloader.train_data.data,inv_images),axis=0)
+                    self.datasetloader.train_data.targets=np.concatenate((self.datasetloader.train_data.targets,inv_labels),axis=0)
+                else:
+                    # If we want need to save directory
+                    raise NotADirectoryError
             else:
                 self.datasetloader.train_data.update(
                     adding_classes_list, self.exemplar_set) # update for class incremental style #
