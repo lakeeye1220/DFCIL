@@ -99,7 +99,7 @@ class ImageDatasetFromData(Dataset):
         return (len(self.X))
     
     def __getitem__(self, i):
-        data=self.X[i]
+        data=Image.fromarray(self.X[i])
         
         if self.transform:
             data = self.transform(data)

@@ -119,10 +119,7 @@ class EEIL(ICARL):
                     print("Len bft data: {}".format(len(bft_train_dataset[0])))
                     images,labels=data_augmentation_e2e(bft_train_dataset[0],bft_train_dataset[1])
                     print("After EEIL Len: {}".format(len(bft_train_dataset[0])))
-                    bft_images=[]
-                    for img in images:
-                        bft_images.append(Image.fromarray(img))
-                    bft_dataset=self.dataset_class(bft_images,labels,self.datasetloader.train_transform,return_idx=True)
+                    bft_dataset=self.dataset_class(images,labels,self.datasetloader.train_transform,return_idx=True)
                 elif self.configs['dataset'] in ['tiny-imagenet','imagenet']:
                     bft_dataset=self.dataset_class(bft_train_dataset,self.datasetloader.train_transform,return_idx=True)
                     raise Warning('FineTuning is not supported for {} dataset'.format(self.configs['dataset']))
@@ -130,7 +127,7 @@ class EEIL(ICARL):
                     raise NotImplementedError
                 bft_train_loader = self.datasetloader.get_dataloader(bft_dataset,True)
                 valid_info=self.balance_fine_tune(bft_train_loader, valid_loader,task_num)
-                self.logger.info("Fine-tune accuracy: %.2f" % valid_info['accuracy'])
+                self.logger.info("[{} task] Fine-tune accuracy: {:.2f}".format(task_num,valid_info['accuracy']))
             finetune_acc.append(valid_info['accuracy'])
             self.update_old_model()
             #######################################

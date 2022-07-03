@@ -20,8 +20,6 @@ class iCIFAR100(datasets.CIFAR100):
                                         download=download)
         self.original_data = copy.deepcopy(self.data)
         self.original_labels = copy.deepcopy(self.targets)
-        self.bft_data=None
-        self.bft_label=None
         self.eeil_aug=eeil_aug
         if self.eeil_aug:
             self.data,self.targets=data_augmentation_e2e(self.data,self.targets)
@@ -42,12 +40,6 @@ class iCIFAR100(datasets.CIFAR100):
                 length = len(datas[0])
                 labels = [np.full((length), label)
                           for label in range(len(exemplar_set))]
-                bft_data, bft_label = self.concatenate(datas, labels)
-                if self.bft_data is None:
-                    self.bft_data,self.bft_label = bft_data, bft_label
-                else:
-                    self.bft_data = np.concatenate((self.bft_data, bft_data), axis=0)
-                    self.bft_label = np.concatenate((self.bft_label, bft_label), axis=0)
 
             for label in range(classes[0], classes[1]):
                 data = self.original_data[np.array(self.original_labels) == label]
@@ -70,11 +62,6 @@ class iCIFAR100(datasets.CIFAR100):
             else:
                 self.data = datas
                 self.targets = labels
-            if self.bft_data is not None:
-                self.bft_data = np.concatenate((self.bft_data, datas), axis=0)
-                self.bft_label = np.concatenate((self.bft_label, labels), axis=0)
-            self.bft_data = self.data
-            self.bft_label= self.targets
         str_train = 'train' if self.train else 'test'
         print("The size of {} set is {}".format(str_train, self.data.shape))
         print("The size of {} label is {}".format(
@@ -97,10 +84,25 @@ class iCIFAR100(datasets.CIFAR100):
         return self.original_data[np.array(self.original_labels) == cls]
 
     def get_bft_data(self):
-        self.bft_datas=[]
-        self.bft_labels=[]
-        for index in range(len(self.bft_data)):
-            img, target = Image.fromarray(self.bft_data[index]), self.bft_label[index]
-            self.bft_datas.append(img)
-            self.bft_labels.append(target)
-        return (np.stack(self.bft_datas,axis=0), self.bft_labels)
+        min_cls_image_num=None
+        # min cls image number
+        for lbl in np.unique(self.targets):
+            if min_cls_image_num is None:
+                min_cls_image_num=np.nonzero(self.targets==lbl)[1].sum()
+            else:
+                current_cls_image_num=np.nonzero(self.targets==lbl)[1].sum()
+                if min_cls_image_num>current_cls_image_num:
+                    min_cls_image_num=current_cls_image_num
+
+        # get bft data
+        bft_data=[]
+        bft_label=[]
+        for lbl in np.unique(self.targets):
+            indices=np.random.permutation(min_cls_image_num)
+            bft_data.append(self.data[np.array(self.targets)==lbl][indices])
+            bft_label.append(np.full((min_cls_image_num),lbl))
+        bft_data=np.concatenate(bft_data, axis=0)
+        bft_label=np.concatenate(bft_label, axis=0)
+        return bft_data, bft_label
+
+        
