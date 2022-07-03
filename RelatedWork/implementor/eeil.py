@@ -59,9 +59,15 @@ class EEIL(ICARL):
                                     (task_num-1), self.task_step*task_num]
             if (self.configs['natural_inversion'] or self.configs['generative_inversion']) and task_num>1:
                 if 'cifar' in self.configs['dataset']:
-                    inv_images=np.concatenate(inv_images,axis=0) # list (np.array(bsz,3,32,32))
-                    inv_images = np.transpose(inv_images,(0, 2, 3, 1))
-                    inv_labels= np.concatenate(inv_labels,axis=0)
+                    datas,labels=[],[]
+                    for lbl,img in zip(inv_images,inv_labels):
+                        for l,i in zip(lbl,img): 
+                            data = np.reshape(np.array(i),(32,32,3))
+                            datas.append(data.astype(np.uint8))
+                            labels.append(np.array(l))
+
+                    inv_images=np.concatenate(datas,axis=0) # list (np.array(bsz,3,32,32))
+                    inv_labels= np.concatenate(labels,axis=0).reshape(-1)
                     self.datasetloader.train_data.data=np.concatenate((self.datasetloader.train_data.data,inv_images),axis=0)
                     self.datasetloader.train_data.targets=np.concatenate((self.datasetloader.train_data.targets,inv_labels),axis=0)
                 else:
