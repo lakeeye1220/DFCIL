@@ -13,10 +13,7 @@ from utils.calc_score import AverageMeter, ProgressMeter, accuracy
 from utils.logger import convert_secs2time
 import torch.nn.functional as F
 import numpy as np
-from PIL import Image
-from torch.utils.data import DataLoader
-import copy
-from utils.onehot import get_one_hot
+import torchvision.transforms as transforms
 from utils.eeil_aug import data_augmentation_e2e
 
 class EEIL(ICARL):
@@ -121,8 +118,8 @@ class EEIL(ICARL):
                 if 'cifar' in self.configs['dataset']:
                     print("Len bft data: {}".format(len(bft_train_dataset[0])))
                     images,labels=data_augmentation_e2e(bft_train_dataset[0],bft_train_dataset[1])
-                    print("After EEIL Len: {}".format(len(bft_train_dataset[0])))
-                    bft_dataset=self.dataset_class(images,labels,self.datasetloader.train_transform,return_idx=True)
+                    bft_dataset=self.dataset_class(images,labels,self.datasetloader.test_transform,return_idx=True)
+                    print("After EEIL Len: {}".format(len(bft_dataset)))
                 elif self.configs['dataset'] in ['tiny-imagenet','imagenet']:
                     bft_dataset=self.dataset_class(bft_train_dataset,self.datasetloader.train_transform,return_idx=True)
                     raise Warning('FineTuning is not supported for {} dataset'.format(self.configs['dataset']))
