@@ -60,7 +60,7 @@ class EEIL(ICARL):
             if (self.configs['natural_inversion'] or self.configs['generative_inversion']) and task_num>1:
                 if 'cifar' in self.configs['dataset']:
                     datas,labels=[],[]
-                    for lbl,img in zip(inv_images,inv_labels):
+                    for lbl,img in zip(inv_labels,inv_images):
                         for l,i in zip(lbl,img): 
                             data = np.reshape(np.array(i),(32,32,3))
                             datas.append(data.astype(np.uint8))
