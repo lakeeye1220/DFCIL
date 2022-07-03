@@ -114,7 +114,7 @@ class EEIL(ICARL):
 
             # End of regular learning: FineTuning #
             if task_num>1:
-                bft_train_dataset = self.datasetloader.train_data.get_bft_data()
+                bft_train_dataset = self.datasetloader.train_data.get_bft_data(self.size_of_exemplar)
                 if 'cifar' in self.configs['dataset']:
                     print("Len bft data: {}".format(len(bft_train_dataset[0])))
                     images,labels=data_augmentation_e2e(bft_train_dataset[0],bft_train_dataset[1])

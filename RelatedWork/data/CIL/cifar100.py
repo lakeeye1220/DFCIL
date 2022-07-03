@@ -83,24 +83,15 @@ class iCIFAR100(datasets.CIFAR100):
     def get_class_images(self, cls):
         return self.original_data[np.array(self.original_labels) == cls]
 
-    def get_bft_data(self):
-        min_cls_image_num=None
-        # min cls image number
-        for lbl in np.unique(self.targets):
-            if min_cls_image_num is None:
-                min_cls_image_num=np.nonzero(self.targets==lbl)[1].sum()
-            else:
-                current_cls_image_num=np.nonzero(self.targets==lbl)[1].sum()
-                if min_cls_image_num>current_cls_image_num:
-                    min_cls_image_num=current_cls_image_num
+    def get_bft_data(self, num_cls_exemplar):
 
         # get bft data
         bft_data=[]
         bft_label=[]
         for lbl in np.unique(self.targets):
-            indices=np.random.permutation(min_cls_image_num)
+            indices=np.random.permutation(num_cls_exemplar)
             bft_data.append(self.data[np.array(self.targets)==lbl][indices])
-            bft_label.append(np.full((min_cls_image_num),lbl))
+            bft_label.append(np.full((num_cls_exemplar),lbl))
         bft_data=np.concatenate(bft_data, axis=0)
         bft_label=np.concatenate(bft_label, axis=0)
         return bft_data, bft_label

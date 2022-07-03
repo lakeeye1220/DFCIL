@@ -313,7 +313,7 @@ class ICARL(Baseline):
             index = np.argmin(x)
             now_class_mean += feature_extractor_output[index]
             exemplar.append(cls_images[index])
-
+        self.size_of_exemplar=len(exemplar)
         print("The size of exemplar :%s" % (str(len(exemplar))), end='')
         self.exemplar_set.append(exemplar)
 
