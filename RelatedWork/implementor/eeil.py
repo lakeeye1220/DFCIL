@@ -68,11 +68,11 @@ class EEIL(ICARL):
             self.datasetloader.test_data.update(
                 adding_classes_list, self.exemplar_set) # Don't need to update loader
                 
-            print("Before EEIL Len: {}".format(len(self.datasetloader.train_data.data)))
-            images,labels=data_augmentation_e2e(self.datasetloader.train_data.data,self.datasetloader.train_data.targets)
-            self.datasetloader.train_data.data=images
-            self.datasetloader.train_data.targets=labels
-            print("After EEIL Len: {}".format(len(self.datasetloader.train_data.data)))
+            # print("Before EEIL Len: {}".format(len(self.datasetloader.train_data.data)))
+            # images,labels=data_augmentation_e2e(self.datasetloader.train_data.data,self.datasetloader.train_data.targets)
+            # self.datasetloader.train_data.data=images
+            # self.datasetloader.train_data.targets=labels
+            # print("After EEIL Len: {}".format(len(self.datasetloader.train_data.data)))
             #############################################################################
             
             bft_images=[]
