@@ -17,7 +17,8 @@ import torchvision.transforms as transforms
 from utils.eeil_aug import data_augmentation_e2e
 from utils.onehot import get_one_hot
 import copy
-
+from torchvision.utils import save_image
+from torchvision.utils import make_grid
 class EEIL(ICARL):
     def __init__(self, model, time_data, save_path, device, configs):
         super().__init__(
@@ -42,6 +43,7 @@ class EEIL(ICARL):
         # Task Init loader #
         self.model.eval()
 
+        saving=True
         for task_num in range(1, self.configs['task_size']+1):
             task_tik = time.time()
 
@@ -61,10 +63,16 @@ class EEIL(ICARL):
                 if 'cifar' in self.configs['dataset']:
                     datas,labels=[],[]
                     for lbl,img in zip(inv_labels,inv_images):
+                        if saving==True:
+                            save_image(make_grid(torch.from_numpy(img)),os.path.join(self.save_path,self.time_data,'task{}_inv_img.png'.format(task_num)))
                         for l,i in zip(lbl,img): 
+
                             data = np.reshape(np.array(i),(32,32,3))
                             datas.append(data.astype(np.uint8))
                             labels.append(np.array([l]))
+                        if saving==True:
+                            saving=False
+                            save_image(make_grid(torch.from_numpy(np.stack(datas,axis=0))),os.path.join(self.save_path,self.time_data,'task{}_inv_img_after reshape.png'.format(task_num)))
 
                     inv_images=np.stack(datas,axis=0) # list (np.array(32,32,3),...) -> stack (bsz,32,32,3)
                     inv_labels= np.concatenate(labels,axis=0).reshape(-1)
@@ -298,8 +306,8 @@ class EEIL(ICARL):
         optimizer = torch.optim.SGD(self.model.parameters(
         ), lr=self.configs['lr']/10.0, momentum=self.configs['momentum'], weight_decay=self.configs['weight_decay'])
 
-        bftepoch = int(self.configs['epochs']*3./4.)
-        bft_lr_steps= [int(3./4.*a) for a in self.configs['lr_steps']]
+        bftepoch = 30
+        bft_lr_steps= [10,20]
         lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
             optimizer, bft_lr_steps, self.configs['gamma'])
         task_best_valid_acc = 0
