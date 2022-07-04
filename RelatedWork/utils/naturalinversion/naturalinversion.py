@@ -124,13 +124,14 @@ def get_inversion_images(net,
 
         # set up criteria for optimization
         criterion = nn.CrossEntropyLoss()
-        optimizer_g.state = collections.defaultdict(dict)
-        optimizer_f.state = collections.defaultdict(dict)  # Reset state of optimizer
-        optimizer_alpha.state = collections.defaultdict(dict)
+        # optimizer_g.state = collections.defaultdict(dict)
+        # optimizer_f.state = collections.defaultdict(dict)  # Reset state of optimizer
+        # optimizer_alpha.state = collections.defaultdict(dict)
         print("----------------------------------------num_classes[0] : ",num_classes[0])
         # np_targets = np.random.choice(num_classes[0],bs)
 
         np_targets=np.random.dirichlet(softmax(minimum_per_class-num_cls_targets),bs)
+        np_targets
         targets = torch.LongTensor(np_targets).to(device)
 
         z = torch.randn((bs, latent_dim)).to(device)
@@ -228,11 +229,15 @@ def get_inversion_images(net,
 
         best_inputs_list.append(best_inputs.cpu().detach().numpy())
         best_targets_list.append(targets.cpu().detach().numpy())
-    optimizer_alpha.zero_grad(set_to_none=True)
-    optimizer_f.zero_grad(set_to_none=True)
-    optimizer_g.zero_grad(set_to_none=True)
-    del generator
-    del feature_decoder
+        for mod in loss_r_feature_layers:
+            mod.hook.close()
+        for target in targets.cpu().detach().numpy():
+            num_cls_targets[target]+=1
+        optimizer_alpha.zero_grad(set_to_none=True)
+        optimizer_f.zero_grad(set_to_none=True)
+        optimizer_g.zero_grad(set_to_none=True)
+        del generator
+        del feature_decoder
     return best_inputs_list, best_targets_list
 
 
