@@ -81,9 +81,10 @@ class EEIL(ICARL):
                     # indexing
                     inv_filtered_images=[]
                     inv_filtered_labels=[]
+                    size_of_exemplar=self.configs['memory_size']//(self.current_num_classes-self.task_step)
                     for cls_idx in range(0,self.current_num_classes-self.task_step):
-                        inv_filtered_images.append(inv_images[inv_labels==cls_idx][:self.size_of_exemplar]) # size of exemplar is from prev task_id.
-                        inv_filtered_labels.append(inv_labels[inv_labels==cls_idx][:self.size_of_exemplar])
+                        inv_filtered_images.append(inv_images[inv_labels==cls_idx][:size_of_exemplar]) # size of exemplar is from prev task_id.
+                        inv_filtered_labels.append(inv_labels[inv_labels==cls_idx][:size_of_exemplar])
                     inv_images=np.concatenate(inv_filtered_images,axis=0)
                     inv_labels= np.concatenate(inv_filtered_labels,axis=0).reshape(-1)
                     self.datasetloader.train_data.data=np.concatenate((self.datasetloader.train_data.data,inv_images),axis=0)
@@ -143,8 +144,8 @@ class EEIL(ICARL):
 
             # End of regular learning: FineTuning #
             if task_num>1:
-                self.size_of_exemplar=self.configs['memory_size']//self.current_num_classes
-                bft_train_dataset = self.datasetloader.train_data.get_bft_data(self.size_of_exemplar)
+                size_of_exemplar=self.configs['memory_size']//self.current_num_classes
+                bft_train_dataset = self.datasetloader.train_data.get_bft_data(size_of_exemplar)
                 if 'cifar' in self.configs['dataset']:
                     print("Len bft data: {}".format(len(bft_train_dataset[0])))
                     images,labels=data_augmentation_e2e(bft_train_dataset[0],bft_train_dataset[1])

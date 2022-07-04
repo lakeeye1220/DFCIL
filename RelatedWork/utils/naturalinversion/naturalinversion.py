@@ -115,8 +115,8 @@ def get_inversion_images(net,
         #### Feature_Map Decoder
         feature_decoder_class = Feature_Decoder
     while np.count_nonzero(num_cls_targets>=minimum_per_class)<num_classes[0]:
-        generator = generator_class.__init__(8,latent_dim,3).to(device)
-        feature_decoder = feature_decoder_class.__init__().to(device)
+        generator = generator_class(8,latent_dim,3).to(device)
+        feature_decoder = feature_decoder_class().to(device)
         optimizer_g = optim.Adam(generator.parameters(), lr=g_lr)
         optimizer_f = torch.optim.Adam(feature_decoder.parameters(), lr=d_lr)
 
@@ -236,6 +236,7 @@ def get_inversion_images(net,
             mod.close()
         for target in targets.cpu().detach().numpy():
             num_cls_targets[target]+=1
+        print("Goal num_cls_targets : {}/ Current {}".format(minimum_per_class,num_cls_targets))
         optimizer_alpha.zero_grad(set_to_none=True)
         optimizer_f.zero_grad(set_to_none=True)
         optimizer_g.zero_grad(set_to_none=True)
