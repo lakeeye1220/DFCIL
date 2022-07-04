@@ -103,18 +103,20 @@ def get_inversion_images(net,
     def softmax(x,axis=0):
         exp_x=np.exp(x)
         return exp_x / np.sum(exp_x, axis=axis, keepdims=True)
-    while np.count_nonzero(num_cls_targets>=minimum_per_class)<num_classes[0]:
-        if configs['network_ver']==1:
-            from model.generative_model.network_v1 import Generator,Feature_Decoder
-            generator = Generator(8,latent_dim,3).to(device)
-            #### Feature_Map Decoder
-            feature_decoder = Feature_Decoder().to(device)
-        elif configs['network_ver']==2:
-            from model.generative_model.network_v2 import Generator,Feature_Decoder
-            generator = Generator(8,latent_dim,3).to(device)
-            #### Feature_Map Decoder
-            feature_decoder = Feature_Decoder().to(device)
 
+    if configs['network_ver']==1:
+        from utils.naturalinversion.network_v1 import Generator,Feature_Decoder
+        generator_class = Generator
+        #### Feature_Map Decoder
+        feature_decoder_class = Feature_Decoder
+    elif configs['network_ver']==2:
+        from utils.naturalinversion.network_v2 import Generator,Feature_Decoder
+        generator_class = Generator
+        #### Feature_Map Decoder
+        feature_decoder_class = Feature_Decoder
+    while np.count_nonzero(num_cls_targets>=minimum_per_class)<num_classes[0]:
+        generator = generator_class.__init__(8,latent_dim,3).to(device)
+        feature_decoder = feature_decoder_class.__init__().to(device)
         optimizer_g = optim.Adam(generator.parameters(), lr=g_lr)
         optimizer_f = torch.optim.Adam(feature_decoder.parameters(), lr=d_lr)
 

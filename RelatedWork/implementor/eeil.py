@@ -78,8 +78,17 @@ class EEIL(ICARL):
 
                     inv_images=np.stack(datas,axis=0) # list (np.array(32,32,3),...) -> stack (bsz,32,32,3)
                     inv_labels= np.concatenate(labels,axis=0).reshape(-1)
+                    # indexing
+                    inv_filtered_images=[]
+                    inv_filtered_labels=[]
+                    for cls_idx in range(0,self.current_num_classes-self.task_step):
+                        inv_filtered_images.append(inv_images[inv_labels==cls_idx][:self.size_of_exemplar]) # size of exemplar is from prev task_id.
+                        inv_filtered_labels.append(inv_labels[inv_labels==cls_idx][:self.size_of_exemplar])
+                    inv_images=np.concatenate(inv_filtered_images,axis=0)
+                    inv_labels= np.concatenate(inv_filtered_labels,axis=0).reshape(-1)
                     self.datasetloader.train_data.data=np.concatenate((self.datasetloader.train_data.data,inv_images),axis=0)
                     self.datasetloader.train_data.targets=np.concatenate((self.datasetloader.train_data.targets,inv_labels),axis=0)
+                    print('The size of train set is {}'.format(len(self.datasetloader.train_data.data)))
                 else:
                     # If we want need to save directory
                     raise NotADirectoryError
