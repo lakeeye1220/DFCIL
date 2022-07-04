@@ -122,8 +122,13 @@ def get_inversion_images(net,
         optimizer_f.state = collections.defaultdict(dict)  # Reset state of optimizer
         optimizer_alpha.state = collections.defaultdict(dict)
         print("----------------------------------------num_classes[0] : ",num_classes[0])
-        np_targets = np.random.choice(num_classes[0],bs)
-        targets = torch.LongTensor(np_targets).to(device)
+        # np_targets = np.random.choice(num_classes[0],bs)
+        np_targets=[]
+        for cls_idx in num_classes[0]:
+            num_cls=bs//num_classes[0]
+            np_targets.extend([cls_idx]*num_cls)
+        if len(np_targets)-bs<0:
+            np_targets.extend(np.random.choice(num_classes[0],bs-len(np_targets)))
         z = torch.randn((bs, latent_dim)).to(device)
         
         loss_r_feature_layers = []
@@ -187,7 +192,7 @@ def get_inversion_images(net,
             # l2 loss
             loss = loss + l2_coeff * torch.norm(inputs_jit, 2)
 
-            if debug_output and epoch % 100==0:
+            if debug_output and epoch % int(epochs/2)==0:
                 print("It {}\t Losses: total: {:.3f},\ttarget: {:.3f} \tR_feature_loss unscaled:\t {:.3f}\tstyle_loss : {:.3f}".format(epoch, loss.item(),loss_target,loss_distr.item(), 0))
                 nchs = inputs_jit.shape[1]
 
