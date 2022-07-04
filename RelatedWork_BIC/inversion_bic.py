@@ -33,6 +33,7 @@ class network(nn.Module):
         super(network, self).__init__()
         self.feature = feature_extractor
         self.fc = nn.Linear(feature_extractor.fc.in_features, numclass, bias=True)
+        
 
     def forward(self, input):
         x,f4,f3,f2,f1,f0 = self.feature(input)
@@ -145,12 +146,13 @@ class bicmodel:
         accuracy = 0.0
         opt = optim.SGD(self.model.parameters(), lr=self.learning_rate,weight_decay=0.00001,momentum=self.configs['momentum'])
         lr_scheduler= optim.lr_scheduler.MultiStepLR(opt, milestones=self.configs['lr_steps'], gamma=self.configs['lr_decay'])
+        bias_opt = optim.Adam(self.bias_layers[int(self.numclass/self.task_size) - 1].parameters(), lr=0.001) # 
         for epoch in range(self.epochs):
 
             for step, (indexs, images, target) in enumerate(self.train_loader):
                 images, target = images.to(device), target.to(device)
                 #output = self.model(images)
-                loss_value = self._compute_loss(indexs, images, target)
+                loss_value = self.stage1(indexs, images, target)
                 opt.zero_grad()
                 loss_value.backward()
                 opt.step()
@@ -168,7 +170,47 @@ class bicmodel:
 
         return accuracy
 
+    def bias_forward(self, input):
+        output_list = []
+        iterator = int (self.numclass / self.task_size) # if 100 / 20 = 5 => i = 0,1,2,3,4
 
+        for i in range(iterator):
+            bias_layer = self.bias_layers[i]
+            out = bias_layer(input[:, task_size*i:task_size(i+1)])
+            output_list.append(out)
+
+        return torch.as_tensor(output)
+
+
+        
+
+
+
+        for i in range(layer_selector):
+            out.append
+
+    def stage1(self, indexes, imgs, target):
+        output,_,_,_,_,_ =self.model(imgs)
+        output = self.model.bias_forward(output)
+        target = get_one_hot(target, self.numclass)
+        output, target = output.to(device), target.to(device)
+        T = 2
+    
+        if self.old_model == None:
+            return F.cross_entropy(output, target)
+        else:
+            alpha = (self.numclass - self.task_size) / self.numclass
+            with torch.no_grad()
+                old_output,_,_,_,_,_ = self.old_model(imgs)
+                old_output = self.model.bias_forward(old_output)
+                old_target = F.softmax(old_output[:, :self.numclass-self.task_size]/T, dim=1)
+            new_target = F.log_softmax(output[:, :self.numclass-self.task_size]/T, dim=1)
+            loss_soft_target = -torch.mean(torch.sum(old_target * new_target, dim=1))
+            loss_hard_target = nn.CrossEntropyLoss()(p[:,:self.numclass], label)
+            loss = loss_soft_target * T * T + (1-alpha) * loss_hard_target
+            return loss
+
+         
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='iCaRL + NaturalInversion')
