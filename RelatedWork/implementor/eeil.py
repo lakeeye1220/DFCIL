@@ -43,7 +43,7 @@ class EEIL(ICARL):
         # Task Init loader #
         self.model.eval()
 
-        saving=True
+        # saving=True
         for task_num in range(1, self.configs['task_size']+1):
             task_tik = time.time()
 
@@ -63,16 +63,17 @@ class EEIL(ICARL):
                 if 'cifar' in self.configs['dataset']:
                     datas,labels=[],[]
                     for lbl,img in zip(inv_labels,inv_images):
-                        if saving==True:
-                            save_image(make_grid(torch.from_numpy(img)),os.path.join(self.save_path,self.time_data,'task{}_inv_img.png'.format(task_num)))
+                        # if saving==True:
+                        #     save_image(make_grid(torch.from_numpy(img)),os.path.join(self.save_path,self.time_data,'task{}_inv_img.png'.format(task_num)))
                         for l,i in zip(lbl,img): 
 
-                            data = np.reshape(np.array(i),(32,32,3))
-                            datas.append(data.astype(np.uint8))
+                            data = np.transpose(np.array(i),(1,2,0))
+                            datas.append(data)
+                            # datas.append(data.astype(np.uint8))
                             labels.append(np.array([l]))
-                        if saving==True:
-                            saving=False
-                            save_image(make_grid(torch.from_numpy(np.stack(datas,axis=0)).permute([0,3,1,2])),os.path.join(self.save_path,self.time_data,'task{}_inv_img_after_reshape.png'.format(task_num)))
+                        # if saving==True:
+                        #     saving=False
+                        #     save_image(make_grid(torch.from_numpy(np.stack(datas,axis=0)).permute([0,3,1,2])),os.path.join(self.save_path,self.time_data,'task{}_inv_img_after_reshape.png'.format(task_num)))
 
                     inv_images=np.stack(datas,axis=0) # list (np.array(32,32,3),...) -> stack (bsz,32,32,3)
                     inv_labels= np.concatenate(labels,axis=0).reshape(-1)

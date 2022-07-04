@@ -69,7 +69,7 @@ class iCIFAR100(CIFAR100):
                         if i==j:
                             datas[i].append(np.array(gen_inputs[t][j]))
             for i in range(0,classes[0]):
-                datas[i] = np.reshape(datas[i],(len(datas[i]),32,32,3))
+                datas[i] = np.transpose(datas[i],(0,2,3,1))
                 datas[i] = datas[i].astype(np.uint8)
                 datas[i] = torch.tensor(datas[i])
                 labels.append(np.full((len(datas[i])),i))
