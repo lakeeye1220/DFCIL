@@ -133,6 +133,7 @@ def get_inversion_images(net,
         print("----------------------------------------num_classes[0] : ",num_classes[0])
         # np_targets = np.random.choice(num_classes[0],bs)
         np_targets=np.random.dirichlet(softmax(minimum_per_class-num_cls_targets),bs)
+        np_targets=np.argmax(np_targets,axis=1)
         targets = torch.LongTensor(np_targets).to(device)
         z = torch.randn((bs, latent_dim)).to(device)
         
@@ -230,7 +231,7 @@ def get_inversion_images(net,
         best_inputs_list.append(best_inputs.cpu().detach().numpy())
         best_targets_list.append(targets.cpu().detach().numpy())
         for mod in loss_r_feature_layers:
-            mod.hook.close()
+            mod.close()
         for target in targets.cpu().detach().numpy():
             num_cls_targets[target]+=1
         # optimizer_alpha.zero_grad(set_to_none=True)

@@ -60,6 +60,8 @@ class EEIL(ICARL):
             adding_classes_list = [self.task_step *
                                     (task_num-1), self.task_step*task_num]
             if (self.configs['natural_inversion'] or self.configs['generative_inversion']) and task_num>1:
+                self.datasetloader.train_data.update(
+                    adding_classes_list) # update for class incremental style #
                 if 'cifar' in self.configs['dataset']:
                     datas,labels=[],[]
                     for lbl,img in zip(inv_labels,inv_images):
