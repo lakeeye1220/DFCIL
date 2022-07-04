@@ -94,10 +94,15 @@ def get_inversion_images(net,
     best_cost = 1e6
    
     net.eval()
+    minimum_per_class=num_generate_images//num_classes[0]
+    num_cls_targets=np.zeros(num_classes[0])
 
     best_inputs_list=[]
     best_targets_list = []
-    for iters_ in range(int(num_generate_images/bs)):
+    def softmax(x,axis=0):
+        exp_x=np.exp(x)
+        return exp_x / np.sum(exp_x, axis=axis, keepdims=True)
+    while np.count_nonzero(num_cls_targets>=minimum_per_class)<num_classes[0]:
         if configs['network_ver']==1:
             from model.generative_model.network_v1 import Generator,Feature_Decoder
             generator = Generator(8,latent_dim,3).to(device)
@@ -127,12 +132,7 @@ def get_inversion_images(net,
         # optimizer_alpha.state = collections.defaultdict(dict)
         print("----------------------------------------num_classes[0] : ",num_classes[0])
         # np_targets = np.random.choice(num_classes[0],bs)
-        np_targets=[]
-        for cls_idx in num_classes[0]:
-            num_cls=bs//num_classes[0]
-            np_targets.extend([cls_idx]*num_cls)
-        if len(np_targets)-bs<0:
-            np_targets.extend(np.random.choice(num_classes[0],bs-len(np_targets)))
+        np_targets=np.random.dirichlet(softmax(minimum_per_class-num_cls_targets),bs)
         targets = torch.LongTensor(np_targets).to(device)
         z = torch.randn((bs, latent_dim)).to(device)
         
@@ -229,6 +229,8 @@ def get_inversion_images(net,
 
         best_inputs_list.append(best_inputs.cpu().detach().numpy())
         best_targets_list.append(targets.cpu().detach().numpy())
+        for target in targets.cpu().detach().numpy():
+            num_cls_targets[target]+=1
     optimizer_f.zero_grad(set_to_none=True)
     optimizer_g.zero_grad(set_to_none=True)
     del generator
