@@ -66,7 +66,7 @@ class EEIL(ICARL):
                             datas.append(data.astype(np.uint8))
                             labels.append(np.array([l]))
 
-                    inv_images=np.concatenate(datas,axis=0) # list (np.array(bsz,3,32,32))
+                    inv_images=np.stack(datas,axis=0) # list (np.array(32,32,3),...) -> stack (bsz,32,32,3)
                     inv_labels= np.concatenate(labels,axis=0).reshape(-1)
                     self.datasetloader.train_data.data=np.concatenate((self.datasetloader.train_data.data,inv_images),axis=0)
                     self.datasetloader.train_data.targets=np.concatenate((self.datasetloader.train_data.targets,inv_labels),axis=0)
@@ -124,6 +124,7 @@ class EEIL(ICARL):
 
             # End of regular learning: FineTuning #
             if task_num>1:
+                self.size_of_exemplar=self.configs['memory_size']//self.current_num_classes
                 bft_train_dataset = self.datasetloader.train_data.get_bft_data(self.size_of_exemplar)
                 if 'cifar' in self.configs['dataset']:
                     print("Len bft data: {}".format(len(bft_train_dataset[0])))
@@ -356,7 +357,6 @@ class EEIL(ICARL):
 
         print("The size of exemplar :%s" % (str(len(exemplar))), end='')
         self.exemplar_set.append(exemplar)
-        self.size_of_exemplar=len(exemplar)
 
 
     def compute_class_mean(self, cls_dataloader):
