@@ -351,6 +351,7 @@ class ICARL(Baseline):
     
     def update_old_model(self):
         self.old_model = copy.deepcopy(self.model)
+        self.old_model.eval()
     
     def incremental_weight(self,task_num):
         if 'resnet' in self.configs['model']:
