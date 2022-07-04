@@ -85,10 +85,10 @@ def get_inversion_images(net,
                 num_generate_images=2000,
                 latent_dim=100,
                 configs=None,
+                device='cuda',
+
             ):
 
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    
     kl_loss = nn.KLDivLoss(reduction='batchmean').cuda()
 
     best_cost = 1e6
@@ -127,7 +127,7 @@ def get_inversion_images(net,
         # optimizer_alpha.state = collections.defaultdict(dict)
         print("----------------------------------------num_classes[0] : ",num_classes[0])
         np_targets = np.random.choice(num_classes[0],bs)
-        targets = torch.LongTensor(np_targets).to('cuda')
+        targets = torch.LongTensor(np_targets).to(device)
         z = torch.randn((bs, latent_dim)).to(device)
         
         loss_r_feature_layers = []

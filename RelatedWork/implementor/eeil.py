@@ -64,7 +64,7 @@ class EEIL(ICARL):
                         for l,i in zip(lbl,img): 
                             data = np.reshape(np.array(i),(32,32,3))
                             datas.append(data.astype(np.uint8))
-                            labels.append(np.array(l))
+                            labels.append(np.array([l]))
 
                     inv_images=np.concatenate(datas,axis=0) # list (np.array(bsz,3,32,32))
                     inv_labels= np.concatenate(labels,axis=0).reshape(-1)
@@ -146,11 +146,11 @@ class EEIL(ICARL):
             if self.configs['natural_inversion']:
                 from utils.naturalinversion.naturalinversion import get_inversion_images
                 prefix=os.path.join(self.save_path, self.time_data)
-                inv_images,inv_labels=get_inversion_images(self.model,[self.current_num_classes,self.current_num_classes+self.task_step],task_num,epochs=self.configs['inversion_epochs'],prefix=prefix,global_iteration=task_num,bn_reg_scale=3,g_lr=0.001,d_lr=0.0005,a_lr=0.05,var_scale=0.001,l2_coeff=0.00001,num_generate_images=self.configs['memory_size'],latent_dim=self.configs['latent_dim'],configs=self.configs)
+                inv_images,inv_labels=get_inversion_images(self.model,[self.current_num_classes,self.current_num_classes+self.task_step],task_num,epochs=self.configs['inversion_epochs'],prefix=prefix,global_iteration=task_num,bn_reg_scale=3,g_lr=0.001,d_lr=0.0005,a_lr=0.05,var_scale=0.001,l2_coeff=0.00001,num_generate_images=self.configs['memory_size'],latent_dim=self.configs['latent_dim'],configs=self.configs,device=self.device)
             elif self.configs['generative_inversion']:
                 from model.generative_model.generative_network import get_inversion_images
                 prefix=os.path.join(self.save_path, self.time_data)
-                inv_images,inv_labels=get_inversion_images(self.model,[self.current_num_classes,self.current_num_classes+self.task_step],task_num,epochs=self.configs['inversion_epochs'],prefix=prefix,global_iteration=task_num,bn_reg_scale=3,g_lr=0.001,d_lr=0.0005,a_lr=0.05,var_scale=0.001,l2_coeff=0.00001,num_generate_images=self.configs['memory_size'],latent_dim=self.configs['latent_dim'],configs=self.configs)
+                inv_images,inv_labels=get_inversion_images(self.model,[self.current_num_classes,self.current_num_classes+self.task_step],task_num,epochs=self.configs['inversion_epochs'],prefix=prefix,global_iteration=task_num,bn_reg_scale=3,g_lr=0.001,d_lr=0.0005,a_lr=0.05,var_scale=0.001,l2_coeff=0.00001,num_generate_images=self.configs['memory_size'],latent_dim=self.configs['latent_dim'],configs=self.configs,device=self.device)
             else:
                 self.model.eval()
                 print('')
@@ -242,19 +242,19 @@ class EEIL(ICARL):
                 if balance_finetune:
                     soft_target = torch.softmax(score[:, self.current_num_classes -
                                             self.task_step:self.current_num_classes]/self.configs['temperature'],dim=1)
-                    output_logits = outputs[:, self.current_num_classes -
-                                            self.task_step:self.current_num_classes]/self.configs['temperature']
-                    kd_loss = self.onehot_criterion(output_logits,soft_target) # distillation entropy loss
+                    output_logits = torch.softmax(outputs[:, self.current_num_classes -
+                                            self.task_step:self.current_num_classes]/self.configs['temperature'],dim=1)
+                    kd_loss = self.configs['lamb']* F.binary_cross_entropy(output_logits,soft_target) # distillation entropy loss
                     # kd_loss = F.binary_cross_entropy_with_logits(output_logits,soft_target) # distillation entropy loss
                 else:
                     kd_loss = torch.zeros(task_num)
                     for t in range(task_num-1):
                         # local distillation
                         soft_target =  torch.softmax(score [:,self.task_step*t:self.task_step*(t+1)] / self.configs['temperature'],dim=1)
-                        output_logits = outputs[:,self.task_step*t:self.task_step*(t+1)] / self.configs['temperature']
+                        output_logits = torch.softmax(outputs[:,self.task_step*t:self.task_step*(t+1)] / self.configs['temperature'],dim=1)
                         # kd_loss[t] = F.binary_cross_entropy_with_logits(
                         #     output_logits, soft_target) * (self.configs['temperature']**2)
-                        kd_loss[t] = self.onehot_criterion(output_logits, soft_target)
+                        kd_loss[t] = self.configs['lamb']*F.binary_cross_entropy(output_logits, soft_target)
                         # kd_loss[t] = F.binary_cross_entropy_with_logits(output_logits, soft_target)
                     kd_loss = kd_loss.mean()
                 loss = kd_loss+cls_loss
@@ -267,6 +267,12 @@ class EEIL(ICARL):
             # compute gradient and do SGD step
             optimizer.zero_grad()
             loss.backward()
+            if self.configs['noise_grad']:
+                self._noise_grad(self.model.parameters(), epoch)
+            # Page 8: "We apply L2-regularization and random noise [21] (with parameters eta = 0.3, gamma = 0.55)
+            # on the gradients to minimize overfitting"
+            # https://github.com/fmcp/EndToEndIncrementalLearning/blob/master/cnn_train_dag_exemplars.m#L367
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.configs['clip_grad'])
             optimizer.step()
 
             # measure elapsed time
@@ -389,3 +395,9 @@ class EEIL(ICARL):
             self.class_mean_set.append(class_mean)
         print("")
     
+    def _noise_grad(self, parameters, iteration, eta=0.3, gamma=0.55):
+        """Add noise to the gradients"""
+        parameters = list(filter(lambda p: p.grad is not None, parameters))
+        variance = eta / ((1 + iteration) ** gamma)
+        for p in parameters:
+            p.grad.add_(torch.randn(p.grad.shape, device=p.grad.device) * variance)

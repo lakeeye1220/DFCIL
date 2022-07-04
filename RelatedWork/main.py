@@ -41,8 +41,6 @@ def parse_args(args):
     parser.add_argument(
         '--momentum', type=float, default=0.9, help='set momentum')
     parser.add_argument(
-        '--temperature', type=float, default=2.0, help='set temperature of knowledge distillation')
-    parser.add_argument(
         '--epochs', type=int, default=70, help='run epochs')
     parser.add_argument(
         '--dataset', type=str, default='cifar100', help='select dataset')
@@ -57,18 +55,30 @@ def parse_args(args):
     parser.add_argument('--lr_steps', help='lr decaying epoch determination', default=[49,63],
                         type=lambda s: [int(item) for item in s.split(',')])
     parser.add_argument('--dataset_path', help='dataset path (None: /data or .\\data\\dataset\\)', default=None)
-    parser.add_argument('--natural_inversion','-ni', default=False,help='natural inversion')
-    parser.add_argument('--generative_inversion','-gi', default=False,help='natural inversion')
-    if parser.parse_known_args(args)[0].natural_inversion or parser.parse_known_args(args)[0].generative_inversion:
-        parser.add_argument('--inversion_epochs', default=2000, type=int, help='natural inversion epoch')
-        parser.add_argument('--latent_dim', default=1024, type=int, help='Dimension of latent vector')
-        parser.add_argument('--network_ver', default=1, type=int, help='inversion epoch')
 
 
     if parser.parse_known_args(args)[0].mode.lower() == 'train':
         parser.add_argument(
             '--train_mode', '-t', type=str, default='baseline', choices=['baseline','icarl','eeil'],
             help='Choose Train Mode')
+
+        parser.add_argument('--natural_inversion','-ni', default=False,help='natural inversion')
+        parser.add_argument('--generative_inversion','-gi', default=False,help='natural inversion')
+        
+        if parser.parse_known_args(args)[0].natural_inversion or parser.parse_known_args(args)[0].generative_inversion:
+            parser.add_argument('--inversion_epochs', default=2000, type=int, help='natural inversion epoch')
+            parser.add_argument('--latent_dim', default=1024, type=int, help='Dimension of latent vector')
+            parser.add_argument('--network_ver', default=1, type=int, help='inversion epoch')
+
+        if 'eeil' == parser.parse_known_args(args)[0].train_mode:
+            parser.add_argument(
+                '--temperature', type=float, default=2.0, help='set temperature of knowledge distillation')
+            parser.add_argument(
+                '--clip-grad', type=float, default=10000, help='clipping ratio')
+            parser.add_argument(
+                '--lamb', type=float, default=1.0, help='forgetting-intrasigence tradeoff')
+            parser.add_argument(
+                '--noise-grad', type=bool, default=False, help='add noise to gradients')
 
     elif parser.parse_known_args(args)[0].mode.lower() == 'eval':
         parser.add_argument(
