@@ -68,8 +68,7 @@ class EEIL(ICARL):
                         for l,i in zip(lbl,img): 
 
                             data = np.transpose(np.array(i),(1,2,0))
-                            datas.append(data)
-                            # datas.append(data.astype(np.uint8))
+                            datas.append(data.astype(np.uint8))
                             labels.append(np.array([l]))
                         # if saving==True:
                         #     saving=False
@@ -253,21 +252,27 @@ class EEIL(ICARL):
                 if balance_finetune:
                     soft_target = torch.softmax(score[:, self.current_num_classes -
                                             self.task_step:self.current_num_classes]/self.configs['temperature'],dim=1)
-                    output_logits = torch.softmax(outputs[:, self.current_num_classes -
-                                            self.task_step:self.current_num_classes]/self.configs['temperature'],dim=1)
-                    kd_loss = self.configs['lamb']* F.binary_cross_entropy(output_logits,soft_target) # distillation entropy loss
+                    output_logits = (outputs[:, self.current_num_classes -
+                                            self.task_step:self.current_num_classes]/self.configs['temperature'])
+                    # output_logits = torch.softmax(outputs[:, self.current_num_classes -
+                    #                         self.task_step:self.current_num_classes]/self.configs['temperature'],dim=1)
+                    # kd_loss = self.configs['lamb']* F.binary_cross_entropy(output_logits,soft_target) # distillation entropy loss
+                    kd_loss = self.configs['lamb']* self.onehot_criterion(output_logits,soft_target) # distillation entropy loss
                     # kd_loss = F.binary_cross_entropy_with_logits(output_logits,soft_target) # distillation entropy loss
                 else:
                     kd_loss = torch.zeros(task_num)
                     for t in range(task_num-1):
                         # local distillation
                         soft_target =  torch.softmax(score [:,self.task_step*t:self.task_step*(t+1)] / self.configs['temperature'],dim=1)
-                        output_logits = torch.softmax(outputs[:,self.task_step*t:self.task_step*(t+1)] / self.configs['temperature'],dim=1)
+                        output_logits = (outputs[:,self.task_step*t:self.task_step*(t+1)] / self.configs['temperature'])
+                        # output_logits = torch.softmax(outputs[:,self.task_step*t:self.task_step*(t+1)] / self.configs['temperature'],dim=1)
                         # kd_loss[t] = F.binary_cross_entropy_with_logits(
                         #     output_logits, soft_target) * (self.configs['temperature']**2)
-                        kd_loss[t] = self.configs['lamb']*F.binary_cross_entropy(output_logits, soft_target)
+                        kd_loss[t] = self.configs['lamb']*self.onehot_criterion(output_logits, soft_target)
+                        # kd_loss[t] = self.configs['lamb']*F.binary_cross_entropy(output_logits, soft_target)
                         # kd_loss[t] = F.binary_cross_entropy_with_logits(output_logits, soft_target)
-                    kd_loss = kd_loss.sum()
+                    # kd_loss = kd_loss.mean()
+                    kd_loss = kd_loss.sum()#binary crossentropy
                 loss = kd_loss+cls_loss
 
             # measure accuracy and record loss
@@ -320,8 +325,7 @@ class EEIL(ICARL):
             if task_best_valid_acc < valid_info['accuracy']:
                 task_best_valid_acc = valid_info['accuracy']
                 ## save best model ##
-                self.best_valid_accuracy = valid_info['accuracy']
-                self.best_valid_loss = valid_info['loss']
+                task_best_valid_loss = valid_info['loss']
                 model_dict = self.model.module.state_dict()
                 #optimizer_dict = self.optimizer.state_dict()
                 save_dict = {
@@ -335,7 +339,8 @@ class EEIL(ICARL):
             #####################
         print('Finetune finished')
         # self.model=self.fix_feature(self.model,False)
-        return valid_info
+        return {'loss': task_best_valid_loss, 'accuracy': task_best_valid_acc}
+
 
     def _reduce_exemplar_sets(self, m):
         print("Reducing exemplar sets!")
