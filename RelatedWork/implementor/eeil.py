@@ -271,8 +271,7 @@ class EEIL(ICARL):
                         kd_loss[t] = self.configs['lamb']*self.onehot_criterion(output_logits, soft_target)
                         # kd_loss[t] = self.configs['lamb']*F.binary_cross_entropy(output_logits, soft_target)
                         # kd_loss[t] = F.binary_cross_entropy_with_logits(output_logits, soft_target)
-                    # kd_loss = kd_loss.mean()
-                    kd_loss = kd_loss.sum()#binary crossentropy
+                    kd_loss = kd_loss.sum()
                 loss = kd_loss+cls_loss
 
             # measure accuracy and record loss
