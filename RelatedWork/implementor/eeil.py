@@ -72,7 +72,7 @@ class EEIL(ICARL):
                             labels.append(np.array([l]))
                         if saving==True:
                             saving=False
-                            save_image(make_grid(torch.from_numpy(np.stack(datas,axis=0))),os.path.join(self.save_path,self.time_data,'task{}_inv_img_after reshape.png'.format(task_num)))
+                            save_image(make_grid(torch.from_numpy(np.stack(datas,axis=0)).permute([0,3,1,2])),os.path.join(self.save_path,self.time_data,'task{}_inv_img_after_reshape.png'.format(task_num)))
 
                     inv_images=np.stack(datas,axis=0) # list (np.array(32,32,3),...) -> stack (bsz,32,32,3)
                     inv_labels= np.concatenate(labels,axis=0).reshape(-1)
@@ -301,7 +301,7 @@ class EEIL(ICARL):
     def balance_fine_tune(self,train_loader,valid_loader,task_num):
         self.old_model = copy.deepcopy(self.model)
         self.old_model.eval()
-        self.model=self.fix_feature(self.model,True)
+        # self.model=self.fix_feature(self.model,True)
         self.model.train()
         optimizer = torch.optim.SGD(self.model.parameters(
         ), lr=self.configs['lr']/10.0, momentum=self.configs['momentum'], weight_decay=self.configs['weight_decay'])
@@ -333,7 +333,7 @@ class EEIL(ICARL):
                 print("Save Best Accuracy Model")
             #####################
         print('Finetune finished')
-        self.model=self.fix_feature(self.model,False)
+        # self.model=self.fix_feature(self.model,False)
         return valid_info
 
     def _reduce_exemplar_sets(self, m):
