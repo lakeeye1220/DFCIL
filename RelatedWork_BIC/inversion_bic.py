@@ -148,6 +148,7 @@ class bicmodel:
         lr_scheduler= optim.lr_scheduler.MultiStepLR(opt, milestones=self.configs['lr_steps'], gamma=self.configs['lr_decay'])
         bias_opt = optim.Adam(self.bias_layers[int(self.numclass/self.task_size) - 1].parameters(), lr=0.001) # 
         for epoch in range(self.epochs):
+            self.model.train()
 
             for step, (indexs, images, target) in enumerate(self.train_loader):
                 images, target = images.to(device), target.to(device)
@@ -167,6 +168,24 @@ class bicmodel:
             print("***************************************")
             print('* epoch:%3d,normal accuracy:%6.3f *' % (epoch, accuracy))
             print("***************************************")
+        if self.old_model != None :
+            for epoch in range(self.epochs):
+                self.model.eval()
+                for _ in range(len(self.bias_layers)):
+                    self.bias_layers[_].train()
+
+                for step, (indexs, images, target) in enumerate(self.val_loader):
+                    images, target = images.to(device), target.to(device)
+                #output = self.model(images)
+                    loss_value = self.stage2(indexs, images, target)
+                    opt.zero_grad()
+                    loss_value.backward()
+                    opt.step()
+                
+                lr_scheduler.step()
+                accuracy = self._test(self.test_loader, 1)
+
+        
 
         return accuracy
 
@@ -185,9 +204,6 @@ class bicmodel:
         
 
 
-
-        for i in range(layer_selector):
-            out.append
 
     def stage1(self, indexes, imgs, target):
         output,_,_,_,_,_ =self.model(imgs)
@@ -210,10 +226,17 @@ class bicmodel:
             loss = loss_soft_target * T * T + (1-alpha) * loss_hard_target
             return loss
 
+    def stage2(self, indexes, imgs, target):
+        output,_,_,_,_,_ =self.model(imgs)
+        output = self.model.bias_forward(output)
+        return F.cross_entropy(output, target)
+
+
+
          
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description='iCaRL + NaturalInversion')
+    parser = argparse.ArgumentParser(description='BiC + NI')
 
 
     feature_extractor = resnet34_cbam()
