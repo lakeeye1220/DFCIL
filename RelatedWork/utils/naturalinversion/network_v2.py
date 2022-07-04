@@ -47,46 +47,49 @@ class Feature_Decoder(nn.Module):
     def __init__(self):
         super(Feature_Decoder, self).__init__()
         self.upsample = nn.Upsample(scale_factor = 2)
-        self.conv1 = nn.Conv2d(512, 256, 1, stride = 1, padding = 0)
+        self.conv1 = nn.Conv2d(512, 256, 1, stride = 1, padding = 0,bias=False)
         self.bn1 = nn.BatchNorm2d(256)
-        self.conv2 = nn.Conv2d(256, 128, 1, stride = 1, padding = 0)
+        self.conv2 = nn.Conv2d(256, 128, 1, stride = 1, padding = 0,bias=False)
         self.bn2 = nn.BatchNorm2d(128)
-        self.conv3 = nn.Conv2d(128, 64, 1, stride = 1, padding = 0)
+        self.conv3 = nn.Conv2d(128, 64, 1, stride = 1, padding = 0,bias=False)
         self.bn3 = nn.BatchNorm2d(64)
-        self.conv4 = nn.Conv2d(64, 3, 1, stride = 1, padding = 0)
+        self.conv4 = nn.Conv2d(64, 3, 1, stride = 1, padding = 0,bias=False)
         self.bn4 = nn.BatchNorm2d(3)
-        self.conv5 = nn.Conv2d(3, 3, 1, stride = 1, padding = 0)
+        self.conv5 = nn.Conv2d(3, 3, 1, stride = 1, padding = 0,bias=False)
         self.bn5 = nn.BatchNorm2d(3)
-        self.conv_31 = nn.Conv2d(256, 256, 3, stride=1, padding=1)
+        self.conv_31 = nn.Conv2d(256, 256, 3, stride=1, padding=1,bias=False)
         self.bn_31 = nn.BatchNorm2d(256)
-        self.conv_32 = nn.Conv2d(128, 128, 3, stride=1, padding=1)
+        self.conv_32 = nn.Conv2d(128, 128, 3, stride=1, padding=1,bias=False)
         self.bn_32 = nn.BatchNorm2d(128)
-        self.conv_33 = nn.Conv2d(64, 64, 3, stride=1, padding=1)
+        self.conv_33 = nn.Conv2d(64, 64, 3, stride=1, padding=1,bias=False)
         self.bn_33 = nn.BatchNorm2d(64)
         self.relu= nn.ReLU()
 
     def forward(self, x, features):
         out = self.conv1(self.upsample(features[-2]))
         out = self.bn1(out)
-        out = self.relu(out)
-        out = self.conv_31(out)# + features[-3]) #no ftp
+        out1 = self.relu(out)
+        out = self.conv_31(out1)# + features[-3]) #no ftp
         out = self.bn_31(out)
+        out+=out1
         out = self.relu(out)
-        
+
         out = self.conv2(self.upsample(out))
         out = self.bn2(out)
+        out2 = self.relu(out)
+
+        out = self.conv_32(out2)# + features[-4]) # no ftp
+        out = self.bn_32(out)
+        out += out2
         out = self.relu(out)
 
-        out = self.conv_32(out)# + features[-4]) # no ftp
-        out = self.bn_32(out)
-        out = self.relu(out)
-        
         out = self.conv3(self.upsample(out))
         out = self.bn3(out)
-        out = self.relu(out)
+        out3 = self.relu(out)
 
-        out = self.conv_33(out) # + features[-5]) # no ftp
+        out = self.conv_33(out3) # + features[-5]) # no ftp
         out = self.bn_33(out)
+        out += out3
         out = self.relu(out)
 
         

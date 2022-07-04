@@ -51,12 +51,10 @@ class Feature_Decoder(nn.Module):
         self.conv2 = nn.Conv2d(256, 128, 1, stride = 1, padding = 0)
         self.conv3 = nn.Conv2d(128, 64, 1, stride = 1, padding = 0)
         self.conv4 = nn.Conv2d(64, 3, 1, stride = 1, padding = 0)
-        self.conv5 = nn.Conv2d(64, 3, 1, stride = 1, padding = 0)
-        self.conv6 = nn.Conv2d(3, 3, 1, stride = 1, padding = 0)
+        self.conv5 = nn.Conv2d(3, 3, 1, stride = 1, padding = 0)
         self.conv_31 = nn.Conv2d(256, 256, 3, stride=1, padding=1)
         self.conv_32 = nn.Conv2d(128, 128, 3, stride=1, padding=1)
         self.conv_33 = nn.Conv2d(64, 64, 3, stride=1, padding=1)
-        self.conv_34 = nn.Conv2d(3, 3, 3, stride=1, padding=1)
 
     def forward(self, x, features):
         out = self.conv1(self.upsample(features[-2]))
@@ -70,7 +68,7 @@ class Feature_Decoder(nn.Module):
         
         out_ = self.conv4(out)
         out = (x + out_)
-        out = self.conv6(out)
+        out = self.conv5(out)
         out = torch.tanh(out)
         
         return out, out_

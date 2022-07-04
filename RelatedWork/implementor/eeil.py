@@ -300,7 +300,7 @@ class EEIL(ICARL):
         tok = time.time()
         self.logger.info('[train] Loss: {:.4f} | top1: {:.4f} | top5: {:.4f} | time: {:.3f}'.format(
             losses.avg, top1.avg, top5.avg, tok-tik))
-
+        optimizer.zero_grad(set_to_none=True)
         return {'loss': losses.avg, 'accuracy': top1.avg.item(), 'top5': top5.avg.item()}
 
     def balance_fine_tune(self,train_loader,valid_loader,task_num):
@@ -319,6 +319,7 @@ class EEIL(ICARL):
         print('==start fine-tuning==')
         for epoch in range(1,bftepoch+1):
             self._train(train_loader, optimizer, epoch, 0, balance_finetune=True)
+            optimizer.zero_grad(set_to_none=True)
             lr_scheduler.step()
             valid_info=self._eval(valid_loader, epoch, 0)
             if task_best_valid_acc < valid_info['accuracy']:

@@ -223,7 +223,10 @@ def get_inversion_images(net,
 
         best_inputs_list.append(best_inputs.cpu().detach().numpy())
         best_targets_list.append(targets.cpu().detach().numpy())
-    
+    optimizer_f.zero_grad(set_to_none=True)
+    optimizer_g.zero_grad(set_to_none=True)
+    del generator
+    del feature_decoder
     return best_inputs_list, best_targets_list
 
 
