@@ -29,7 +29,7 @@ class BiC(EEIL):
         # bias correction layer
         self.bias_layers = []
         self.bias_optimizers = []
-        for i in range(1,self.configs['task_size']):
+        for i in range(0,self.configs['task_size']-1):
             self.bias_layers.append(BiasLayer().to(self.device))
             self.bias_optimizers.append(optim.Adam(self.bias_layers[i].parameters(), lr=0.001))
         
@@ -41,6 +41,7 @@ class BiC(EEIL):
             s=self.task_step
             for i in range(task_num - 1):
                 outputs.append( self.bias_layers[i](x[:,s*i:s*(i+1)] ))
+            outputs.append(x[:,s*(i+1):])
             return torch.cat(outputs, dim=1)
 
     def run(self, dataset_path):
@@ -127,7 +128,7 @@ class BiC(EEIL):
                 bic_labels=np.concatenate(bic_labels,axis=0)
                 self.datasetloader.train_data.data=np.concatenate(train_images,axis=0)
                 self.datasetloader.train_data.targets=np.concatenate(train_labels,axis=0)
-                bic_dataset=self.dataset_class(bic_images,bic_labels,transform=self.datasetloader.test_transform)
+                bic_dataset=self.dataset_class(bic_images,bic_labels,transform=self.datasetloader.test_transform,return_idx=True)
                 bic_loader = self.datasetloader.get_dataloader(bic_dataset,True)                    
             #######################
 
@@ -177,7 +178,8 @@ class BiC(EEIL):
 
             self.update_old_model()
             #######################################
-            self.train_bias_correction(bic_loader,valid_loader,epoch,task_num)
+            if task_num>1:
+                self.train_bias_correction(bic_loader,valid_loader,epoch,task_num)
 
             ## after train- process exemplar set ##
             if self.configs['natural_inversion']:
@@ -416,7 +418,7 @@ class BiC(EEIL):
             self.logger.info('[BiC train] Loss: {:.4f} | top1: {:.4f} | top5: {:.4f} | time: {:.3f}'.format(
                 losses.avg, top1.avg, top5.avg, tok-tik))
             for i in range(task_num - 1):
-                self.bias_optimizers.zero_grad(set_to_none=True)
+                self.bias_optimizers[i].zero_grad(set_to_none=True)
             
             if e % 10 ==0:
                 valid_info=self._eval(valid_loader, epoch, task_num)
@@ -424,7 +426,7 @@ class BiC(EEIL):
                 
                 if bias_correction_best_acc < valid_info['accuracy']:
                     bias_correction_best_acc = valid_info['accuracy']
-                    self.logger.info("[Task {%d} Bias Correction Best Acc] {%.2f}".format
+                    self.logger.info("[Task {:2d} Bias Correction Best Acc] {:.2f}".format
                           (task_num, bias_correction_best_acc))
                     model_dict = self.model.module.state_dict()  
                     save_dict = {
