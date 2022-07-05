@@ -60,7 +60,7 @@ def parse_args(args):
 
     if parser.parse_known_args(args)[0].mode.lower() == 'train':
         parser.add_argument(
-            '--train-mode', '-t', type=str, default='baseline', choices=['baseline','icarl','eeil'],
+            '--train-mode', '-t', type=str, default='baseline', choices=['baseline','icarl','eeil','bic'],
             help='Choose Train Mode')
 
         parser.add_argument('--natural-inversion','-ni', default=False,help='natural inversion')
