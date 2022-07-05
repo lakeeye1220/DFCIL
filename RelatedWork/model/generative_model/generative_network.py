@@ -200,7 +200,7 @@ def get_inversion_images(net,
             loss = loss + l2_coeff * torch.norm(inputs_jit, 2)
 
             if debug_output and epoch % int(epochs/2)==0:
-                print("It {}\t Losses: total: {:.3f},\ttarget: {:.3f} \tR_feature_loss unscaled:\t {:.3f}\tstyle_loss : {:.3f}".format(epoch, loss.item(),loss_target,loss_distr.item(), 0))
+                print("It {}\t Losses: total: {:.3f},\ttarget: {:.3f} \tR_feature_loss unscaled:\t {:.3f}".format(epoch, loss.item(),loss_target,loss_distr.item()))
                 nchs = inputs_jit.shape[1]
 
                 save_pth = os.path.join(prefix, 'inversion_images', 'task{}'.format(task))
