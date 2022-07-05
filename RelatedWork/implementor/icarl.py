@@ -118,7 +118,7 @@ class ICARL(Baseline):
             for epoch in range(1, self.configs['epochs'] + 1):
                 epoch_tik = time.time()
 
-                train_info = self._train(train_loader, epoch, task_num)
+                train_info = self._train(train_loader,optimizer, epoch, task_num)
                 valid_info = self._eval(valid_loader, epoch, task_num)
 
                 for key in train_info.keys():
@@ -232,7 +232,7 @@ class ICARL(Baseline):
             self.best_valid_accuracy))
         ##############
 
-    def _train(self, loader, epoch, task_num):
+    def _train(self, loader,optimizer, epoch, task_num):
 
         tik = time.time()
         self.model.train()
@@ -271,9 +271,9 @@ class ICARL(Baseline):
             top1.update(acc1[0]*100.0, images.size(0))
             top5.update(acc5[0]*100.0, images.size(0))
             # compute gradient and do SGD step
-            self.optimizer.zero_grad()
+            optimizer.zero_grad()
             loss.backward()
-            self.optimizer.step()
+            optimizer.step()
 
             # measure elapsed time
             batch_time.update(time.time() - end)
