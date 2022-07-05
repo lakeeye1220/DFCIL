@@ -134,8 +134,7 @@ def get_inversion_images(net,
         # optimizer_alpha.state = collections.defaultdict(dict)
         print("----------------------------------------num_classes[0] : ",num_classes[0])
         # np_targets = np.random.choice(num_classes[0],bs)
-        np_targets=np.random.dirichlet(softmax(minimum_per_class-num_cls_targets),bs)
-        np_targets=np.argmax(np_targets,axis=1)
+        np_targets=np.random.choice(num_classes[0],bs)
         targets = torch.LongTensor(np_targets).to(device)
         z = torch.randn((bs, latent_dim)).to(device)
         
