@@ -6,6 +6,7 @@ import sys
 from implementor.baseline import Baseline
 from implementor.eeil import EEIL
 from implementor.icarl import ICARL
+from implementor.bic import BiC
 from model.basenet import get_model
 from implementor.evaluator.evaluation import Evaluation
 from utils.seed import fix_seed
@@ -75,6 +76,18 @@ def parse_args(args):
         if 'eeil' == parser.parse_known_args(args)[0].train_mode:
             parser.add_argument(
                 '--temperature', type=float, default=2.0, help='set temperature of knowledge distillation')
+            parser.add_argument(
+                '--clip-grad', type=float, default=10000, help='clipping ratio')
+            parser.add_argument(
+                '--lamb', type=float, default=1.0, help='forgetting-intrasigence tradeoff')
+            parser.add_argument(
+                '--noise-grad', type=bool, default=False, help='add noise to gradients')
+        
+        if 'bic' == parser.parse_known_args(args)[0].train_mode:
+            parser.add_argument(
+                '--temperature', type=float, default=2.0, help='set temperature of knowledge distillation')
+            parser.add_argument(
+                '--split_ratio', type=float, default=0.9, help='set split ratio of train validation split from old classes')
             parser.add_argument(
                 '--clip-grad', type=float, default=10000, help='clipping ratio')
             parser.add_argument(
@@ -188,6 +201,7 @@ def main(args):
             'baseline': Baseline,
             'icarl': ICARL,
             'eeil': EEIL,
+            'bic': BiC,
         }
         learner = LEARNER[configs['train_mode']](
             model, time_data, save_path, device, configs)
