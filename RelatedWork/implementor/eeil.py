@@ -1,5 +1,5 @@
 from data.custom_dataset import ImageDatasetFromData
-from data.cil_data_load import CILDatasetLoaderv2
+from data.cil_data_load import CILDatasetLoader
 from data.custom_dataset import ImageDataset
 from data.data_load import DatasetLoader
 from implementor.baseline import Baseline
@@ -27,7 +27,7 @@ class EEIL(ICARL):
             model, time_data, save_path, device, configs)
 
     def run(self, dataset_path):
-        self.datasetloader = CILDatasetLoaderv2(
+        self.datasetloader = CILDatasetLoader(
             self.configs, dataset_path, self.device)
         train_loader, valid_loader = self.datasetloader.get_settled_dataloader() #init for once
 

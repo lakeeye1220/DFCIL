@@ -1,5 +1,5 @@
 import copy
-from data.cil_data_load import CILDatasetLoaderv2
+from data.cil_data_load import CILDatasetLoader
 from implementor.baseline import Baseline
 import torch
 import torch.nn as nn
@@ -43,7 +43,7 @@ class ICARL(Baseline):
 
 
     def run(self, dataset_path):
-        self.datasetloader = CILDatasetLoaderv2(
+        self.datasetloader = CILDatasetLoader(
             self.configs, dataset_path, self.device)
         train_loader, valid_loader = self.datasetloader.get_settled_dataloader() #init for once
 
@@ -357,11 +357,14 @@ class ICARL(Baseline):
         for index in range(len(self.exemplar_set)):
             self.exemplar_set[index] = self.exemplar_set[index][:m]
             print('\rThe size of class %d examplar: %s' % (index, str(len(self.exemplar_set[index]))),end='')
-
+            
 
     def _construct_exemplar_set(self, class_id, m):
-        cls_dataloader, cls_images = self.datasetloader.get_class_dataloader(
-            class_id,no_return_target=True)
+        cls_images = self.datasetloader.train_data.get_class_images(
+            class_id)
+        cls_dataset=self.dataset_class(cls_images,transform=self.datasetloader.test_transform)
+
+        cls_dataloader=self.datasetloader.get_dataloader(cls_dataset,shuffle=False)
         class_mean, feature_extractor_output = self.compute_class_mean(
             cls_dataloader)
         exemplar = []
@@ -376,14 +379,22 @@ class ICARL(Baseline):
             index = np.argmin(x)
             now_class_mean += feature_extractor_output[index]
             exemplar.append(cls_images[index])
-        self.size_of_exemplar=len(exemplar)
+
         print("The size of exemplar :%s" % (str(len(exemplar))), end='')
         self.exemplar_set.append(exemplar)
+
 
     def compute_class_mean(self, cls_dataloader):
         with torch.no_grad():
             feature_extractor_outputs = []
-            for images in cls_dataloader:
+
+            for datas in cls_dataloader:
+                if type(datas)==tuple and len(datas)==1:
+                    images=datas[0]
+                elif type(datas)==tuple and len(datas)==2:
+                    images,_=datas
+                else:
+                    images=datas
                 images = images.to(self.device)
                 _, features = self.model(images)
                 feature_extractor_outputs.append(
@@ -404,14 +415,11 @@ class ICARL(Baseline):
             # why? transform differently #
             exemplar_dataset = self.dataset_class(
                 exemplar, transform=self.datasetloader.test_transform)
-            exemplar_dataloader = DataLoader(exemplar_dataset, batch_size=self.configs['batch_size'],
-                                             shuffle=False,
-                                             num_workers=self.configs['num_workers'],
-                                             )
+            exemplar_dataloader = self.datasetloader.get_dataloader(exemplar_dataset,False)
             class_mean, _ = self.compute_class_mean(exemplar_dataloader)
             self.class_mean_set.append(class_mean)
         print("")
-    
+
     def update_old_model(self):
         self.old_model = copy.deepcopy(self.model)
         self.old_model.eval()

@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from data.cil_data_load import CILDatasetLoaderv2
+from data.cil_data_load import CILDatasetLoader
 import time
 import os
 import copy
@@ -45,7 +45,7 @@ class BiC(EEIL):
             return torch.cat(outputs, dim=1)
 
     def run(self, dataset_path):
-        self.datasetloader = CILDatasetLoaderv2(
+        self.datasetloader = CILDatasetLoader(
             self.configs, dataset_path, self.device)
         train_loader, valid_loader = self.datasetloader.get_settled_dataloader() #init for once
 
