@@ -67,16 +67,11 @@ class EEIL(ICARL):
                 if 'cifar' in self.configs['dataset']:
                     datas,labels=[],[]
                     for lbl,img in zip(inv_labels,inv_images):
-                        # if saving==True:
-                        #     save_image(make_grid(torch.from_numpy(img)),os.path.join(self.save_path,self.time_data,'task{}_inv_img.png'.format(task_num)))
                         for l,i in zip(lbl,img): 
 
                             data = np.transpose(np.array(i),(1,2,0))
                             datas.append(data.astype(np.uint8))
                             labels.append(np.array([l]))
-                        # if saving==True:
-                        #     saving=False
-                        #     save_image(make_grid(torch.from_numpy(np.stack(datas,axis=0)).permute([0,3,1,2])),os.path.join(self.save_path,self.time_data,'task{}_inv_img_after_reshape.png'.format(task_num)))
 
                     inv_images=np.stack(datas,axis=0) # list (np.array(32,32,3),...) -> stack (bsz,32,32,3)
                     inv_labels= np.concatenate(labels,axis=0).reshape(-1)
@@ -100,18 +95,6 @@ class EEIL(ICARL):
                     adding_classes_list, self.exemplar_set) # update for class incremental style #
             self.datasetloader.test_data.update(
                 adding_classes_list, self.exemplar_set) # Don't need to update loader
-                
-            # print("Before EEIL Len: {}".format(len(self.datasetloader.train_data.data)))
-            # images,labels=data_augmentation_e2e(self.datasetloader.train_data.data,self.datasetloader.train_data.targets)
-            # self.datasetloader.train_data.data=images
-            # self.datasetloader.train_data.targets=labels
-            # print("After EEIL Len: {}".format(len(self.datasetloader.train_data.data)))
-            #############################################################################
-            
-            # bft_images=[]
-            # for img in images:
-            #     bft_images.append(Image.fromarray(img))
-            ###################
 
             task_best_valid_acc=0
             for epoch in range(1, self.configs['epochs'] + 1):
@@ -268,23 +251,14 @@ class EEIL(ICARL):
                                             self.task_step:self.current_num_classes]/self.configs['temperature'],dim=1)
                     output_logits = (outputs[:, self.current_num_classes -
                                             self.task_step:self.current_num_classes]/self.configs['temperature'])
-                    # output_logits = torch.softmax(outputs[:, self.current_num_classes -
-                    #                         self.task_step:self.current_num_classes]/self.configs['temperature'],dim=1)
-                    # kd_loss = self.configs['lamb']* F.binary_cross_entropy(output_logits,soft_target) # distillation entropy loss
                     kd_loss = self.configs['lamb']* self.onehot_criterion(output_logits,soft_target) # distillation entropy loss
-                    # kd_loss = F.binary_cross_entropy_with_logits(output_logits,soft_target) # distillation entropy loss
                 else:
                     kd_loss = torch.zeros(task_num)
                     for t in range(task_num-1):
                         # local distillation
                         soft_target =  torch.softmax(score [:,self.task_step*t:self.task_step*(t+1)] / self.configs['temperature'],dim=1)
                         output_logits = (outputs[:,self.task_step*t:self.task_step*(t+1)] / self.configs['temperature'])
-                        # output_logits = torch.softmax(outputs[:,self.task_step*t:self.task_step*(t+1)] / self.configs['temperature'],dim=1)
-                        # kd_loss[t] = F.binary_cross_entropy_with_logits(
-                        #     output_logits, soft_target) * (self.configs['temperature']**2)
                         kd_loss[t] = self.configs['lamb']*self.onehot_criterion(output_logits, soft_target)
-                        # kd_loss[t] = self.configs['lamb']*F.binary_cross_entropy(output_logits, soft_target)
-                        # kd_loss[t] = F.binary_cross_entropy_with_logits(output_logits, soft_target)
                     kd_loss = kd_loss.sum()
                 loss = kd_loss+cls_loss
 

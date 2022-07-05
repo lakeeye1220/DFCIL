@@ -12,6 +12,7 @@ from utils.onehot import get_one_hot
 from implementor.eeil import EEIL
 import torch.optim as optim
 import torch.nn.functional as F
+
 class BiasLayer(nn.Module):
     def __init__(self):
         super(BiasLayer, self).__init__()
@@ -21,18 +22,16 @@ class BiasLayer(nn.Module):
     def forward(self, x):
         return self.alpha * x + self.beta
 
-    
-
 class BiC(EEIL):
     def __init__(self, model, time_data, save_path, device, configs):
         super().__init__(
             model, time_data, save_path, device, configs)
         # bias correction layer
         self.bias_layers = []
-        self.bias_optimizer = []
+        self.bias_optimizers = []
         for i in range(1,self.configs['task_size']):
             self.bias_layers.append(BiasLayer().to(self.device))
-            self.bias_optimizer.append(optim.Adam(self.bias_layers[i].parameters(), lr=0.001))
+            self.bias_optimizers.append(optim.Adam(self.bias_layers[i].parameters(), lr=0.001))
         
     def bias_forward(self, x, task_num):
         if task_num ==1:
@@ -163,8 +162,11 @@ class BiC(EEIL):
                         'model': model_dict,
                         # 'optim': optimizer_dict,
                     }
+                    save_dict.update(
+                        {'task{}_bias_model_{}'.format(task_num, i): self.bias_layers[i].state_dict() for i in range(task_num-1)})
+                    
                     torch.save(save_dict, os.path.join(
-                        self.save_path, self.time_data, 'best_task{}_finetune_model.pt'.format(task_num)))
+                        self.save_path, self.time_data, 'best_task{}_main_trained_model.pt'.format(task_num)))
                     print("Save Best Accuracy Model")
                 ### epoch end ###
             h, m, s = convert_secs2time(time.time()-task_tik)
@@ -367,62 +369,74 @@ class BiC(EEIL):
     
 
     
-    # def train_bias_correction(self, train_loader, valid_loader, epoch, task_num):
-    #     for e in range(self.configs['bias_correction_epochs']):
-    #     tik = time.time()
-    #     self.model.train()
-    #     batch_time = AverageMeter('Time', ':6.3f')
-    #     losses = AverageMeter('Loss', ':.4e')
-    #     top1 = AverageMeter('Acc@1', ':6.2f')
-    #     top5 = AverageMeter('Acc@5', ':6.2f')
-    #     progress = ProgressMeter(
-    #         len(loader),
-    #         [batch_time, losses, top1, top5],
-    #         prefix="Epoch: [{}]".format(epoch))
-    #     i = 0
-    #     end = time.time()
-    #     for images, target, indices in loader:
-    #         # measure data loading time
-    #         images, target = images.to(
-    #             self.device), target.to(self.device)
-    #         target_reweighted = get_one_hot(target, self.current_num_classes)
-    #         outputs, _ = self.model(images)
+    def train_bias_correction(self, train_loader, valid_loader, epoch, task_num):
+        bias_correction_best_acc=0
+        for e in range(self.configs['bias_correction_epochs']):
+            tik=time.time()
+            batch_time = AverageMeter('Time', ':6.3f')
+            losses = AverageMeter('Loss', ':.4e')
+            top1 = AverageMeter('Acc@1', ':6.2f')
+            top5 = AverageMeter('Acc@5', ':6.2f')
+            progress = ProgressMeter(
+                len(train_loader),
+                [batch_time, losses, top1, top5],
+                prefix="Epoch: [{}]".format(epoch))
+            i = 0
+            end = time.time()
+            for images, target, indices in train_loader:
+                # measure data loading time
+                images, target = images.to(
+                    self.device), target.to(self.device)
+                # target_reweighted = get_one_hot(target, self.current_num_classes)
+                with torch.no_grad():
+                    outputs, _ = self.model(images)
+                outputs = self.bias_forward(outputs, task_num)
+                loss = self.criterion(outputs[:,:self.current_num_classes], target)
 
-    #         if task_num == 1:
-    #             loss = self.onehot_criterion(outputs, target_reweighted)
-    #         else:  # after the normal learning
-    #             cls_loss = self.onehot_criterion(outputs, target_reweighted)
-    #             with torch.no_grad():
-    #                 score, _ = self.old_model(images)
-    #                 outputs=self.bias_forward(outputs,task_num)
-    #             kd_loss = torch.zeros(task_num)
-    #             for t in range(task_num-1):
-    #                 # local distillation
-    #                 soft_target =  torch.softmax(score [:,self.task_step*t:self.task_step*(t+1)] / self.configs['temperature'],dim=1)
-    #                 output_logits = (outputs[:,self.task_step*t:self.task_step*(t+1)] / self.configs['temperature'])
-    #                 kd_loss[t] = self.configs['lamb']*self.onehot_criterion(output_logits, soft_target)
-    #             kd_loss = kd_loss.sum()
-    #             loss = kd_loss+cls_loss
+                # measure accuracy and record loss
+                acc1, acc5 = accuracy(outputs, target, topk=(1, 5))
+                losses.update(loss.item(), images.size(0))
+                top1.update(acc1[0]*100.0, images.size(0))
+                top5.update(acc5[0]*100.0, images.size(0))
+                # compute gradient and do SGD step
+                for i in range(task_num - 1):
+                    self.bias_optimizers[i].zero_grad()
+                loss.backward()
+                for i in range(task_num - 1):
+                    self.bias_optimizers[i].step()
 
-    #         # measure accuracy and record loss
-    #         acc1, acc5 = accuracy(outputs, target, topk=(1, 5))
-    #         losses.update(loss.item(), images.size(0))
-    #         top1.update(acc1[0]*100.0, images.size(0))
-    #         top5.update(acc5[0]*100.0, images.size(0))
-    #         # compute gradient and do SGD step
-    #         optimizer.zero_grad()
-    #         loss.backward()
-    #         optimizer.step()
+                # measure elapsed time
+                batch_time.update(time.time() - end)
+                end = time.time()
+                if i % int(len(train_loader)//2) == 0:
+                    progress.display(i)
+                i += 1
 
-    #         # measure elapsed time
-    #         batch_time.update(time.time() - end)
-    #         end = time.time()
-    #         if i % int(len(loader)//2) == 0:
-    #             progress.display(i)
-    #         i += 1
+            tok = time.time()
+            self.logger.info('[BiC train] Loss: {:.4f} | top1: {:.4f} | top5: {:.4f} | time: {:.3f}'.format(
+                losses.avg, top1.avg, top5.avg, tok-tik))
+            for i in range(task_num - 1):
+                self.bias_optimizers.zero_grad(set_to_none=True)
+            
+            if e % 10 ==0:
+                valid_info=self._eval(valid_loader, epoch, task_num)
+                self.logger.info('[BiC valid] Loss: {:.4f} | top1: {:.4f} | top5: {:.4f}'.format( valid_info['loss'], valid_info['accuracy'], valid_info['top5']))
+                
+                if bias_correction_best_acc < valid_info['accuracy']:
+                    bias_correction_best_acc = valid_info['accuracy']
+                    self.logger.info("[Task {%d} Bias Correction Best Acc] {%.2f}".format
+                          (task_num, bias_correction_best_acc))
+                    model_dict = self.model.module.state_dict()  
+                    save_dict = {
+                        'info': valid_info,
+                        'model': model_dict,
+                        
+                        # 'optim': optimizer_dict,
+                    }
+                    save_dict.update(
+                        {'task{}_bic_model_{}'.format(task_num,i): self.bias_layers[i].state_dict() for i in range(task_num - 1)})
+                    torch.save(save_dict, os.path.join(
+                        self.save_path, self.time_data, 'best_task{}_bias_corrected_model.pt'.format(task_num)))
+                    print("Save Best Accuracy Model")
 
-    #     tok = time.time()
-    #     self.logger.info('[train] Loss: {:.4f} | top1: {:.4f} | top5: {:.4f} | time: {:.3f}'.format(
-    #         losses.avg, top1.avg, top5.avg, tok-tik))
-    #     optimizer.zero_grad(set_to_none=True)
-    #     return {'loss': losses.avg, 'accuracy': top1.avg.item(), 'top5': top5.avg.item()}
+        return {'loss': losses.avg, 'accuracy': top1.avg.item(), 'top5': top5.avg.item()}
