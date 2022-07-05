@@ -30,22 +30,22 @@ class ICARL(Baseline):
         self.exemplar_set = []
         self.class_mean_set = []
 
-        if self.configs['dataset'] in ['tiny-imagenet','imagenet']:
-            self.dataset_class=ImageDatasetFromLoc
+        if self.configs['dataset'] in ['tiny-imagenet', 'imagenet']:
+            self.dataset_class = ImageDatasetFromLoc
         elif 'cifar' in self.configs['dataset']:
-            self.dataset_class=ImageDatasetFromData
+            self.dataset_class = ImageDatasetFromData
         else:
-            raise NotImplementedError('Dataset {} not supported'.format(self.configs['dataset']))
+            raise NotImplementedError(
+                'Dataset {} not supported'.format(self.configs['dataset']))
 
         self.criterion = nn.CrossEntropyLoss().to(self.device)
         self.none_reduction_criterion = nn.CrossEntropyLoss(
             reduction='none').to(self.device)
 
-
     def run(self, dataset_path):
         self.datasetloader = CILDatasetLoader(
             self.configs, dataset_path, self.device)
-        train_loader, valid_loader = self.datasetloader.get_settled_dataloader() #init for once
+        train_loader, valid_loader = self.datasetloader.get_settled_dataloader()  # init for once
 
         ## Hyper Parameter setting ##
         self.criterion = nn.CrossEntropyLoss().to(self.device)
@@ -56,7 +56,7 @@ class ICARL(Baseline):
         tik = time.time()
         learning_time = AverageMeter('Time', ':6.3f')
         tasks_acc = []
-        finetune_acc=[]
+        finetune_acc = []
 
         # Task Init loader #
         self.model.eval()
@@ -64,7 +64,7 @@ class ICARL(Baseline):
         # saving=True
         for task_num in range(1, self.configs['task_size']+1):
             task_tik = time.time()
-            task_best_valid_acc=0
+            task_best_valid_acc = 0
 
             if self.configs['task_size'] > 0:
                 self.incremental_weight(task_num)
@@ -77,48 +77,58 @@ class ICARL(Baseline):
             lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
                 optimizer, self.configs['lr_steps'], self.configs['gamma'])
             adding_classes_list = [self.task_step *
-                                    (task_num-1), self.task_step*task_num]
+                                   (task_num-1), self.task_step*task_num]
 
-            if (self.configs['natural_inversion'] or self.configs['generative_inversion']) and task_num>1:
+            if (self.configs['natural_inversion'] or self.configs['generative_inversion']) and task_num > 1:
                 self.datasetloader.train_data.update(
-                    adding_classes_list) # update for class incremental style #
+                    adding_classes_list)  # update for class incremental style #
                 if 'cifar' in self.configs['dataset']:
-                    datas,labels=[],[]
-                    for lbl,img in zip(inv_labels,inv_images):
-                        for l,i in zip(lbl,img): 
+                    datas, labels = [], []
+                    for lbl, img in zip(inv_labels, inv_images):
+                        for l, i in zip(lbl, img):
 
-                            data = np.transpose(np.array(i),(1,2,0))
+                            data = np.transpose(np.array(i), (1, 2, 0))
                             datas.append(data.astype(np.uint8))
                             labels.append(np.array([l]))
 
-                    inv_images=np.stack(datas,axis=0) # list (np.array(32,32,3),...) -> stack (bsz,32,32,3)
-                    inv_labels= np.concatenate(labels,axis=0).reshape(-1)
+                    # list (np.array(32,32,3),...) -> stack (bsz,32,32,3)
+                    inv_images = np.stack(datas, axis=0)
+                    inv_labels = np.concatenate(labels, axis=0).reshape(-1)
                     # indexing
-                    inv_filtered_images=[]
-                    inv_filtered_labels=[]
-                    size_of_exemplar=self.configs['memory_size']//(self.current_num_classes-self.task_step)
-                    for cls_idx in range(0,self.current_num_classes-self.task_step):
-                        inv_filtered_images.append(inv_images[inv_labels==cls_idx][:size_of_exemplar]) # size of exemplar is from prev task_id.
-                        inv_filtered_labels.append(inv_labels[inv_labels==cls_idx][:size_of_exemplar])
-                    inv_images=np.concatenate(inv_filtered_images,axis=0)
-                    inv_labels= np.concatenate(inv_filtered_labels,axis=0).reshape(-1)
-                    self.datasetloader.train_data.data=np.concatenate((self.datasetloader.train_data.data,inv_images),axis=0)
-                    self.datasetloader.train_data.targets=np.concatenate((self.datasetloader.train_data.targets,inv_labels),axis=0)
-                    print('The size of train set is {}'.format(len(self.datasetloader.train_data.data)))
+                    inv_filtered_images = []
+                    inv_filtered_labels = []
+                    size_of_exemplar = self.configs['memory_size']//(
+                        self.current_num_classes-self.task_step)
+                    for cls_idx in range(0, self.current_num_classes-self.task_step):
+                        # size of exemplar is from prev task_id.
+                        inv_filtered_images.append(
+                            inv_images[inv_labels == cls_idx][:size_of_exemplar])
+                        inv_filtered_labels.append(
+                            inv_labels[inv_labels == cls_idx][:size_of_exemplar])
+                    inv_images = np.concatenate(inv_filtered_images, axis=0)
+                    inv_labels = np.concatenate(
+                        inv_filtered_labels, axis=0).reshape(-1)
+                    self.datasetloader.train_data.data = np.concatenate(
+                        (self.datasetloader.train_data.data, inv_images), axis=0)
+                    self.datasetloader.train_data.targets = np.concatenate(
+                        (self.datasetloader.train_data.targets, inv_labels), axis=0)
+                    print('The size of train set is {}'.format(
+                        len(self.datasetloader.train_data.data)))
                 else:
                     # If we want need to save directory
                     raise NotADirectoryError
             else:
                 self.datasetloader.train_data.update(
-                    adding_classes_list, self.exemplar_set) # update for class incremental style #
+                    adding_classes_list, self.exemplar_set)  # update for class incremental style #
             self.datasetloader.test_data.update(
-                adding_classes_list, self.exemplar_set) # Don't need to update loader
+                adding_classes_list, self.exemplar_set)  # Don't need to update loader
 
             ###################
             for epoch in range(1, self.configs['epochs'] + 1):
                 epoch_tik = time.time()
 
-                train_info = self._train(train_loader,optimizer, epoch, task_num)
+                train_info = self._train(
+                    train_loader, optimizer, epoch, task_num)
                 valid_info = self._eval(valid_loader, epoch, task_num)
 
                 for key in train_info.keys():
@@ -166,38 +176,71 @@ class ICARL(Baseline):
             ## after train- process exemplar set ##
             if self.configs['natural_inversion']:
                 from utils.naturalinversion.naturalinversion import get_inversion_images
-                prefix=os.path.join(self.save_path, self.time_data)
-                inv_images,inv_labels=get_inversion_images(self.model,[self.current_num_classes,self.current_num_classes+self.task_step],task_num,epochs=self.configs['inversion_epochs'],prefix=prefix,global_iteration=task_num,bn_reg_scale=3,g_lr=0.001,d_lr=0.0005,a_lr=0.05,var_scale=0.001,l2_coeff=0.00001,bs=self.configs['inversion_batch_size'],num_generate_images=self.configs['memory_size'],latent_dim=self.configs['latent_dim'],configs=self.configs,device=self.device)
+                prefix = os.path.join(self.save_path, self.time_data)
+                inv_images, inv_labels = get_inversion_images(self.model,
+                                                              num_classes=[
+                                                                  self.current_num_classes, self.current_num_classes+self.task_step],
+                                                              task=task_num,
+                                                              epochs=self.configs['inversion_epochs'],
+                                                              prefix=prefix,
+                                                              global_iteration=task_num, bn_reg_scale=3,
+                                                              g_lr=0.001,
+                                                              d_lr=0.0005,
+                                                              a_lr=0.05,
+                                                              var_scale=0.001,
+                                                              l2_coeff=0.00001,
+                                                              bs=self.configs['inversion_batch_size'],
+                                                              num_generate_images=self.configs['memory_size'],
+                                                              latent_dim=self.configs['latent_dim'],
+                                                              configs=self.configs,
+                                                              device=self.device)
             elif self.configs['generative_inversion']:
                 from model.generative_model.generative_network import get_inversion_images
-                prefix=os.path.join(self.save_path, self.time_data)
-                inv_images,inv_labels=get_inversion_images(self.model,[self.current_num_classes,self.current_num_classes+self.task_step],task_num,epochs=self.configs['inversion_epochs'],prefix=prefix,global_iteration=task_num,bn_reg_scale=3,g_lr=0.001,d_lr=0.0005,a_lr=0.05,var_scale=0.001,l2_coeff=0.00001,bs=self.configs['inversion_batch_size'], num_generate_images=self.configs['memory_size'],latent_dim=self.configs['latent_dim'],configs=self.configs,device=self.device)
+                prefix = os.path.join(self.save_path, self.time_data)
+                inv_images, inv_labels = get_inversion_images(self.model,
+                                                              num_classes=[
+                                                                  self.current_num_classes, self.current_num_classes+self.task_step],
+                                                              task=task_num,
+                                                              epochs=self.configs['inversion_epochs'],
+                                                              prefix=prefix,
+                                                              global_iteration=task_num, bn_reg_scale=3,
+                                                              g_lr=0.001,
+                                                              d_lr=0.0005,
+                                                              a_lr=0.05,
+                                                              var_scale=0.001,
+                                                              l2_coeff=0.00001,
+                                                              bs=self.configs['inversion_batch_size'],
+                                                              num_generate_images=self.configs['memory_size'],
+                                                              latent_dim=self.configs['latent_dim'],
+                                                              configs=self.configs,
+                                                              device=self.device)
             else:
                 self.model.eval()
                 print('')
                 with torch.no_grad():
-                    m = int(self.configs['memory_size']/self.current_num_classes)
+                    m = int(self.configs['memory_size'] /
+                            self.current_num_classes)
                     self._reduce_exemplar_sets(m)  # exemplar reduce
                     # for each class
                     for class_id in range(self.task_step*(task_num-1), self.task_step*(task_num)):
                         print('\r Construct class %s exemplar set...' %
-                            (class_id), end='')
+                              (class_id), end='')
                         self._construct_exemplar_set(class_id, m)
 
                     self.compute_exemplar_class_mean()
                     KNN_accuracy = self._eval(
                         valid_loader, epoch, task_num)['accuracy']
-                    self.logger.info("NMS accuracy: {}".format(str(KNN_accuracy)))
+                    self.logger.info(
+                        "NMS accuracy: {}".format(str(KNN_accuracy)))
 
-            
             self.current_num_classes += self.task_step
             #######################################
         tok = time.time()
-        h,m,s=convert_secs2time(tok-tik)
+        h, m, s = convert_secs2time(tok-tik)
         print('Total Learning Time: {:2d}h {:2d}m {:2d}s'.format(
-            h,m,s))
-        str_acc=' '.join("{:.2f}".format(x) for x in tasks_acc)
-        self.logger.info("Task Accs:",str_acc)
+            h, m, s))
+        str_acc = ' '.join("{:.2f}".format(x) for x in tasks_acc)
+        self.logger.info("Task Accs:", str_acc)
 
         ############## info save #################
         import copy
@@ -232,7 +275,7 @@ class ICARL(Baseline):
             self.best_valid_accuracy))
         ##############
 
-    def _train(self, loader,optimizer, epoch, task_num):
+    def _train(self, loader, optimizer, epoch, task_num):
 
         tik = time.time()
         self.model.train()
@@ -256,9 +299,9 @@ class ICARL(Baseline):
             if self.old_model == None:
                 loss = F.binary_cross_entropy_with_logits(
                     outputs, target_reweighted)
-            elif task_num>1: # second step
-                old_target,_=self.old_model(images)
-                old_target=torch.sigmoid(old_target)
+            elif task_num > 1:  # second step
+                old_target, _ = self.old_model(images)
+                old_target = torch.sigmoid(old_target)
                 old_task_size = old_target.shape[1]
                 # print(old_task_size,old_target.shape,target.shape)
                 target_reweighted[..., :old_task_size] = old_target
@@ -336,26 +379,29 @@ class ICARL(Baseline):
                 end = time.time()
                 i += 1
         if task_num == 1 or (self.configs['natural_inversion'] or self.configs['generative_inversion']):
-            self.logger.info('[eval] [{:3d} epoch] Loss: {:.4f} | top1: {:.4f} | top5: {:.4f}'.format(epoch, losses.avg, top1.avg, top5.avg))
+            self.logger.info('[eval] [{:3d} epoch] Loss: {:.4f} | top1: {:.4f} | top5: {:.4f}'.format(
+                epoch, losses.avg, top1.avg, top5.avg))
         else:
-            self.logger.info('[eval] [{:3d} epoch] Loss: {:.4f} | top1: {:.4f} | top5: {:.4f} | NMS: {:.4f}'.format(epoch, losses.avg, top1.avg, top5.avg, 100.*nms_correct/all_total))
+            self.logger.info('[eval] [{:3d} epoch] Loss: {:.4f} | top1: {:.4f} | top5: {:.4f} | NMS: {:.4f}'.format(
+                epoch, losses.avg, top1.avg, top5.avg, 100.*nms_correct/all_total))
 
         return {'loss': losses.avg, 'accuracy': top1.avg.item(), 'top5': top5.avg.item()}
-    
 
     def _reduce_exemplar_sets(self, m):
         print("Reducing exemplar sets!")
         for index in range(len(self.exemplar_set)):
             self.exemplar_set[index] = self.exemplar_set[index][:m]
-            print('\rThe size of class %d examplar: %s' % (index, str(len(self.exemplar_set[index]))),end='')
-            
+            print('\rThe size of class %d examplar: %s' %
+                  (index, str(len(self.exemplar_set[index]))), end='')
 
     def _construct_exemplar_set(self, class_id, m):
         cls_images = self.datasetloader.train_data.get_class_images(
             class_id)
-        cls_dataset=self.dataset_class(cls_images,transform=self.datasetloader.test_transform)
+        cls_dataset = self.dataset_class(
+            cls_images, transform=self.datasetloader.test_transform)
 
-        cls_dataloader=self.datasetloader.get_dataloader(cls_dataset,shuffle=False)
+        cls_dataloader = self.datasetloader.get_dataloader(
+            cls_dataset, shuffle=False)
         class_mean, feature_extractor_output = self.compute_class_mean(
             cls_dataloader)
         exemplar = []
@@ -374,18 +420,17 @@ class ICARL(Baseline):
         print("The size of exemplar :%s" % (str(len(exemplar))), end='')
         self.exemplar_set.append(exemplar)
 
-
     def compute_class_mean(self, cls_dataloader):
         with torch.no_grad():
             feature_extractor_outputs = []
 
             for datas in cls_dataloader:
-                if type(datas)==tuple and len(datas)==1:
-                    images=datas[0]
-                elif type(datas)==tuple and len(datas)==2:
-                    images,_=datas
+                if type(datas) == tuple and len(datas) == 1:
+                    images = datas[0]
+                elif type(datas) == tuple and len(datas) == 2:
+                    images, _ = datas
                 else:
-                    images=datas
+                    images = datas
                 images = images.to(self.device)
                 _, features = self.model(images)
                 feature_extractor_outputs.append(
@@ -406,7 +451,8 @@ class ICARL(Baseline):
             # why? transform differently #
             exemplar_dataset = self.dataset_class(
                 exemplar, transform=self.datasetloader.test_transform)
-            exemplar_dataloader = self.datasetloader.get_dataloader(exemplar_dataset,False)
+            exemplar_dataloader = self.datasetloader.get_dataloader(
+                exemplar_dataset, False)
             class_mean, _ = self.compute_class_mean(exemplar_dataloader)
             self.class_mean_set.append(class_mean)
         print("")
@@ -414,8 +460,8 @@ class ICARL(Baseline):
     def update_old_model(self):
         self.old_model = copy.deepcopy(self.model)
         self.old_model.eval()
-    
-    def incremental_weight(self,task_num):
+
+    def incremental_weight(self, task_num):
         if 'resnet' in self.configs['model']:
             fc = self.model.module.fc
         elif 'densenet' in self.configs['model']:
@@ -448,8 +494,8 @@ class ICARL(Baseline):
                 self.model.module.linear = fc
         print('{} num_classes with checksum: '.format(
             self.current_num_classes), fc)
-    
-    def fix_feature(self,model,fix=True):
+
+    def fix_feature(self, model, fix=True):
         if fix:
             for param in model.parameters():
                 param.requires_grad = False
@@ -458,10 +504,9 @@ class ICARL(Baseline):
                 param.requires_grad = True
         if fix:
             if 'resnet' in self.configs['model']:
-                model.module.fc.weight.requires_grad=fix
-                model.module.fc.bias.requires_grad=fix
+                model.module.fc.weight.requires_grad = fix
+                model.module.fc.bias.requires_grad = fix
             elif 'densenet' in self.configs['model']:
-                model.module.linear.weight.requires_grad=fix
-                model.module.linear.bias.requires_grad=fix
+                model.module.linear.weight.requires_grad = fix
+                model.module.linear.bias.requires_grad = fix
         return model
-

@@ -29,7 +29,7 @@ class EEIL(ICARL):
     def run(self, dataset_path):
         self.datasetloader = CILDatasetLoader(
             self.configs, dataset_path, self.device)
-        train_loader, valid_loader = self.datasetloader.get_settled_dataloader() #init for once
+        train_loader, valid_loader = self.datasetloader.get_settled_dataloader()  # init for once
 
         ## Hyper Parameter setting ##
         self.criterion = nn.CrossEntropyLoss().to(self.device)
@@ -40,7 +40,7 @@ class EEIL(ICARL):
         tik = time.time()
         learning_time = AverageMeter('Time', ':6.3f')
         tasks_acc = []
-        finetune_acc=[]
+        finetune_acc = []
 
         # Task Init loader #
         self.model.eval()
@@ -60,47 +60,57 @@ class EEIL(ICARL):
             lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
                 optimizer, self.configs['lr_steps'], self.configs['gamma'])
             adding_classes_list = [self.task_step *
-                                    (task_num-1), self.task_step*task_num]
-            if (self.configs['natural_inversion'] or self.configs['generative_inversion']) and task_num>1:
+                                   (task_num-1), self.task_step*task_num]
+            if (self.configs['natural_inversion'] or self.configs['generative_inversion']) and task_num > 1:
                 self.datasetloader.train_data.update(
-                    adding_classes_list) # update for class incremental style #
+                    adding_classes_list)  # update for class incremental style #
                 if 'cifar' in self.configs['dataset']:
-                    datas,labels=[],[]
-                    for lbl,img in zip(inv_labels,inv_images):
-                        for l,i in zip(lbl,img): 
+                    datas, labels = [], []
+                    for lbl, img in zip(inv_labels, inv_images):
+                        for l, i in zip(lbl, img):
 
-                            data = np.transpose(np.array(i),(1,2,0))
+                            data = np.transpose(np.array(i), (1, 2, 0))
                             datas.append(data.astype(np.uint8))
                             labels.append(np.array([l]))
 
-                    inv_images=np.stack(datas,axis=0) # list (np.array(32,32,3),...) -> stack (bsz,32,32,3)
-                    inv_labels= np.concatenate(labels,axis=0).reshape(-1)
+                    # list (np.array(32,32,3),...) -> stack (bsz,32,32,3)
+                    inv_images = np.stack(datas, axis=0)
+                    inv_labels = np.concatenate(labels, axis=0).reshape(-1)
                     # indexing
-                    inv_filtered_images=[]
-                    inv_filtered_labels=[]
-                    size_of_exemplar=self.configs['memory_size']//(self.current_num_classes-self.task_step)
-                    for cls_idx in range(0,self.current_num_classes-self.task_step):
-                        inv_filtered_images.append(inv_images[inv_labels==cls_idx][:size_of_exemplar]) # size of exemplar is from prev task_id.
-                        inv_filtered_labels.append(inv_labels[inv_labels==cls_idx][:size_of_exemplar])
-                    inv_images=np.concatenate(inv_filtered_images,axis=0)
-                    inv_labels= np.concatenate(inv_filtered_labels,axis=0).reshape(-1)
-                    self.datasetloader.train_data.data=np.concatenate((self.datasetloader.train_data.data,inv_images),axis=0)
-                    self.datasetloader.train_data.targets=np.concatenate((self.datasetloader.train_data.targets,inv_labels),axis=0)
-                    print('The size of train set is {}'.format(len(self.datasetloader.train_data.data)))
+                    inv_filtered_images = []
+                    inv_filtered_labels = []
+                    size_of_exemplar = self.configs['memory_size']//(
+                        self.current_num_classes-self.task_step)
+                    for cls_idx in range(0, self.current_num_classes-self.task_step):
+                        # size of exemplar is from prev task_id.
+                        inv_filtered_images.append(
+                            inv_images[inv_labels == cls_idx][:size_of_exemplar])
+                        inv_filtered_labels.append(
+                            inv_labels[inv_labels == cls_idx][:size_of_exemplar])
+                    inv_images = np.concatenate(inv_filtered_images, axis=0)
+                    inv_labels = np.concatenate(
+                        inv_filtered_labels, axis=0).reshape(-1)
+                    self.datasetloader.train_data.data = np.concatenate(
+                        (self.datasetloader.train_data.data, inv_images), axis=0)
+                    self.datasetloader.train_data.targets = np.concatenate(
+                        (self.datasetloader.train_data.targets, inv_labels), axis=0)
+                    print('The size of train set is {}'.format(
+                        len(self.datasetloader.train_data.data)))
                 else:
                     # If we want need to save directory
                     raise NotADirectoryError
             else:
                 self.datasetloader.train_data.update(
-                    adding_classes_list, self.exemplar_set) # update for class incremental style #
+                    adding_classes_list, self.exemplar_set)  # update for class incremental style #
             self.datasetloader.test_data.update(
-                adding_classes_list, self.exemplar_set) # Don't need to update loader
+                adding_classes_list, self.exemplar_set)  # Don't need to update loader
 
-            task_best_valid_acc=0
+            task_best_valid_acc = 0
             for epoch in range(1, self.configs['epochs'] + 1):
                 epoch_tik = time.time()
 
-                train_info = self._train(train_loader,optimizer, epoch, task_num)
+                train_info = self._train(
+                    train_loader, optimizer, epoch, task_num)
                 valid_info = self._eval(valid_loader, epoch, task_num)
 
                 for key in train_info.keys():
@@ -128,22 +138,31 @@ class EEIL(ICARL):
             #####################
 
             # End of regular learning: FineTuning #
-            if task_num>1:
-                size_of_bft_exemplar=self.configs['memory_size']//(self.current_num_classes-self.task_step)
-                bft_train_dataset = self.datasetloader.train_data.get_bft_data(size_of_bft_exemplar)
+            if task_num > 1:
+                size_of_bft_exemplar = self.configs['memory_size']//(
+                    self.current_num_classes-self.task_step)
+                bft_train_dataset = self.datasetloader.train_data.get_bft_data(
+                    size_of_bft_exemplar)
                 if 'cifar' in self.configs['dataset']:
                     print("Len bft data: {}".format(len(bft_train_dataset[0])))
-                    images,labels=data_augmentation_e2e(bft_train_dataset[0],bft_train_dataset[1])
-                    bft_dataset=self.dataset_class(images,labels,self.datasetloader.test_transform,return_idx=True)
+                    images, labels = data_augmentation_e2e(
+                        bft_train_dataset[0], bft_train_dataset[1])
+                    bft_dataset = self.dataset_class(
+                        images, labels, self.datasetloader.test_transform, return_idx=True)
                     print("After EEIL Len: {}".format(len(bft_dataset)))
-                elif self.configs['dataset'] in ['tiny-imagenet','imagenet']:
-                    bft_dataset=self.dataset_class(bft_train_dataset,self.datasetloader.train_transform,return_idx=True)
-                    raise Warning('FineTuning is not supported for {} dataset'.format(self.configs['dataset']))
+                elif self.configs['dataset'] in ['tiny-imagenet', 'imagenet']:
+                    bft_dataset = self.dataset_class(
+                        bft_train_dataset, self.datasetloader.train_transform, return_idx=True)
+                    raise Warning('FineTuning is not supported for {} dataset'.format(
+                        self.configs['dataset']))
                 else:
                     raise NotImplementedError
-                bft_train_loader = self.datasetloader.get_dataloader(bft_dataset,True)
-                valid_info=self.balance_fine_tune(bft_train_loader, valid_loader,task_num)
-                self.logger.info("[{} task] Fine-tune accuracy: {:.2f}".format(task_num,valid_info['accuracy']))
+                bft_train_loader = self.datasetloader.get_dataloader(
+                    bft_dataset, True)
+                valid_info = self.balance_fine_tune(
+                    bft_train_loader, valid_loader, task_num)
+                self.logger.info(
+                    "[{} task] Fine-tune accuracy: {:.2f}".format(task_num, valid_info['accuracy']))
             finetune_acc.append(valid_info['accuracy'])
             self.update_old_model()
             #######################################
@@ -151,40 +170,43 @@ class EEIL(ICARL):
             ## after train- process exemplar set ##
             if self.configs['natural_inversion']:
                 from utils.naturalinversion.naturalinversion import get_inversion_images
-                prefix=os.path.join(self.save_path, self.time_data)
-                inv_images,inv_labels=get_inversion_images(self.model,[self.current_num_classes,self.current_num_classes+self.task_step],task_num,epochs=self.configs['inversion_epochs'],prefix=prefix,global_iteration=task_num,bn_reg_scale=3,g_lr=0.001,d_lr=0.0005,a_lr=0.05,var_scale=0.001,l2_coeff=0.00001,bs=self.configs['inversion_batch_size'],num_generate_images=self.configs['memory_size'],latent_dim=self.configs['latent_dim'],configs=self.configs,device=self.device)
+                prefix = os.path.join(self.save_path, self.time_data)
+                inv_images, inv_labels = get_inversion_images(self.model, [self.current_num_classes, self.current_num_classes+self.task_step], task_num, epochs=self.configs['inversion_epochs'], prefix=prefix, global_iteration=task_num, bn_reg_scale=3,
+                                                              g_lr=0.001, d_lr=0.0005, a_lr=0.05, var_scale=0.001, l2_coeff=0.00001, bs=self.configs['inversion_batch_size'], num_generate_images=self.configs['memory_size'], latent_dim=self.configs['latent_dim'], configs=self.configs, device=self.device)
             elif self.configs['generative_inversion']:
                 from model.generative_model.generative_network import get_inversion_images
-                prefix=os.path.join(self.save_path, self.time_data)
-                inv_images,inv_labels=get_inversion_images(self.model,[self.current_num_classes,self.current_num_classes+self.task_step],task_num,epochs=self.configs['inversion_epochs'],prefix=prefix,global_iteration=task_num,bn_reg_scale=3,g_lr=0.001,d_lr=0.0005,a_lr=0.05,var_scale=0.001,l2_coeff=0.00001,bs=self.configs['inversion_batch_size'], num_generate_images=self.configs['memory_size'],latent_dim=self.configs['latent_dim'],configs=self.configs,device=self.device)
+                prefix = os.path.join(self.save_path, self.time_data)
+                inv_images, inv_labels = get_inversion_images(self.model, [self.current_num_classes, self.current_num_classes+self.task_step], task_num, epochs=self.configs['inversion_epochs'], prefix=prefix, global_iteration=task_num, bn_reg_scale=3,
+                                                              g_lr=0.001, d_lr=0.0005, a_lr=0.05, var_scale=0.001, l2_coeff=0.00001, bs=self.configs['inversion_batch_size'], num_generate_images=self.configs['memory_size'], latent_dim=self.configs['latent_dim'], configs=self.configs, device=self.device)
             else:
                 self.model.eval()
                 print('')
                 with torch.no_grad():
-                    m = int(self.configs['memory_size']/self.current_num_classes)
+                    m = int(self.configs['memory_size'] /
+                            self.current_num_classes)
                     self._reduce_exemplar_sets(m)  # exemplar reduce
                     # for each class
                     for class_id in range(self.task_step*(task_num-1), self.task_step*(task_num)):
                         print('\r Construct class %s exemplar set...' %
-                            (class_id), end='')
+                              (class_id), end='')
                         self._construct_exemplar_set(class_id, m)
 
                     self.compute_exemplar_class_mean()
                     KNN_accuracy = self._eval(
                         valid_loader, epoch, task_num)['accuracy']
-                    self.logger.info("NMS accuracy: {}".format(str(KNN_accuracy)))
+                    self.logger.info(
+                        "NMS accuracy: {}".format(str(KNN_accuracy)))
 
-            
             self.current_num_classes += self.task_step
             #######################################
 
         tok = time.time()
-        h,m,s=convert_secs2time(tok-tik)
+        h, m, s = convert_secs2time(tok-tik)
         print('Total Learning Time: {:2d}h {:2d}m {:2d}s'.format(
-            h,m,s))
-        str_acc=' '.join("{:.2f}".format(x) for x in tasks_acc)
+            h, m, s))
+        str_acc = ' '.join("{:.2f}".format(x) for x in tasks_acc)
         self.logger.info("Task Accs: {}".format(str_acc))
-        str_acc=' '.join("{:.2f}".format(x) for x in finetune_acc)
+        str_acc = ' '.join("{:.2f}".format(x) for x in finetune_acc)
         self.logger.info("Finetune Accs: {}".format(str_acc))
 
         ############## info save #################
@@ -248,17 +270,22 @@ class EEIL(ICARL):
                     score, _ = self.old_model(images)
                 if balance_finetune:
                     soft_target = torch.softmax(score[:, self.current_num_classes -
-                                            self.task_step:self.current_num_classes]/self.configs['temperature'],dim=1)
+                                                      self.task_step:self.current_num_classes]/self.configs['temperature'], dim=1)
                     output_logits = (outputs[:, self.current_num_classes -
-                                            self.task_step:self.current_num_classes]/self.configs['temperature'])
-                    kd_loss = self.configs['lamb']* self.onehot_criterion(output_logits,soft_target) # distillation entropy loss
+                                             self.task_step:self.current_num_classes]/self.configs['temperature'])
+                    # distillation entropy loss
+                    kd_loss = self.configs['lamb'] * \
+                        self.onehot_criterion(output_logits, soft_target)
                 else:
                     kd_loss = torch.zeros(task_num)
                     for t in range(task_num-1):
                         # local distillation
-                        soft_target =  torch.softmax(score [:,self.task_step*t:self.task_step*(t+1)] / self.configs['temperature'],dim=1)
-                        output_logits = (outputs[:,self.task_step*t:self.task_step*(t+1)] / self.configs['temperature'])
-                        kd_loss[t] = self.configs['lamb']*self.onehot_criterion(output_logits, soft_target)
+                        soft_target = torch.softmax(
+                            score[:, self.task_step*t:self.task_step*(t+1)] / self.configs['temperature'], dim=1)
+                        output_logits = (
+                            outputs[:, self.task_step*t:self.task_step*(t+1)] / self.configs['temperature'])
+                        kd_loss[t] = self.configs['lamb'] * \
+                            self.onehot_criterion(output_logits, soft_target)
                     kd_loss = kd_loss.sum()
                 loss = kd_loss+cls_loss
 
@@ -275,7 +302,8 @@ class EEIL(ICARL):
             # Page 8: "We apply L2-regularization and random noise [21] (with parameters eta = 0.3, gamma = 0.55)
             # on the gradients to minimize overfitting"
             # https://github.com/fmcp/EndToEndIncrementalLearning/blob/master/cnn_train_dag_exemplars.m#L367
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.configs['clip_grad'])
+            torch.nn.utils.clip_grad_norm_(
+                self.model.parameters(), self.configs['clip_grad'])
             optimizer.step()
 
             # measure elapsed time
@@ -291,7 +319,7 @@ class EEIL(ICARL):
         optimizer.zero_grad(set_to_none=True)
         return {'loss': losses.avg, 'accuracy': top1.avg.item(), 'top5': top5.avg.item()}
 
-    def balance_fine_tune(self,train_loader,valid_loader,task_num):
+    def balance_fine_tune(self, train_loader, valid_loader, task_num):
         self.old_model = copy.deepcopy(self.model)
         self.old_model.eval()
         # self.model=self.fix_feature(self.model,True)
@@ -300,16 +328,17 @@ class EEIL(ICARL):
         ), lr=self.configs['lr']/10.0, momentum=self.configs['momentum'], weight_decay=self.configs['weight_decay'])
 
         bftepoch = 30
-        bft_lr_steps= [10,20]
+        bft_lr_steps = [10, 20]
         lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
             optimizer, bft_lr_steps, self.configs['gamma'])
         task_best_valid_acc = 0
         print('==start fine-tuning==')
-        for epoch in range(1,bftepoch+1):
-            self._train(train_loader, optimizer, epoch, 0, balance_finetune=True)
+        for epoch in range(1, bftepoch+1):
+            self._train(train_loader, optimizer, epoch,
+                        0, balance_finetune=True)
             optimizer.zero_grad(set_to_none=True)
             lr_scheduler.step()
-            valid_info=self._eval(valid_loader, epoch, 0)
+            valid_info = self._eval(valid_loader, epoch, 0)
             if task_best_valid_acc < valid_info['accuracy']:
                 task_best_valid_acc = valid_info['accuracy']
                 ## save best model ##
@@ -329,20 +358,21 @@ class EEIL(ICARL):
         # self.model=self.fix_feature(self.model,False)
         return {'loss': task_best_valid_loss, 'accuracy': task_best_valid_acc}
 
-
     def _reduce_exemplar_sets(self, m):
         print("Reducing exemplar sets!")
         for index in range(len(self.exemplar_set)):
             self.exemplar_set[index] = self.exemplar_set[index][:m]
-            print('\rThe size of class %d examplar: %s' % (index, str(len(self.exemplar_set[index]))),end='')
-            
+            print('\rThe size of class %d examplar: %s' %
+                  (index, str(len(self.exemplar_set[index]))), end='')
 
     def _construct_exemplar_set(self, class_id, m):
         cls_images = self.datasetloader.train_data.get_class_images(
             class_id)
-        cls_dataset=self.dataset_class(cls_images,transform=self.datasetloader.test_transform)
+        cls_dataset = self.dataset_class(
+            cls_images, transform=self.datasetloader.test_transform)
 
-        cls_dataloader=self.datasetloader.get_dataloader(cls_dataset,shuffle=False)
+        cls_dataloader = self.datasetloader.get_dataloader(
+            cls_dataset, shuffle=False)
         class_mean, feature_extractor_output = self.compute_class_mean(
             cls_dataloader)
         exemplar = []
@@ -361,18 +391,17 @@ class EEIL(ICARL):
         print("The size of exemplar :%s" % (str(len(exemplar))), end='')
         self.exemplar_set.append(exemplar)
 
-
     def compute_class_mean(self, cls_dataloader):
         with torch.no_grad():
             feature_extractor_outputs = []
 
             for datas in cls_dataloader:
-                if type(datas)==tuple and len(datas)==1:
-                    images=datas[0]
-                elif type(datas)==tuple and len(datas)==2:
-                    images,_=datas
+                if type(datas) == tuple and len(datas) == 1:
+                    images = datas[0]
+                elif type(datas) == tuple and len(datas) == 2:
+                    images, _ = datas
                 else:
-                    images=datas
+                    images = datas
                 images = images.to(self.device)
                 _, features = self.model(images)
                 feature_extractor_outputs.append(
@@ -393,14 +422,16 @@ class EEIL(ICARL):
             # why? transform differently #
             exemplar_dataset = self.dataset_class(
                 exemplar, transform=self.datasetloader.test_transform)
-            exemplar_dataloader = self.datasetloader.get_dataloader(exemplar_dataset,False)
+            exemplar_dataloader = self.datasetloader.get_dataloader(
+                exemplar_dataset, False)
             class_mean, _ = self.compute_class_mean(exemplar_dataloader)
             self.class_mean_set.append(class_mean)
         print("")
-    
+
     def _noise_grad(self, parameters, iteration, eta=0.3, gamma=0.55):
         """Add noise to the gradients"""
         parameters = list(filter(lambda p: p.grad is not None, parameters))
         variance = eta / ((1 + iteration) ** gamma)
         for p in parameters:
-            p.grad.add_(torch.randn(p.grad.shape, device=p.grad.device) * variance)
+            p.grad.add_(torch.randn(
+                p.grad.shape, device=p.grad.device) * variance)
