@@ -58,6 +58,7 @@ class BiC(EEIL):
         tik = time.time()
         learning_time = AverageMeter('Time', ':6.3f')
         tasks_acc = []
+        after_bic_tasks_acc=[0.0]
 
         # Task Init loader #
         self.model.eval()
@@ -179,7 +180,9 @@ class BiC(EEIL):
             self.update_old_model()
             #######################################
             if task_num>1:
-                self.train_bias_correction(bic_loader,valid_loader,epoch,task_num)
+                print("==== Start Bias Correction ====")
+                bic_info=self.train_bias_correction(bic_loader,valid_loader,epoch,task_num)
+                after_bic_tasks_acc.append(bic_info['accuracy'])
 
             ## after train- process exemplar set ##
             if self.configs['natural_inversion']:
@@ -223,7 +226,10 @@ class BiC(EEIL):
         print('Total Learning Time: {:2d}h {:2d}m {:2d}s'.format(
             h,m,s))
         str_acc=' '.join("{:.2f}".format(x) for x in tasks_acc)
-        self.logger.info("Task Accs: {}".format(str_acc))
+        self.logger.info("Task Accs before BiC: {}".format(str_acc))
+
+        str_acc=' '.join("{:.2f}".format(x) for x in after_bic_tasks_acc)
+        self.logger.info("Task Accs after BiC: {}".format(str_acc))
 
         ############## info save #################
         df_dict = copy.deepcopy(self.configs)
