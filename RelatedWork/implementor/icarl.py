@@ -1,6 +1,5 @@
 import copy
-from data.cil_data_load import CILDatasetLoader
-from data.custom_dataset import ImageDataset
+from data.cil_data_load import CILDatasetLoaderv2
 from implementor.baseline import Baseline
 import torch
 import torch.nn as nn
@@ -44,23 +43,40 @@ class ICARL(Baseline):
 
 
     def run(self, dataset_path):
-        self.datasetloader = CILDatasetLoader(
+        self.datasetloader = CILDatasetLoaderv2(
             self.configs, dataset_path, self.device)
-        train_loader, valid_loader = self.datasetloader.get_dataloader()
+        train_loader, valid_loader = self.datasetloader.get_settled_dataloader() #init for once
+
+        ## Hyper Parameter setting ##
+        self.criterion = nn.CrossEntropyLoss().to(self.device)
+        self.none_reduction_criterion = nn.CrossEntropyLoss(
+            reduction='none').to(self.device)
+
         ## training ##
         tik = time.time()
         learning_time = AverageMeter('Time', ':6.3f')
         tasks_acc = []
-    
+        finetune_acc=[]
+
+        # Task Init loader #
+        self.model.eval()
+
+        # saving=True
         for task_num in range(1, self.configs['task_size']+1):
             task_tik = time.time()
-            task_best_valid_acc = 0
-            # get incremental train data
-            self.model.eval()
+
+            if self.configs['task_size'] > 0:
+                self.incremental_weight(task_num)
+                self.model.train()
+                self.model.to(self.device)
+
+            ## training info ##
+            optimizer = torch.optim.SGD(self.model.parameters(
+            ), self.configs['lr'], self.configs['momentum'], weight_decay=self.configs['weight_decay'], nesterov=self.configs['nesterov'])
+            lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
+                optimizer, self.configs['lr_steps'], self.configs['gamma'])
             adding_classes_list = [self.task_step *
-                                   (task_num-1), self.task_step*(task_num)]
-            self.train_loader, self.test_loader = self.datasetloader.get_updated_dataloader(
-                adding_classes_list, self.exemplar_set)
+                                    (task_num-1), self.task_step*task_num]
 
             if self.configs['task_size'] > 0:
                 self.incremental_weight(task_num)
@@ -72,6 +88,41 @@ class ICARL(Baseline):
             ), self.configs['lr'], self.configs['momentum'], weight_decay=self.configs['weight_decay'], nesterov=self.configs['nesterov'])
             lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
                 self.optimizer, self.configs['lr_steps'], self.configs['gamma'])
+            if (self.configs['natural_inversion'] or self.configs['generative_inversion']) and task_num>1:
+                self.datasetloader.train_data.update(
+                    adding_classes_list) # update for class incremental style #
+                if 'cifar' in self.configs['dataset']:
+                    datas,labels=[],[]
+                    for lbl,img in zip(inv_labels,inv_images):
+                        for l,i in zip(lbl,img): 
+
+                            data = np.transpose(np.array(i),(1,2,0))
+                            datas.append(data.astype(np.uint8))
+                            labels.append(np.array([l]))
+
+                    inv_images=np.stack(datas,axis=0) # list (np.array(32,32,3),...) -> stack (bsz,32,32,3)
+                    inv_labels= np.concatenate(labels,axis=0).reshape(-1)
+                    # indexing
+                    inv_filtered_images=[]
+                    inv_filtered_labels=[]
+                    size_of_exemplar=self.configs['memory_size']//(self.current_num_classes-self.task_step)
+                    for cls_idx in range(0,self.current_num_classes-self.task_step):
+                        inv_filtered_images.append(inv_images[inv_labels==cls_idx][:size_of_exemplar]) # size of exemplar is from prev task_id.
+                        inv_filtered_labels.append(inv_labels[inv_labels==cls_idx][:size_of_exemplar])
+                    inv_images=np.concatenate(inv_filtered_images,axis=0)
+                    inv_labels= np.concatenate(inv_filtered_labels,axis=0).reshape(-1)
+                    self.datasetloader.train_data.data=np.concatenate((self.datasetloader.train_data.data,inv_images),axis=0)
+                    self.datasetloader.train_data.targets=np.concatenate((self.datasetloader.train_data.targets,inv_labels),axis=0)
+                    print('The size of train set is {}'.format(len(self.datasetloader.train_data.data)))
+                else:
+                    # If we want need to save directory
+                    raise NotADirectoryError
+            else:
+                self.datasetloader.train_data.update(
+                    adding_classes_list, self.exemplar_set) # update for class incremental style #
+            self.datasetloader.test_data.update(
+                adding_classes_list, self.exemplar_set) # Don't need to update loader
+
             ###################
             for epoch in range(1, self.configs['epochs'] + 1):
                 epoch_tik = time.time()
@@ -122,10 +173,15 @@ class ICARL(Baseline):
             #####################
 
             ## after train- process exemplar set ##
-            KNN_accuracy = self._eval(
-                valid_loader, epoch, task_num)['accuracy']
-            print("NMS accuracy: "+str(KNN_accuracy))
-            if task_num != self.configs['task_size']:
+            if self.configs['natural_inversion']:
+                from utils.naturalinversion.naturalinversion import get_inversion_images
+                prefix=os.path.join(self.save_path, self.time_data)
+                inv_images,inv_labels=get_inversion_images(self.model,[self.current_num_classes,self.current_num_classes+self.task_step],task_num,epochs=self.configs['inversion_epochs'],prefix=prefix,global_iteration=task_num,bn_reg_scale=3,g_lr=0.001,d_lr=0.0005,a_lr=0.05,var_scale=0.001,l2_coeff=0.00001,bs=self.configs['inversion_batch_size'],num_generate_images=self.configs['memory_size'],latent_dim=self.configs['latent_dim'],configs=self.configs,device=self.device)
+            elif self.configs['generative_inversion']:
+                from model.generative_model.generative_network import get_inversion_images
+                prefix=os.path.join(self.save_path, self.time_data)
+                inv_images,inv_labels=get_inversion_images(self.model,[self.current_num_classes,self.current_num_classes+self.task_step],task_num,epochs=self.configs['inversion_epochs'],prefix=prefix,global_iteration=task_num,bn_reg_scale=3,g_lr=0.001,d_lr=0.0005,a_lr=0.05,var_scale=0.001,l2_coeff=0.00001,bs=self.configs['inversion_batch_size'], num_generate_images=self.configs['memory_size'],latent_dim=self.configs['latent_dim'],configs=self.configs,device=self.device)
+            else:
                 self.model.eval()
                 print('')
                 with torch.no_grad():
@@ -136,8 +192,15 @@ class ICARL(Baseline):
                         print('\r Construct class %s exemplar set...' %
                             (class_id), end='')
                         self._construct_exemplar_set(class_id, m)
-                    self.current_num_classes += self.task_step
+
                     self.compute_exemplar_class_mean()
+                    KNN_accuracy = self._eval(
+                        valid_loader, epoch, task_num)['accuracy']
+                    self.logger.info("NMS accuracy: {}".format(str(KNN_accuracy)))
+
+            
+            self.current_num_classes += self.task_step
+            #######################################
         tok = time.time()
         h,m,s=convert_secs2time(tok-tik)
         print('Total Learning Time: {:2d}h {:2d}m {:2d}s'.format(
