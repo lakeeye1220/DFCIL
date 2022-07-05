@@ -69,6 +69,8 @@ def parse_args(args):
             parser.add_argument('--inversion-epochs', default=2000, type=int, help='natural inversion epoch')
             parser.add_argument('--latent-dim', default=1024, type=int, help='Dimension of latent vector')
             parser.add_argument('--network-ver', default=1, type=int, help='inversion epoch')
+            parser.add_argument('--inversion-batch-size', default=200, type=int, help='inversion epoch')
+
 
         if 'eeil' == parser.parse_known_args(args)[0].train_mode:
             parser.add_argument(
