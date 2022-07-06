@@ -17,8 +17,8 @@ import torch.nn.functional as F
 class BiasLayer(nn.Module):
     def __init__(self):
         super(BiasLayer, self).__init__()
-        self.alpha = nn.Parameter(torch.ones(1, requires_grad=True))
-        self.beta = nn.Parameter(torch.zeros(1, requires_grad=True))
+        self.alpha = nn.Parameter(torch.ones((1,1), requires_grad=True))
+        self.beta = nn.Parameter(torch.zeros((1,1), requires_grad=True))
 
     def forward(self, x):
         return self.alpha * x + self.beta
@@ -122,9 +122,10 @@ class BiC(EEIL):
                 bic_labels = []
                 train_images = []
                 train_labels = []
-                for cls_idx in range(0, self.current_num_classes-self.task_step):  # for old class
-                    len_cls_data = len(
-                        dataset.data[dataset.targets == cls_idx])
+                for cls_idx in range(0, self.current_num_classes):  # for old class
+                    if cls_idx==0:
+                        len_cls_data = len(
+                            dataset.data[dataset.targets == cls_idx])
                     bic_images.append(dataset.data[dataset.targets == cls_idx][:int(
                         len_cls_data*(1-self.configs['split_ratio']))])
                     bic_labels.append(dataset.targets[dataset.targets == cls_idx][:int(
@@ -139,6 +140,7 @@ class BiC(EEIL):
                     train_images, axis=0)
                 self.datasetloader.train_data.targets = np.concatenate(
                     train_labels, axis=0)
+                print(bic_images.shape,self.datasetloader.train_data.data.shape)
                 bic_dataset = self.dataset_class(
                     bic_images, bic_labels, transform=self.datasetloader.test_transform, return_idx=True)
                 bic_loader = self.datasetloader.get_dataloader(
@@ -177,7 +179,7 @@ class BiC(EEIL):
                         'model': model_dict,
                         # 'optim': optimizer_dict,
                     }
-                    if task_num>1:
+                    if task_num>2:
                         save_dict.update(
                             {'task{}_bias_model_{}'.format(task_num, i): self.bias_layers[i].state_dict() for i in range(task_num-1)})
 
@@ -192,9 +194,9 @@ class BiC(EEIL):
             #####################
 
             self.update_old_model()
+            self.bias_layers.append(BiasLayer().to(self.device))
             #######################################
             if task_num > 1:
-                self.bias_layers.append(BiasLayer().to(self.device))
                 print("==== Start Bias Correction ====")
                 bic_info = self.train_bias_correction(
                     bic_loader, valid_loader, epoch, task_num)
@@ -435,8 +437,8 @@ class BiC(EEIL):
     def train_bias_correction(self, train_loader, valid_loader, epoch, task_num):
         bias_correction_best_acc = 0
         bias_correction_layer = self.bias_layers[task_num-1]
-        optimizer=torch.optim.SGD(bias_correction_layer, lr=self.configs['lr'], momentum=self.configs['momentum'], weight_decay=self.configs['weight_decay'])
-        lr_scheduler=torch.optim.lr_scheduler.StepLR(optimizer, step_size=self.configs['lr_step'], gamma=self.configs['gamma'])
+        optimizer=torch.optim.SGD(bias_correction_layer.parameters(), lr=self.configs['lr'], momentum=self.configs['momentum'], weight_decay=self.configs['weight_decay'])
+        lr_scheduler=torch.optim.lr_scheduler.StepLR(optimizer, step_size=self.configs['lr_steps'], gamma=self.configs['gamma'])
 
         self.model.eval()
         bias_correction_layer.train()
