@@ -264,35 +264,78 @@ class EEIL(ICARL):
             # measure data loading time
             images, target = images.to(
                 self.device), target.to(self.device)
-            # target_reweighted = get_one_hot(target, self.current_num_classes)
+            target_reweighted = get_one_hot(target, self.current_num_classes)
             outputs, _ = self.model(images)
 
-            if task_num == 1:
-                loss = self.criterion(outputs, target)
-            else:  # after the normal learning
-                cls_loss = self.criterion(outputs, target)
-                with torch.no_grad():
-                    score, _ = self.old_model(images)
-                if balance_finetune:
-                    soft_target = torch.softmax(score[:, self.current_num_classes -
-                                                      self.task_step:self.current_num_classes]/self.configs['temperature'], dim=1)
-                    output_logits = (outputs[:, self.current_num_classes -
-                                             self.task_step:self.current_num_classes]/self.configs['temperature'])
-                    # distillation entropy loss
-                    kd_loss = self.configs['lamb'] * \
-                        self.onehot_criterion(output_logits, soft_target)
-                else:
-                    kd_loss = torch.zeros(task_num)
-                    for t in range(task_num-1):
-                        # local distillation
-                        soft_target = torch.softmax(
-                            score[:, self.task_step*t:self.task_step*(t+1)] / self.configs['temperature'], dim=1)
-                        output_logits = (
-                            outputs[:, self.task_step*t:self.task_step*(t+1)] / self.configs['temperature'])
-                        kd_loss[t] = self.configs['lamb'] * \
+            if self.configs['train_mode']=='eeil':
+                if task_num == 1:
+                    loss = self.criterion(outputs, target)
+                else:  # after the normal learning
+                    cls_loss = self.criterion(outputs, target)
+                    with torch.no_grad():
+                        score, _ = self.old_model(images)
+                    if balance_finetune:
+                        soft_target = torch.softmax(score[:, self.current_num_classes -
+                                                        self.task_step:self.current_num_classes]/self.configs['temperature'], dim=1)
+                        output_logits = (outputs[:, self.current_num_classes -
+                                                self.task_step:self.current_num_classes]/self.configs['temperature'])
+                        # distillation entropy loss
+                        kd_loss = self.configs['lamb'] * \
                             self.onehot_criterion(output_logits, soft_target)
-                    kd_loss = kd_loss.sum()
-                loss = kd_loss+cls_loss
+                    else:
+                        kd_loss = torch.zeros(task_num)
+                        for t in range(task_num-1):
+                            # local distillation
+                            soft_target = torch.softmax(
+                                score[:, self.task_step*t:self.task_step*(t+1)] / self.configs['temperature'], dim=1)
+                            output_logits = (
+                                outputs[:, self.task_step*t:self.task_step*(t+1)] / self.configs['temperature'])
+                            kd_loss[t] = self.configs['lamb'] * \
+                                self.onehot_criterion(output_logits, soft_target)
+                        kd_loss = kd_loss.sum()
+                    loss = kd_loss+cls_loss
+            elif self.configs['train_mode']=='eeil_loss_icarl':
+                if task_num==1:
+                    loss = F.binary_cross_entropy_with_logits(
+                        outputs, target_reweighted)
+                elif task_num > 1:  # second step
+                    with torch.no_grad():
+                        old_target, _ = self.old_model(images)
+                        old_target = torch.sigmoid(old_target)
+                        old_task_size = old_target.shape[1]
+                        # print(old_task_size,old_target.shape,target.shape)
+                    target_reweighted[..., :old_task_size] = old_target
+                    loss = F.binary_cross_entropy_with_logits(
+                        outputs, target_reweighted)
+            elif self.configs['train_mode']=='eeil_loss_bce':
+                if task_num==1:
+                    loss = F.binary_cross_entropy_with_logits(
+                        outputs, target_reweighted)
+                else:
+                    cls_loss = F.binary_cross_entropy_with_logits(
+                        outputs, target_reweighted)
+                    if balance_finetune:
+                        soft_target = torch.sigmoid(score[:, self.current_num_classes -
+                                                        self.task_step:self.current_num_classes])/self.configs['temperature']
+                        output_logits = torch.sigmoid(outputs[:, self.current_num_classes -
+                                                self.task_step:self.current_num_classes])/self.configs['temperature']
+                                                                   # distillation entropy loss
+                        kd_loss = self.configs['lamb'] * \
+                            F.binary_cross_entropy(output_logits, soft_target)
+                    else:
+                        kd_loss = torch.zeros(task_num)
+                        for t in range(task_num-1):
+                            # local distillation
+                            soft_target = torch.sigmoid(
+                                score[:, self.task_step*t:self.task_step*(t+1)]) / self.configs['temperature']
+                            output_logits = torch.sigmoid(
+                                outputs[:, self.task_step*t:self.task_step*(t+1)]) / self.configs['temperature']
+                            kd_loss[t] = self.configs['lamb'] * \
+                                F.binary_cross_entropy(output_logits, soft_target)
+                        kd_loss = kd_loss.sum()
+                    
+            else:
+                raise NotImplementedError
 
             # measure accuracy and record loss
             acc1, acc5 = accuracy(outputs, target, topk=(1, 5))

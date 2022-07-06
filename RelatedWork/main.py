@@ -204,6 +204,8 @@ def main(args):
             'baseline': Baseline,
             'icarl': ICARL,
             'eeil': EEIL,
+            'eeil_loss_icarl':EEIL,
+            'eeil_loss_bce':EEIL,
             'bic': BiC,
         }
         learner = LEARNER[configs['train_mode']](
