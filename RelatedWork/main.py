@@ -13,6 +13,16 @@ from utils.seed import fix_seed
 from utils.params import load_params, save_params
 
 
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+        
 def parse_args(args):
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -73,7 +83,7 @@ def parse_args(args):
             parser.add_argument('--inversion-batch-size', default=200, type=int, help='inversion epoch')
 
 
-        if 'eeil' == parser.parse_known_args(args)[0].train_mode:
+        if 'eeil' in parser.parse_known_args(args)[0].train_mode:
             parser.add_argument(
                 '--temperature', type=float, default=2.0, help='set temperature of knowledge distillation')
             parser.add_argument(
@@ -83,7 +93,7 @@ def parse_args(args):
             parser.add_argument(
                 '--noise-grad', type=bool, default=False, help='add noise to gradients')
             parser.add_argument(
-                '--eeil-aug', type=bool, default=False, help='eeil augmentation apply or not')
+                '--eeil-aug', type=str2bool, default=False, help='eeil augmentation apply or not')
 
         
         if 'bic' == parser.parse_known_args(args)[0].train_mode:
