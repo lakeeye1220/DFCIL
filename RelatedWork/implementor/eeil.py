@@ -362,8 +362,8 @@ class EEIL(ICARL):
             i += 1
 
         tok = time.time()
-        self.logger.info('[train] Loss: {:.4f} | top1: {:.4f} | top5: {:.4f} | time: {:.3f}'.format(
-            losses.avg, top1.avg, top5.avg, tok-tik))
+        self.logger.info('[{:2d}/{:2d} task train] Loss: {:.4f} | top1: {:.4f} | top5: {:.4f} | time: {:.3f}'.format(
+            task_num,self.configs['task_size'], losses.avg, top1.avg, top5.avg, tok-tik))
         optimizer.zero_grad(set_to_none=True)
         return {'loss': losses.avg, 'accuracy': top1.avg.item(), 'top5': top5.avg.item()}
 

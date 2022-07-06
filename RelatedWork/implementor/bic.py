@@ -369,8 +369,8 @@ class BiC(EEIL):
             i += 1
 
         tok = time.time()
-        self.logger.info('[train] Loss: {:.4f} | top1: {:.4f} | top5: {:.4f} | time: {:.3f}'.format(
-            losses.avg, top1.avg, top5.avg, tok-tik))
+        self.logger.info('[{:2d}/{:2d} task train] Loss: {:.4f} | top1: {:.4f} | top5: {:.4f} | time: {:.3f}'.format(
+            task_num,self.configs['task_size'], losses.avg, top1.avg, top5.avg, tok-tik))
         optimizer.zero_grad(set_to_none=True)
         return {'loss': losses.avg, 'accuracy': top1.avg.item(), 'top5': top5.avg.item()}
 
@@ -424,11 +424,11 @@ class BiC(EEIL):
                 end = time.time()
                 i += 1
         if task_num == 1 or (self.configs['natural_inversion'] or self.configs['generative_inversion']):
-            self.logger.info('[eval] [{:3d} epoch] Loss: {:.4f} | top1: {:.4f} | top5: {:.4f}'.format(
-                epoch, losses.avg, top1.avg, top5.avg))
+            self.logger.info('[{:2d}/{:2d} task eval] [{:3d} epoch] Loss: {:.4f} | top1: {:.4f} | top5: {:.4f}'.format(
+            task_num,self.configs['task_size'],epoch, losses.avg, top1.avg, top5.avg))
         else:
-            self.logger.info('[eval] [{:3d} epoch] Loss: {:.4f} | top1: {:.4f} | top5: {:.4f} | NMS: {:.4f}'.format(
-                epoch, losses.avg, top1.avg, top5.avg, 100.*nms_correct/all_total))
+            self.logger.info('[{:2d}/{:2d} task eval] [{:3d} epoch] Loss: {:.4f} | top1: {:.4f} | top5: {:.4f} | NMS: {:.4f}'.format(
+                task_num,self.configs['task_size'], epoch, losses.avg, top1.avg, top5.avg, 100.*nms_correct/all_total))
 
         return {'loss': losses.avg, 'accuracy': top1.avg.item(), 'top5': top5.avg.item()}
 
@@ -483,13 +483,13 @@ class BiC(EEIL):
                 i += 1
             lr_scheduler.step()
             tok = time.time()
-            self.logger.info('[BiC train] Loss: {:.4f} | top1: {:.4f} | top5: {:.4f} | time: {:.3f}'.format(
-                losses.avg, top1.avg, top5.avg, tok-tik))
+            self.logger.info('[{:2d}/{:2d} task BiC train] [{:3d} epoch] Loss: {:.4f} | top1: {:.4f} | top5: {:.4f} | time: {:.3f}'.format(
+                task_num,self.configs['task_size'], e, losses.avg, top1.avg, top5.avg, tok-tik))
 
             if e % 10 == 0:
                 valid_info = self._eval(valid_loader, epoch, task_num, bias_correct=True)
-                self.logger.info('[BiC valid] Loss: {:.4f} | top1: {:.4f} | top5: {:.4f}'.format(
-                    valid_info['loss'], valid_info['accuracy'], valid_info['top5']))
+                self.logger.info('[{:2d}/{:2d} task BiC valid] [{:3d} epoch] Loss: {:.4f} | top1: {:.4f} | top5: {:.4f}'.format(
+                    task_num,self.configs['task_size'], e, valid_info['loss'], valid_info['accuracy'], valid_info['top5']))
 
                 if bias_correction_best_acc < valid_info['accuracy']:
                     bias_correction_best_acc = valid_info['accuracy']
