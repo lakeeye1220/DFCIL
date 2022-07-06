@@ -82,6 +82,9 @@ def parse_args(args):
                 '--lamb', type=float, default=1.0, help='forgetting-intrasigence tradeoff')
             parser.add_argument(
                 '--noise-grad', type=bool, default=False, help='add noise to gradients')
+            parser.add_argument(
+                '--eeil-aug', type=bool, default=False, help='eeil augmentation apply or not')
+
         
         if 'bic' == parser.parse_known_args(args)[0].train_mode:
             parser.add_argument(

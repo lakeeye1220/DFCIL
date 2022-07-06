@@ -179,7 +179,8 @@ def get_inversion_images(net,
             flip = random.random() > 0.5
             if flip:
                 inputs_jit = torch.flip(inputs_jit, dims = (3,))
-            outputs, features = net(inputs_jit)
+            with torch.no_grad():
+                outputs, features = net(inputs_jit)
         
             loss_target = criterion(outputs, targets)
             loss = loss_target

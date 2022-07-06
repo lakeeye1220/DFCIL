@@ -56,8 +56,6 @@ class ICARL(Baseline):
         tik = time.time()
         learning_time = AverageMeter('Time', ':6.3f')
         tasks_acc = []
-        finetune_acc = []
-
         # Task Init loader #
         self.model.eval()
 
@@ -240,7 +238,7 @@ class ICARL(Baseline):
         print('Total Learning Time: {:2d}h {:2d}m {:2d}s'.format(
             h, m, s))
         str_acc = ' '.join("{:.2f}".format(x) for x in tasks_acc)
-        self.logger.info("Task Accs:", str_acc)
+        self.logger.info("Task Accs: {}".format( str_acc))
 
         ############## info save #################
         import copy

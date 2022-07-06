@@ -117,6 +117,8 @@ def get_inversion_images(net,
     while np.count_nonzero(num_cls_targets>=minimum_per_class)<num_classes[0]:
         generator = generator_class(8,latent_dim,3).to(device)
         feature_decoder = feature_decoder_class().to(device)
+        generator.train()
+        feature_decoder.train()
         optimizer_g = optim.Adam(generator.parameters(), lr=g_lr)
         optimizer_f = torch.optim.Adam(feature_decoder.parameters(), lr=d_lr)
 
@@ -179,7 +181,8 @@ def get_inversion_images(net,
             flip = random.random() > 0.5
             if flip:
                 inputs_jit = torch.flip(inputs_jit, dims = (3,))
-            outputs, features = net(inputs_jit)
+            with torch.no_grad():
+                outputs, features = net(inputs_jit)
         
             loss_target = criterion(outputs, targets)
             loss = loss_target
@@ -213,10 +216,12 @@ def get_inversion_images(net,
             if best_cost > loss.item():
                 best_cost = loss.item()
                 with torch.no_grad():
+                    generator.eval()
                     best_inputs = generator(z)
                     _, features = net(best_inputs)
                     best_inputs, addition = feature_decoder(best_inputs, features)
                     best_inputs *= alpha
+                    generator.train()
         
             optimizer_g.zero_grad()
             optimizer_f.zero_grad()
