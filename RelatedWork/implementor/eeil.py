@@ -145,10 +145,15 @@ class EEIL(ICARL):
                     size_of_bft_exemplar)
                 if 'cifar' in self.configs['dataset']:
                     print("Len bft data: {}".format(len(bft_train_dataset[0])))
-                    images, labels = data_augmentation_e2e(
-                        bft_train_dataset[0], bft_train_dataset[1])
-                    bft_dataset = self.dataset_class(
-                        images, labels, self.datasetloader.test_transform, return_idx=True)
+                    if self.configs['eeil_aug']:
+                        images, labels = data_augmentation_e2e(
+                            bft_train_dataset[0], bft_train_dataset[1])
+                        bft_dataset = self.dataset_class(
+                            images, labels, self.datasetloader.test_transform, return_idx=True)
+                    else:
+                        bft_dataset = self.dataset_class(
+                            bft_train_dataset[0],bft_train_dataset[1], self.datasetloader.test_transform, return_idx=True)
+                        
                     print("After EEIL Len: {}".format(len(bft_dataset)))
                 elif self.configs['dataset'] in ['tiny-imagenet', 'imagenet']:
                     bft_dataset = self.dataset_class(
