@@ -264,13 +264,13 @@ class EEIL(ICARL):
             # measure data loading time
             images, target = images.to(
                 self.device), target.to(self.device)
-            target_reweighted = get_one_hot(target, self.current_num_classes)
+            # target_reweighted = get_one_hot(target, self.current_num_classes)
             outputs, _ = self.model(images)
 
             if task_num == 1:
-                loss = self.onehot_criterion(outputs, target_reweighted)
+                loss = self.criterion(outputs, target)
             else:  # after the normal learning
-                cls_loss = self.onehot_criterion(outputs, target_reweighted)
+                cls_loss = self.criterion(outputs, target)
                 with torch.no_grad():
                     score, _ = self.old_model(images)
                 if balance_finetune:
