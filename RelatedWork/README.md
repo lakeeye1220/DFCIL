@@ -15,6 +15,19 @@
 ```
     python main.py train --train-mode eeil --gpu-ids 1 --task-size 10 --model resnet34 --batch-size 128 --lr 0.1 --gamma 0.1 --epochs 250 --lr-steps 100,150,200 --weight-decay 0.0002 --natural-inversion True --inversion_epochs 2000
 ``` 
+- How to Implement (EEIL+NI)
+```
+    python main.py train --train-mode eeil --gpu-ids 1 --task-size 10 --model resnet34 --batch-size 128 --lr 0.1 --gamma 0.1 --epochs 250 --lr-steps 100,150,200 --weight-decay 0.0002 --natural-inversion True --inversion_epochs 2000
+``` 
+- How to Implement (EEIL+NI+BCE)
+```
+    python main.py train --train-mode eeil_loss_bce --gpu-ids 4 --model resnet34 --batch-size 128 --lr 1.0 --gamma 0.5 --epochs 200 --lr-steps 49,63,100 --weight-decay 0.0001 --natural-inversion True --inversion_epochs 2000 --eeil-aug True  --inversion-batch-size 256
+``` 
+
+- How to Implement (EEIL+NI+icarl_loss style)
+```
+    python main.py train --train-mode eeil_loss_icarl --gpu-ids 4 --model resnet34 --batch-size 128 --lr 1.0 --gamma 0.5 --epochs 200 --lr-steps 49,63,100 --weight-decay 0.0001 --natural-inversion True --inversion_epochs 2000 --eeil-aug True  --inversion-batch-size 256
+``` 
 
 - How to Implement (BiC)
 ```
@@ -45,3 +58,8 @@
 | iCaRL   |      |      |      |       |       |      |       |      |       |      |       |       |       |       |       |       |       |       |       |       |
 | EEIL    | 84.4 | 83.3 | 75.4 | 69.65 | 70.36 | 65.6 | 63.86 | 56.8 | 54.29 | 52.3 | 50.42 | 48.32 | 47.95 | 45.39 | 43.12 | 42.81 | 40.58 | 40.46 | 39.65 | 36.12 |
 | BiC     |      |      |      |       |       |      |       |      |       |      |       |       |       |       |       |       |       |       |       |       |
+
+
+
+### Reference
+iCaRL construct exemplar set is borrowed from [iCaRL-pytorch](https://github.com/DRSAD/iCaRL/blob/master/iCaRL.py)
