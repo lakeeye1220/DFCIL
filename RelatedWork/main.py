@@ -94,8 +94,6 @@ def parse_args(args):
                 '--lamb', type=float, default=1.0, help='forgetting-intrasigence tradeoff')
             parser.add_argument(
                 '--noise-grad', type=bool, default=False, help='add noise to gradients')
-            parser.add_argument(
-                '--bias-correction-epochs', type=int, default=40, help='bias correction epochs')
 
     elif parser.parse_known_args(args)[0].mode.lower() == 'eval':
         parser.add_argument(
