@@ -339,7 +339,6 @@ class BiC(EEIL):
                 cls_loss = self.onehot_criterion(outputs, target_reweighted)
                 with torch.no_grad():
                     score, _ = self.old_model(images)
-                    outputs = self.bias_forward(outputs, task_num)
                 kd_loss = torch.zeros(task_num)
                 for t in range(task_num-1):
                     # local distillation
