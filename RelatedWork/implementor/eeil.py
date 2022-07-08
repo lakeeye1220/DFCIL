@@ -312,6 +312,8 @@ class EEIL(ICARL):
                     loss = F.binary_cross_entropy_with_logits(
                         outputs, target_reweighted)
                 else:
+                    with torch.no_grad():
+                        score, _ = self.old_model(images)
                     cls_loss = F.binary_cross_entropy_with_logits(
                         outputs, target_reweighted)
                     if balance_finetune:
@@ -333,6 +335,7 @@ class EEIL(ICARL):
                             kd_loss[t] = self.configs['lamb'] * \
                                 F.binary_cross_entropy(output_logits, soft_target)
                         kd_loss = kd_loss.sum()
+                    loss=cls_loss+kd_loss
                     
             else:
                 raise NotImplementedError

@@ -438,7 +438,7 @@ class BiC(EEIL):
         bias_correction_best_acc = 0
         bias_correction_layer = self.bias_layers[task_num-1]
         optimizer=torch.optim.SGD(bias_correction_layer.parameters(), lr=self.configs['lr'], momentum=self.configs['momentum'], weight_decay=self.configs['weight_decay'])
-        lr_scheduler=torch.optim.lr_scheduler.StepLR(optimizer, step_size=self.configs['lr_steps'], gamma=self.configs['gamma'])
+        lr_scheduler=torch.optim.lr_scheduler.MultiStepLR(optimizer,self.configs['lr_steps'], gamma=self.configs['gamma'])
 
         self.model.eval()
         bias_correction_layer.train()
