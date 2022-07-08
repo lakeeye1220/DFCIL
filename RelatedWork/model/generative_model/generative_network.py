@@ -235,7 +235,7 @@ def get_inversion_images(net,
             mod.close()
         for target in targets.cpu().detach().numpy():
             num_cls_targets[target]+=1
-        print("Goal num_cls_targets : {}/ Current {}".format(minimum_per_class,num_cls_targets))
+        print("Goal num_cls_targets : {} / Current [{:.2f}%] {}".format(minimum_per_class, 100.*min(num_cls_targets)/minimum_per_class,num_cls_targets))
         # optimizer_alpha.zero_grad(set_to_none=True)
         optimizer_f.zero_grad(set_to_none=True)
         optimizer_g.zero_grad(set_to_none=True)
