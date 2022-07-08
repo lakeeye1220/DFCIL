@@ -465,7 +465,7 @@ class ICARL(Baseline):
                             self.current_num_classes)
                     self._reduce_exemplar_sets(m)  # exemplar reduce
                     # for each class
-                    for class_id in range(self.task_step*(task_num-1), self.task_step*(task_num)):
+                    for class_id in range(self.task_step*(task_num-2), self.task_step*(task_num-1)):
                         print('\r Construct class %s exemplar set...' %
                                 (class_id), end='')
                         self._construct_exemplar_set(class_id, m)
