@@ -76,7 +76,7 @@ class ICARL(Baseline):
                 optimizer, self.configs['lr_steps'], self.configs['gamma'])
 
             ## before training setupe the dataset ##            
-            self.construct_task_dataset(task_num, epoch, valid_loader)
+            self.construct_task_dataset(task_num, 0, valid_loader)
             ###################
             
             ## regular training process ##
@@ -406,7 +406,7 @@ class ICARL(Baseline):
         return model
 
     
-    def construct_task_dataset(self,task_num, epoch, valid_loader):
+    def construct_task_dataset(self,task_num, valid_loader):
         self.model.eval()
         self.old_model.eval()
         ## after train- process exemplar set ##
@@ -468,7 +468,7 @@ class ICARL(Baseline):
 
                     self.compute_exemplar_class_mean()
                     KNN_accuracy = self._eval(
-                        valid_loader, epoch, task_num)['accuracy']
+                        valid_loader, 0, task_num)['accuracy']
                     self.logger.info(
                         "NMS accuracy: {}".format(str(KNN_accuracy)))
 

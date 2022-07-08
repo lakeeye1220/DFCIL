@@ -61,7 +61,7 @@ class EEIL(ICARL):
                 optimizer, self.configs['lr_steps'], self.configs['gamma'])
 
             ## before training setupe the dataset ##            
-            self.construct_task_dataset(task_num,epoch,valid_loader)
+            self.construct_task_dataset(task_num,valid_loader)
             ########################################
             
             task_best_valid_acc = 0

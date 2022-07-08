@@ -73,7 +73,7 @@ class BiC(EEIL):
                 optimizer, self.configs['lr_steps'], self.configs['gamma'])
             
             # Task Init loader #
-            self.construct_task_dataset(task_num,epoch,valid_loader)
+            self.construct_task_dataset(task_num,valid_loader)
 
             ## for BiC split 9:1 ##
             if task_num > 1:
