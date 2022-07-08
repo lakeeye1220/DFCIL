@@ -16,8 +16,8 @@ import torch.nn.functional as F
 class BiasLayer(nn.Module):
     def __init__(self):
         super(BiasLayer, self).__init__()
-        self.alpha = nn.Parameter(torch.ones((1,1), requires_grad=True))
-        self.beta = nn.Parameter(torch.zeros((1,1), requires_grad=True))
+        self.alpha = nn.Parameter(torch.ones(1, requires_grad=True))
+        self.beta = nn.Parameter(torch.zeros(1, requires_grad=True))
 
     def forward(self, x):
         return self.alpha * x + self.beta
@@ -139,7 +139,7 @@ class BiC(EEIL):
                         'model': model_dict,
                         # 'optim': optimizer_dict,
                     }
-                    if task_num>2:
+                    if task_num>1:
                         save_dict.update(
                             {'task{}_bias_model_{}'.format(task_num, i): self.bias_layers[i].state_dict() for i in range(task_num-1)})
 
@@ -236,13 +236,13 @@ class BiC(EEIL):
             # measure data loading time
             images, target = images.to(
                 self.device), target.to(self.device)
-            target_reweighted = get_one_hot(target, self.current_num_classes)
+            # target_reweighted = get_one_hot(target, self.current_num_classes)
             outputs, _ = self.model(images)
 
             if task_num == 1:
-                loss = self.onehot_criterion(outputs, target_reweighted)
+                loss = self.criterion(outputs, target)
             else:  # after the normal learning
-                cls_loss = self.onehot_criterion(outputs, target_reweighted)
+                cls_loss = self.criterion(outputs, target)
                 with torch.no_grad():
                     score, _ = self.old_model(images)
                     score=self.bias_forward(score, task_num, self.bias_layers[task_num-1])
@@ -345,9 +345,7 @@ class BiC(EEIL):
         lr_scheduler=torch.optim.lr_scheduler.MultiStepLR(optimizer,self.configs['lr_steps'], gamma=self.configs['gamma'])
 
         self.model.eval()
-        self.bias_layers[task_num-1].train()
-
-        for e in range(self.configs['epochs']):
+        for e in range(1,self.configs['epochs']+1):
             tik = time.time()
             batch_time = AverageMeter('Time', ':6.3f')
             losses = AverageMeter('Loss', ':.4e')
@@ -359,6 +357,7 @@ class BiC(EEIL):
                 prefix="Epoch: [{}]".format(e))
             i = 0
             end = time.time()
+            self.bias_layers[task_num-1].train()
             for images, target, indices in train_loader:
                 # measure data loading time
                 images, target = images.to(
@@ -393,6 +392,7 @@ class BiC(EEIL):
                 task_num,self.configs['task_size'], e, losses.avg, top1.avg, top5.avg, tok-tik))
 
             if e % 10 == 0:
+                self.bias_layers[task_num-1].eval()
                 valid_info = self._eval(valid_loader, epoch, task_num, bias_correct=True)
                 self.logger.info('[{:2d}/{:2d} task BiC valid] [{:3d} epoch] Loss: {:.4f} | top1: {:.4f} | top5: {:.4f}'.format(
                     task_num,self.configs['task_size'], e, valid_info['loss'], valid_info['accuracy'], valid_info['top5']))
