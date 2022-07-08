@@ -73,6 +73,7 @@ class BiC(EEIL):
             
             # Task Init loader #
             self.construct_task_dataset(task_num,valid_loader)
+            self.bias_layers.append(BiasLayer().to(self.device))
 
             ## for BiC split 9:1 ##
             if task_num > 1:
@@ -153,7 +154,6 @@ class BiC(EEIL):
             #####################
 
             self.update_old_model()
-            self.bias_layers.append(BiasLayer().to(self.device))
             #######################################
             if task_num > 1:
                 print("==== Start Bias Correction ====")
@@ -237,6 +237,7 @@ class BiC(EEIL):
                 cls_loss = self.onehot_criterion(outputs, target_reweighted)
                 with torch.no_grad():
                     score, _ = self.old_model(images)
+                    score=self.bias_forward(score, task_num, self.bias_layers[task_num-1])
                 kd_loss = torch.zeros(task_num)
                 for t in range(task_num-1):
                     # local distillation
@@ -332,12 +333,11 @@ class BiC(EEIL):
 
     def train_bias_correction(self, train_loader, valid_loader, epoch, task_num):
         bias_correction_best_acc = 0
-        bias_correction_layer = self.bias_layers[task_num-1]
-        optimizer=torch.optim.SGD(bias_correction_layer.parameters(), lr=self.configs['lr'], momentum=self.configs['momentum'], weight_decay=self.configs['weight_decay'])
+        optimizer=torch.optim.SGD(self.bias_layers[task_num-1].parameters(), lr=self.configs['lr'], momentum=self.configs['momentum'], weight_decay=self.configs['weight_decay'])
         lr_scheduler=torch.optim.lr_scheduler.MultiStepLR(optimizer,self.configs['lr_steps'], gamma=self.configs['gamma'])
 
         self.model.eval()
-        bias_correction_layer.train()
+        self.bias_layers[task_num-1].train()
 
         for e in range(self.configs['epochs']):
             tik = time.time()
@@ -359,7 +359,7 @@ class BiC(EEIL):
                 with torch.no_grad():
                     outputs, _ = self.model(images)
                 outputs = self.bias_forward(
-                    outputs, task_num, bias_correction_layer)
+                    outputs, task_num, self.bias_layers[task_num-1])
                 loss = self.criterion(
                     outputs, target)
 
