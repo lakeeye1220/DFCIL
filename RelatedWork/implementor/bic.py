@@ -10,7 +10,6 @@ from utils.logger import convert_secs2time
 import numpy as np
 from utils.onehot import get_one_hot
 from implementor.eeil import EEIL
-import torch.optim as optim
 import torch.nn.functional as F
 
 
@@ -349,7 +348,7 @@ class BiC(EEIL):
             progress = ProgressMeter(
                 len(train_loader),
                 [batch_time, losses, top1, top5],
-                prefix="Epoch: [{}]".format(epoch))
+                prefix="Epoch: [{}]".format(e))
             i = 0
             end = time.time()
             for images, target, indices in train_loader:
