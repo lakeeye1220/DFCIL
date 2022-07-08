@@ -117,33 +117,30 @@ def get_inversion_images(net,
         generator_class = Generator
         feature_decoder_class = Feature_Decoder
     while np.count_nonzero(num_cls_targets>=minimum_per_class)<num_classes[0]:
-        generator = generator_class(8,latent_dim,3).to(device)
+        generator = generator_class(8,latent_dim+num_classes[0],3).to(device)
         feature_decoder = feature_decoder_class().to(device)
-
+        generator.train()
+        feature_decoder.train()
         optimizer_g = optim.Adam(generator.parameters(), lr=g_lr)
         optimizer_f = torch.optim.Adam(feature_decoder.parameters(), lr=d_lr)
-        # Learnable Scale Parameter
-        # alpha = torch.empty((bs,3,1,1), requires_grad=True, device=device)
-        # torch.nn.init.normal_(alpha, 5.0, 1)
-        # optimizer_alpha = torch.optim.Adam([alpha], lr=a_lr)
+
 
         # set up criteria for optimization
         criterion = nn.CrossEntropyLoss()
-        # optimizer_g.state = collections.defaultdict(dict)
-        # optimizer_f.state = collections.defaultdict(dict)  # Reset state of optimizer
-        # optimizer_alpha.state = collections.defaultdict(dict)
-        print("----------------------------------------num_classes[0] : ",num_classes[0])
-        # np_targets = np.random.choice(num_classes[0],bs)
+        optimizer_g.state = collections.defaultdict(dict)
+        optimizer_f.state = collections.defaultdict(dict)  # Reset state of optimizer
+
         np_targets=np.random.choice(num_classes[0],bs)
         targets = torch.LongTensor(np_targets).to(device)
+
         z = torch.randn((bs, latent_dim)).to(device)
+        z = torch.cat((z,targets), dim = 1)
         
         loss_r_feature_layers = []
         count = 0
         for module in net.modules():
             if isinstance(module, nn.BatchNorm2d):
                 loss_r_feature_layers.append(NaturalInversionFeatureHook(module, 0))
-    
         lim_0, lim_1 = 2, 2
 
         for epoch in tqdm(range(epochs), leave=False, bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}'):

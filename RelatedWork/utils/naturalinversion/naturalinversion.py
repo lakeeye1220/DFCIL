@@ -100,9 +100,6 @@ def get_inversion_images(net,
 
     best_inputs_list=[]
     best_targets_list = []
-    def softmax(x,axis=0):
-        exp_x=np.exp(x)
-        return exp_x / np.sum(exp_x, axis=axis, keepdims=True)
 
     if configs['network_ver']==1:
         from utils.naturalinversion.network_v1 import Generator,Feature_Decoder
@@ -115,7 +112,7 @@ def get_inversion_images(net,
         #### Feature_Map Decoder
         feature_decoder_class = Feature_Decoder
     while np.count_nonzero(num_cls_targets>=minimum_per_class)<num_classes[0]:
-        generator = generator_class(8,latent_dim,3).to(device)
+        generator = generator_class(8,latent_dim+num_classes[0],3).to(device)
         feature_decoder = feature_decoder_class().to(device)
         generator.train()
         feature_decoder.train()
@@ -129,16 +126,15 @@ def get_inversion_images(net,
 
         # set up criteria for optimization
         criterion = nn.CrossEntropyLoss()
-        # optimizer_g.state = collections.defaultdict(dict)
-        # optimizer_f.state = collections.defaultdict(dict)  # Reset state of optimizer
-        # optimizer_alpha.state = collections.defaultdict(dict)
-        print("----------------------------------------num_classes[0] : ",num_classes[0])
-        # np_targets = np.random.choice(num_classes[0],bs)
+        optimizer_g.state = collections.defaultdict(dict)
+        optimizer_f.state = collections.defaultdict(dict)  # Reset state of optimizer
+        optimizer_alpha.state = collections.defaultdict(dict)
 
         np_targets=np.random.choice(num_classes[0],bs)
         targets = torch.LongTensor(np_targets).to(device)
 
         z = torch.randn((bs, latent_dim)).to(device)
+        z = torch.cat((z,targets), dim = 1)
         
         loss_r_feature_layers = []
         count = 0
@@ -148,7 +144,7 @@ def get_inversion_images(net,
     
         lim_0, lim_1 = 2, 2
 
-        for epoch in tqdm(range(epochs), leave=False, bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}'):
+        for epoch in range(epochs):
             inputs_jit = generator(z)
         
             # apply random jitter offsets
@@ -202,8 +198,8 @@ def get_inversion_images(net,
             # l2 loss
             loss = loss + l2_coeff * torch.norm(inputs_jit, 2)
 
-            if debug_output and epoch % int(epochs/2)==0:
-                print("It {}\t Losses: total: {:.3f},\ttarget: {:.3f} \tR_feature_loss unscaled:\t {:.3f}".format(epoch, loss.item(),loss_target,loss_distr.item()))
+            if debug_output and (epoch+1) % int(epochs/5)==0:
+                print("\r It {}\t Losses: total: {:.3f},\ttarget: {:.3f} \tR_feature_loss unscaled:\t {:.3f}".format(epoch, loss.item(),loss_target,loss_distr.item()),end='')
                 nchs = inputs_jit.shape[1]
 
                 save_pth = os.path.join(prefix, 'inversion_images', 'task{}'.format(task))
@@ -233,7 +229,7 @@ def get_inversion_images(net,
             optimizer_g.step()
             optimizer_f.step()
             optimizer_alpha.step()
-
+        print("")
         best_inputs_list.append(best_inputs.cpu().detach().numpy())
         best_targets_list.append(targets.cpu().detach().numpy())
         for mod in loss_r_feature_layers:
