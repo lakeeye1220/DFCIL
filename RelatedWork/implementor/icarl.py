@@ -76,7 +76,7 @@ class ICARL(Baseline):
                 optimizer, self.configs['lr_steps'], self.configs['gamma'])
 
             ## before training setupe the dataset ##            
-            self.construct_task_dataset(task_num, 0, valid_loader)
+            self.construct_task_dataset(task_num, valid_loader)
             ###################
             
             ## regular training process ##
