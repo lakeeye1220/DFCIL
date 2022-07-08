@@ -133,7 +133,7 @@ def get_inversion_images(net,
 
         np_targets=np.random.choice(num_classes[0],bs)
         targets = torch.LongTensor(np_targets).to(device)
-        onehot_targets=F.onehot(targets,num_classes[0]).float().to(device)
+        onehot_targets=F.one_hot(targets,num_classes[0]).float().to(device)
         z = torch.randn((bs, latent_dim)).to(device)
         z = torch.cat((z,onehot_targets), dim = 1)
         
