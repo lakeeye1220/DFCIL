@@ -408,7 +408,8 @@ class ICARL(Baseline):
     
     def construct_task_dataset(self,task_num, valid_loader):
         self.model.eval()
-        self.old_model.eval()
+        if task_num > 1:
+            self.old_model.eval()
         ## after train- process exemplar set ##
 
         if task_num >1:
