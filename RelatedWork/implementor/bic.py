@@ -168,6 +168,14 @@ class BiC(EEIL):
                         (self.datasetloader.train_data.targets, bic_labels), axis=0)
                 else:
                     raise NotImplementedError
+                print("BiC alpha:",end='')
+                for i in range(task_num-1):
+                    print("{:.3f} ".format(self.bias_layers[i].alpha),end='')
+                print("")
+                print("BiC beta:",end='')
+                for i in range(task_num-1):
+                    print("{:.3f} ".format(self.bias_layers[i].beta),end='')
+                print("==== End Bias Correction ====")
             self.current_num_classes += self.task_step
             #######################################
 
