@@ -127,6 +127,7 @@ class ICARL(Baseline):
             print('Task {} Finished. [Acc] {:.2f} [Running Time] {:2d}h {:2d}m {:2d}s'.format(
                 task_num, task_best_valid_acc, h, m, s))
             tasks_acc.append(task_best_valid_acc)
+            self.update_old_model()
             self.current_num_classes += self.task_step
             #######################################
         tok = time.time()
