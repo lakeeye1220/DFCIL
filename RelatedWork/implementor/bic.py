@@ -391,29 +391,28 @@ class BiC(EEIL):
             self.logger.info('[{:2d}/{:2d} task BiC train] [{:3d} epoch] Loss: {:.4f} | top1: {:.4f} | top5: {:.4f} | time: {:.3f}'.format(
                 task_num,self.configs['task_size'], e, losses.avg, top1.avg, top5.avg, tok-tik))
 
-            if e % 10 == 0:
-                self.bias_layers[task_num-1].eval()
-                valid_info = self._eval(valid_loader, epoch, task_num, bias_correct=True)
-                self.logger.info('[{:2d}/{:2d} task BiC valid] [{:3d} epoch] Loss: {:.4f} | top1: {:.4f} | top5: {:.4f}'.format(
-                    task_num,self.configs['task_size'], e, valid_info['loss'], valid_info['accuracy'], valid_info['top5']))
+            self.bias_layers[task_num-1].eval()
+            valid_info = self._eval(valid_loader, epoch, task_num, bias_correct=True)
+            self.logger.info('[{:2d}/{:2d} task BiC valid] [{:3d} epoch] Loss: {:.4f} | top1: {:.4f} | top5: {:.4f}'.format(
+                task_num,self.configs['task_size'], e, valid_info['loss'], valid_info['accuracy'], valid_info['top5']))
 
-                if bias_correction_best_acc < valid_info['accuracy']:
-                    bias_correction_best_acc = valid_info['accuracy']
-                    bias_correction_best_top5 = valid_info['top5']
-                    bias_correction_best_loss= valid_info['loss']
-                    self.logger.info("[Task {:2d} Bias Correction Best Acc] {:.2f}".format
-                                     (task_num, bias_correction_best_acc))
-                    model_dict = self.model.module.state_dict()
-                    save_dict = {
-                        'info': valid_info,
-                        'model': model_dict,
+            if bias_correction_best_acc < valid_info['accuracy']:
+                bias_correction_best_acc = valid_info['accuracy']
+                bias_correction_best_top5 = valid_info['top5']
+                bias_correction_best_loss= valid_info['loss']
+                self.logger.info("[Task {:2d} Bias Correction Best Acc] {:.2f}".format
+                                    (task_num, bias_correction_best_acc))
+                model_dict = self.model.module.state_dict()
+                save_dict = {
+                    'info': valid_info,
+                    'model': model_dict,
 
-                        # 'optim': optimizer_dict,
-                    }
-                    save_dict.update(
-                        {'task{}_bic_model_{}'.format(task_num, i): self.bias_layers[i].state_dict() for i in range(task_num - 1)})
-                    torch.save(save_dict, os.path.join(
-                        self.save_path, self.time_data, 'best_task{}_bias_corrected_model.pt'.format(task_num)))
-                    print("Save Best Accuracy Model")
+                    # 'optim': optimizer_dict,
+                }
+                save_dict.update(
+                    {'task{}_bic_model_{}'.format(task_num, i): self.bias_layers[i].state_dict() for i in range(task_num - 1)})
+                torch.save(save_dict, os.path.join(
+                    self.save_path, self.time_data, 'best_task{}_bias_corrected_model.pt'.format(task_num)))
+                print("Save Best Accuracy Model")
 
         return {'loss': bias_correction_best_loss, 'accuracy': bias_correction_best_acc, 'top5': bias_correction_best_top5}
