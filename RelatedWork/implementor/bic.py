@@ -392,6 +392,8 @@ class BiC(EEIL):
 
                 if bias_correction_best_acc < valid_info['accuracy']:
                     bias_correction_best_acc = valid_info['accuracy']
+                    bias_correction_best_top5 = valid_info['top5']
+                    bias_correction_best_loss= valid_info['loss']
                     self.logger.info("[Task {:2d} Bias Correction Best Acc] {:.2f}".format
                                      (task_num, bias_correction_best_acc))
                     model_dict = self.model.module.state_dict()
@@ -407,4 +409,4 @@ class BiC(EEIL):
                         self.save_path, self.time_data, 'best_task{}_bias_corrected_model.pt'.format(task_num)))
                     print("Save Best Accuracy Model")
 
-        return {'loss': losses.avg, 'accuracy': top1.avg.item(), 'top5': top5.avg.item()}
+        return {'loss': bias_correction_best_loss, 'accuracy': bias_correction_best_acc, 'top5': bias_correction_best_top5}
