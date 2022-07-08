@@ -407,7 +407,8 @@ class ICARL(Baseline):
 
     
     def construct_task_dataset(self,task_num, epoch, valid_loader):
-        
+        self.model.eval()
+        self.old_model.eval()
         ## after train- process exemplar set ##
 
         if task_num >1:
@@ -515,3 +516,4 @@ class ICARL(Baseline):
                 adding_classes_list, self.exemplar_set)  # update for class incremental style #
         self.datasetloader.test_data.update(
             adding_classes_list, self.exemplar_set)  # Don't need to update loader
+        self.model.train()
