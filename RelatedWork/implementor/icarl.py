@@ -431,6 +431,7 @@ class ICARL(Baseline):
                                                                 l2_coeff=0.00001,
                                                                 bs=self.configs['inversion_batch_size'],
                                                                 num_generate_images=self.configs['memory_size'],
+                                                                feature_block_num=self.model.residual_len,
                                                                 latent_dim=self.configs['latent_dim'],
                                                                 configs=self.configs,
                                                                 device=self.device)
@@ -450,6 +451,7 @@ class ICARL(Baseline):
                                                                 l2_coeff=0.00001,
                                                                 bs=self.configs['inversion_batch_size'],
                                                                 num_generate_images=self.configs['memory_size'],
+                                                                feature_block_num=self.model.residual_len,
                                                                 latent_dim=self.configs['latent_dim'],
                                                                 configs=self.configs,
                                                                 device=self.device)

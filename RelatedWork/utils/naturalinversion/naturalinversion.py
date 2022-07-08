@@ -84,6 +84,7 @@ def get_inversion_images(net,
                 var_scale=0.001, 
                 l2_coeff=0.00001,
                 num_generate_images=2000,
+                feature_block_num=4,
                 latent_dim=100,
                 configs=None,
                 device='cuda',
@@ -114,7 +115,7 @@ def get_inversion_images(net,
         feature_decoder_class = Feature_Decoder
     while np.count_nonzero(num_cls_targets>=minimum_per_class)<num_classes[0]:
         generator = generator_class(8,latent_dim+num_classes[0],3).to(device)
-        feature_decoder = feature_decoder_class().to(device)
+        feature_decoder = feature_decoder_class(feature_block_num).to(device)
         generator.train()
         feature_decoder.train()
         optimizer_g = optim.Adam(generator.parameters(), lr=g_lr)
