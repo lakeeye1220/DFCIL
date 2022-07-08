@@ -206,7 +206,7 @@ class BiC(EEIL):
             if self.configs['natural_inversion']:
                 from utils.naturalinversion.naturalinversion import get_inversion_images
                 prefix = os.path.join(self.save_path, self.time_data)
-                inv_images, inv_labels = get_inversion_images(self.model,
+                inv_images, inv_labels = get_inversion_images(self.old_model,
                                                               num_classes=[
                                                                   self.current_num_classes, self.current_num_classes+self.task_step],
                                                               task=task_num,
@@ -226,7 +226,7 @@ class BiC(EEIL):
             elif self.configs['generative_inversion']:
                 from model.generative_model.generative_network import get_inversion_images
                 prefix = os.path.join(self.save_path, self.time_data)
-                inv_images, inv_labels = get_inversion_images(self.model,
+                inv_images, inv_labels = get_inversion_images(self.old_model,
                                                               num_classes=[
                                                                   self.current_num_classes, self.current_num_classes+self.task_step],
                                                               task=task_num,

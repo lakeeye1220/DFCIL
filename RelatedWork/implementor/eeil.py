@@ -176,12 +176,12 @@ class EEIL(ICARL):
             if self.configs['natural_inversion']:
                 from utils.naturalinversion.naturalinversion import get_inversion_images
                 prefix = os.path.join(self.save_path, self.time_data)
-                inv_images, inv_labels = get_inversion_images(self.model, [self.current_num_classes, self.current_num_classes+self.task_step], task_num, epochs=self.configs['inversion_epochs'], prefix=prefix, global_iteration=task_num, bn_reg_scale=3,
+                inv_images, inv_labels = get_inversion_images(self.old_model, [self.current_num_classes, self.current_num_classes+self.task_step], task_num, epochs=self.configs['inversion_epochs'], prefix=prefix, global_iteration=task_num, bn_reg_scale=3,
                                                               g_lr=0.001, d_lr=0.0005, a_lr=0.05, var_scale=0.001, l2_coeff=0.00001, bs=self.configs['inversion_batch_size'], num_generate_images=self.configs['memory_size'], latent_dim=self.configs['latent_dim'], configs=self.configs, device=self.device)
             elif self.configs['generative_inversion']:
                 from model.generative_model.generative_network import get_inversion_images
                 prefix = os.path.join(self.save_path, self.time_data)
-                inv_images, inv_labels = get_inversion_images(self.model, [self.current_num_classes, self.current_num_classes+self.task_step], task_num, epochs=self.configs['inversion_epochs'], prefix=prefix, global_iteration=task_num, bn_reg_scale=3,
+                inv_images, inv_labels = get_inversion_images(self.old_model, [self.current_num_classes, self.current_num_classes+self.task_step], task_num, epochs=self.configs['inversion_epochs'], prefix=prefix, global_iteration=task_num, bn_reg_scale=3,
                                                               g_lr=0.001, d_lr=0.0005, a_lr=0.05, var_scale=0.001, l2_coeff=0.00001, bs=self.configs['inversion_batch_size'], num_generate_images=self.configs['memory_size'], latent_dim=self.configs['latent_dim'], configs=self.configs, device=self.device)
             else:
                 self.model.eval()
