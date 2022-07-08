@@ -62,9 +62,8 @@ class Feature_Decoder(nn.Module):
             self.conv2 = nn.Conv2d(32, 16, 1, stride = 1, padding = 0)
             self.conv3 = nn.Conv2d(16, 3, 1, stride = 1, padding = 0)
             self.conv4 = nn.Conv2d(3, 3, 1, stride = 1, padding = 0)
-            self.conv_31 = nn.Conv2d(64, 64, 3, stride=1, padding=1)
-            self.conv_32 = nn.Conv2d(32, 32, 3, stride=1, padding=1)
-            self.conv_33 = nn.Conv2d(16, 16, 3, stride=1, padding=1)
+            self.conv_31 = nn.Conv2d(32, 32, 3, stride=1, padding=1)
+            self.conv_32 = nn.Conv2d(16, 16, 3, stride=1, padding=1)
 
 
     def forward(self, x, features):
