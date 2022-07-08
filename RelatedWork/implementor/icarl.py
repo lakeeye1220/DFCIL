@@ -408,13 +408,13 @@ class ICARL(Baseline):
     
     def construct_task_dataset(self,task_num, valid_loader):
         self.model.eval()
+        adding_classes_list = [self.task_step *
+                                (task_num-1), self.task_step*task_num]
         if task_num > 1:
             self.old_model.eval()
         ## after train- process exemplar set ##
 
         if task_num >1:
-            adding_classes_list = [self.task_step *
-                                   (task_num-1), self.task_step*task_num]
 
             if self.configs['natural_inversion']:
                 from utils.naturalinversion.naturalinversion import get_inversion_images
