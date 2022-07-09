@@ -316,7 +316,7 @@ class EEIL(ICARL):
         print('==start fine-tuning==')
         for epoch in range(1, bftepoch+1):
             self._train(train_loader, optimizer, epoch,
-                        0, balance_finetune=True)
+                        task_num, balance_finetune=True)
             optimizer.zero_grad(set_to_none=True)
             lr_scheduler.step()
             valid_info = self._eval(valid_loader, epoch, 0)
