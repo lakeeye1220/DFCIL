@@ -234,6 +234,9 @@ class EEIL(ICARL):
                     target_reweighted[..., :old_task_size] = old_target
                     loss = F.binary_cross_entropy_with_logits(
                         outputs, target_reweighted)
+                else:
+                    print(task_num,'error point')
+                    raise NotImplementedError
             elif self.configs['train_mode']=='eeil_loss_bce':
                 if task_num==1:
                     loss = F.binary_cross_entropy_with_logits(
