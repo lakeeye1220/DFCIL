@@ -351,10 +351,6 @@ class BiC(EEIL):
             losses = AverageMeter('Loss', ':.4e')
             top1 = AverageMeter('Acc@1', ':6.2f')
             top5 = AverageMeter('Acc@5', ':6.2f')
-            progress = ProgressMeter(
-                len(train_loader),
-                [batch_time, losses, top1, top5],
-                prefix="Epoch: [{}]".format(e))
             i = 0
             end = time.time()
             self.bias_layers[task_num-1].train()
@@ -383,8 +379,6 @@ class BiC(EEIL):
                 # measure elapsed time
                 batch_time.update(time.time() - end)
                 end = time.time()
-                if i % int(len(train_loader)//2) == 0:
-                    progress.display(i)
                 i += 1
             lr_scheduler.step()
             tok = time.time()
