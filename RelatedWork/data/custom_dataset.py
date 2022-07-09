@@ -102,15 +102,15 @@ class ImageDatasetFromData(Dataset):
     
     def __getitem__(self, i):
         data=Image.fromarray(self.X[i])
-        target=torch.tensor(self.y[i],dtype=torch.long)
         
         if self.transform:
             data = self.transform(data)
         
-        if self.target_transform:
-            target = self.target_transform(target)
 
         if self.y is not None:
+            target=torch.tensor(self.y[i],dtype=torch.long)
+            if self.target_transform:
+                target = self.target_transform(target)
             if self.return_idx:
                 return data, target, i
             return (data, target)
