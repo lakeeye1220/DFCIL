@@ -1,4 +1,3 @@
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -9,17 +8,17 @@ class Generator(nn.Module):
         self.init_size = image_size
         self.l3 = nn.Linear(latent_dim, 128 * image_size ** 2)
         self.conv_block = nn.Sequential(
-            nn.BatchNorm2d(128),
+            torch.nn.utils.spectral_norm(nn.BatchNorm2d(128)),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Upsample(scale_factor = 2),
-            nn.Conv2d(128, 128, 3, stride = 1, padding = 1),
-            nn.BatchNorm2d(128),
+            torch.nn.utils.spectral_norm(nn.Upsample(scale_factor = 2)),
+            torch.nn.utils.spectral_norm(nn.Conv2d(128, 128, 3, stride = 1, padding = 1)),
+            torch.nn.utils.spectral_norm(nn.BatchNorm2d(128)),
             nn.LeakyReLU(0.2, inplace = True),
-            nn.Upsample(scale_factor=2),
-            nn.Conv2d(128, 64, 3, stride = 1, padding = 1),
-            nn.BatchNorm2d(64),
+            torch.nn.utils.spectral_norm(nn.Upsample(scale_factor=2)),
+            torch.nn.utils.spectral_norm(nn.Conv2d(128, 64, 3, stride = 1, padding = 1)),
+            torch.nn.utils.spectral_norm(nn.BatchNorm2d(64)),
             nn.LeakyReLU(0.2, inplace = True),
-            nn.Conv2d(64, 3, 3, stride = 1, padding = 1),
+            torch.nn.utils.spectral_norm(nn.Conv2d(64, 3, 3, stride = 1, padding = 1)),
         )
     
         if initial:
@@ -63,9 +62,8 @@ class Feature_Decoder(nn.Module):
             self.conv2 = nn.Conv2d(32, 16, 1, stride = 1, padding = 0)
             self.conv3 = nn.Conv2d(16, 3, 1, stride = 1, padding = 0)
             self.conv4 = nn.Conv2d(3, 3, 1, stride = 1, padding = 0)
-            self.conv_31 = nn.Conv2d(64, 64, 3, stride=1, padding=1)
-            self.conv_32 = nn.Conv2d(32, 32, 3, stride=1, padding=1)
-            self.conv_33 = nn.Conv2d(16, 16, 3, stride=1, padding=1)
+            self.conv_31 = nn.Conv2d(32, 32, 3, stride=1, padding=1)
+            self.conv_32 = nn.Conv2d(16, 16, 3, stride=1, padding=1)
 
 
     def forward(self, x, features):
@@ -95,4 +93,3 @@ class Feature_Decoder(nn.Module):
         out = torch.tanh(out)
         
         return out, out_
-
