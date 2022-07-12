@@ -1,8 +1,20 @@
+import PIL
 import torch
 from torch import nn
 import torch.nn.functional as F
 import math
+import numpy as np
+import random
+import collections
+import torch.optim as optim
+import torchvision.utils as vutils
+import os
+from torch.utils.data.dataset import Dataset
+from torch.utils.data import DataLoader
+from dataloaders.utils import get_transform
+from models.generator import Feature_Decoder
 
+from PIL import Image
 """
 Some content adapted from the following:
 @article{fang2019datafree,
@@ -158,6 +170,270 @@ class Teacher(nn.Module):
         # clear cuda cache
         torch.cuda.empty_cache()
         self.generator.eval()
+
+
+class NaturalInversionFeatureHook():
+    def __init__(self, module, rs, mean=None, var= None):
+        self.hook = module.register_forward_hook(self.hook_fn)
+        self.rs = rs
+        self.rankmean = mean
+        self.rankvar=var
+
+    def hook_fn(self, module, input, output):
+        nch = input[0].shape[1]
+        mean = input[0].mean([0, 2, 3])
+        var = input[0].permute(1, 0, 2, 3).contiguous().view([nch, -1]).var(1, unbiased=False)
+
+        r_feature = torch.norm(module.running_var.data.type(var.type()) - var, 2) + torch.norm(
+            module.running_mean.data.type(var.type())  - mean, 2)
+
+        self.r_feature = r_feature
+
+    def close(self):
+        self.hook.remove()
+
+class NITeacher(Teacher):
+    def __init__(self, solver, generator, gen_opt, img_shape, iters, class_idx, deep_inv_params,device='cuda',train=True, config=None):
+        super().__init__(solver, generator, gen_opt, img_shape, iters, class_idx, deep_inv_params, train, config)
+        self.device=device
+        self.loader=None
+
+    def sample(self, size, device, return_scores=False):
+        # train if first time
+        if self.first_time:
+            self.first_time=False
+            self.transform_from_cifar=get_transform('cifar100','train')
+        
+        idx= np.random.randchoice(len(self.inv_labels), size)
+        xs_i=self.inv_labels[idx]
+        ys_i=self.inv_labels_y[idx]
+
+        xs=[]
+        for x in xs_i:
+            x_tmp=PIL.Image.fromarray(x)
+            xs.append(self.transform_from_cifar(x_tmp))
+        x_i=torch.stack(xs,dim=0).to(device)
+        y=torch.from_numpy(ys_i).long().to(device)
+        # make sure solver is eval mode
+        self.solver.eval()
+        # get predicted logit-scores
+        with torch.no_grad():
+            y_hat = self.solver.forward(x_i)
+        y_hat = y_hat[:, self.class_idx]
+
+        return (x_i, y, y_hat) if return_scores else (x_i, y)
+
+    def get_images(self, bs=256, epochs=2000, idx=-1):
+        torch.cuda.empty_cache()
+        self.solver.eval()
+        feature_decoder=Feature_Decoder(3)
+
+        bn_reg_scale=10
+        g_lr=0.001
+        d_lr=0.0005
+        a_lr=0.05
+        var_scale=0.001 
+        l2_coeff=0.00001
+        num_generate_images=bs # 2000
+        print("num generate images",num_generate_images)
+        print("class idx",self.class_idx)
+
+        num_classes=len(self.class_idx)
+        minimum_per_class=num_generate_images//num_classes
+        num_cls_targets=np.zeros(num_classes)
+
+        best_inputs_list=[]
+        best_targets_list = []
+        batch_size=256
+        while np.count_nonzero(num_cls_targets>=minimum_per_class)<num_classes:
+            self.generator.reset(num_classes)
+            self.generator=self.generator.to(self.device)
+            self.generator.train()
+            feature_decoder.reset()
+            feature_decoder.to(self.device)
+            feature_decoder.train()
+            optimizer_g = optim.Adam(self.generator.parameters(), lr=g_lr)
+            optimizer_f = torch.optim.Adam(feature_decoder.parameters(), lr=d_lr)
+
+            # Learnable Scale Parameter
+            alpha = torch.empty((batch_size,3,1,1), requires_grad=True, device=self.device)
+            torch.nn.init.normal_(alpha, 5.0, 1)
+            optimizer_alpha = torch.optim.Adam([alpha], lr=a_lr)
+
+            # set up criteria for optimization
+            criterion = nn.CrossEntropyLoss()
+            optimizer_g.state = collections.defaultdict(dict)
+            optimizer_f.state = collections.defaultdict(dict)  # Reset state of optimizer
+            optimizer_alpha.state = collections.defaultdict(dict)
+
+            np_targets=np.random.choice(num_classes,batch_size)
+            targets = torch.LongTensor(np_targets).to(self.device)
+            onehot_targets=F.one_hot(targets,num_classes).float().to(self.device)
+            z = torch.randn((batch_size, 1000)).to(self.device)
+            z = torch.cat((z,onehot_targets), dim = 1)
+            
+            loss_r_feature_layers = []
+            count = 0
+            for module in self.solver.modules():
+                if isinstance(module, nn.BatchNorm2d):
+                    loss_r_feature_layers.append(NaturalInversionFeatureHook(module, 0))
+        
+            lim_0, lim_1 = 2, 2
+
+            for epoch in range(epochs):
+                inputs_jit = self.generator(z)
+            
+                # apply random jitter offsets
+                off1 = random.randint(-lim_0, lim_0)
+                off2 = random.randint(-lim_1, lim_1)
+                inputs_jit = torch.roll(inputs_jit, shifts=(off1,off2), dims=(2,3))
+            
+                # Apply random flip 
+                flip = random.random() > 0.5
+                if flip:
+                    inputs_jit = torch.flip(inputs_jit, dims = (3,))
+            
+                ##### step2
+                input_for_f = inputs_jit.clone().detach()
+                with torch.no_grad():
+                    _, features = self.solver.forward(input_for_f,feature=True)
+            
+                inputs_jit, addition = feature_decoder(inputs_jit, features)
+
+                ##### step3
+                inputs_jit = inputs_jit * alpha
+                inputs_for_save = inputs_jit.data.clone()
+
+                # apply random jitter offsets
+                off1 = random.randint(-lim_0, lim_0)
+                off2 = random.randint(-lim_1, lim_1)
+                inputs_jit = torch.roll(inputs_jit, shifts=(off1,off2), dims=(2,3))
+            
+                # Apply random flip 
+                flip = random.random() > 0.5
+                if flip:
+                    inputs_jit = torch.flip(inputs_jit, dims = (3,))
+                outputs, features = self.solver.forward(inputs_jit,feature=True)
+            
+                loss_target = criterion(outputs, targets)
+                loss = loss_target
+
+                # apply total variation regularization
+                diff1 = inputs_jit[:,:,:,:-1] - inputs_jit[:,:,:,1:]
+                diff2 = inputs_jit[:,:,:-1,:] - inputs_jit[:,:,1:,:]
+                diff3 = inputs_jit[:,:,1:,:-1] - inputs_jit[:,:,:-1,1:]
+                diff4 = inputs_jit[:,:,:-1,:-1] - inputs_jit[:,:,1:,1:]
+                loss_var = torch.norm(diff1) + torch.norm(diff2) + torch.norm(diff3) + torch.norm(diff4)
+                loss = loss + var_scale*loss_var
+
+                # R_feature loss
+                loss_distr = sum([mod.r_feature for idx, mod in enumerate(loss_r_feature_layers)])
+                loss = loss + bn_reg_scale*loss_distr # best for noise before BN
+
+                # l2 loss
+                loss = loss + l2_coeff * torch.norm(inputs_jit, 2)
+
+                if (epoch+1) % int(epochs/5)==0:
+                    print("\rIt {:4d}\tLosses: total: {:7.3f},\ttarget: {:5.3f} \tR_feature_loss unscaled:\t {:6.3f}".format(epoch, loss.item(),loss_target,loss_distr.item()),end='')
+                    nchs = inputs_jit.shape[1]
+
+                    save_pth = os.path.join('inversion_images', 'task{}'.format(idx))
+                    if not os.path.exists(save_pth):
+                        os.makedirs(save_pth)
+        
+                    vutils.save_image(inputs_jit.data.clone(),os.path.join(save_pth,'generator_{}.png'.format(str(epoch//100).zfill(2))),normalize=True, scale_each=True, nrow=10)
+                    vutils.save_image(inputs_for_save,os.path.join(save_pth,'save_{}.png'.format(str(epoch//100).zfill(2))),normalize=True, scale_each=True, nrow=10)
+
+                if best_cost > loss.item():
+                    best_cost = loss.item()
+                    with torch.no_grad():
+                        self.generator.eval()
+                        best_inputs = self.generator(z)
+                        _, features = self.solver.forward(best_inputs,feature=True)
+                        best_inputs, addition = feature_decoder(best_inputs, features)
+                        best_inputs *= alpha
+                        self.generator.train()
+            
+                optimizer_g.zero_grad()
+                optimizer_f.zero_grad()
+                optimizer_alpha.zero_grad()
+
+                # backward pass
+                loss.backward()
+
+                optimizer_g.step()
+                optimizer_f.step()
+                optimizer_alpha.step()
+            print("")
+            best_inputs_list.append(best_inputs.cpu().detach().numpy())
+            best_targets_list.append(targets.cpu().detach().numpy())
+            for mod in loss_r_feature_layers:
+                mod.close()
+            for target in targets.cpu().detach().numpy():
+                num_cls_targets[target]+=1
+            print("Goal num_cls_targets : {} / Current [{:.2f}%] {}".format(minimum_per_class, 100.*min(num_cls_targets)/minimum_per_class,num_cls_targets))
+            optimizer_alpha.zero_grad(set_to_none=True)
+            optimizer_f.zero_grad(set_to_none=True)
+            optimizer_g.zero_grad(set_to_none=True)
+            # del generator
+            # del feature_decoder
+
+            datas, labels = [], []
+            for lbl, img in zip(inv_labels, inv_images):
+                for l, i in zip(lbl, img):
+
+                    data = np.transpose(np.array(i), (1, 2, 0))
+                    datas.append(data.astype(np.uint8))
+                    labels.append(np.array([l]))
+
+            # list (np.array(32,32,3),...) -> stack (bsz,32,32,3)
+            inv_images = np.stack(datas, axis=0)
+            inv_labels = np.concatenate(labels, axis=0).reshape(-1)
+            # indexing
+            inv_filtered_images = []
+            inv_filtered_labels = []
+            size_of_exemplar = num_generate_images//idx
+            for cls_idx in range(0, idx):
+                # size of exemplar is from prev task_id.
+                inv_filtered_images.append(
+                    inv_images[inv_labels == cls_idx][:size_of_exemplar])
+                inv_filtered_labels.append(
+                    inv_labels[inv_labels == cls_idx][:size_of_exemplar])
+            self.inv_images = np.concatenate(inv_filtered_images, axis=0)
+            self.inv_labels = np.concatenate(
+                inv_filtered_labels, axis=0).reshape(-1)
+            print("Length of inv_images: {}".format(len(self.inv_images)))
+
+            
+class ImageDatasetFromData(Dataset):
+    def __init__(self, images, labels=None, transform=None,target_transform=None, return_idx=False):
+        self.X = images
+        self.y = labels
+        self.transform = transform
+        self.target_transform = target_transform
+        self.return_idx=return_idx
+         
+    def __len__(self):
+        return (len(self.X))
+    
+    def __getitem__(self, i):
+        data=Image.fromarray(self.X[i])
+        
+        if self.transform:
+            data = self.transform(data)
+        
+
+        if self.y is not None:
+            target=torch.tensor(self.y[i],dtype=torch.long)
+            if self.target_transform:
+                target = self.target_transform(target)
+            if self.return_idx:
+                return data, target, i
+            return (data, target)
+        else:
+            if self.return_idx:
+                return data, i
+            return data
 
 class DeepInversionFeatureHook():
     '''

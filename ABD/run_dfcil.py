@@ -15,7 +15,13 @@ def create_args():
     
     # This function prepares the variables shared across demo.py
     parser = argparse.ArgumentParser()
-
+    
+    if sys.platform == 'linux':
+        dataset_path = '/data/cifar100'
+    elif sys.platform == 'win32':
+        dataset_path = '..\..\data\dataset\cifar100'
+    else:
+        dataset_path = '\dataset'
     # standard Args
     parser.add_argument('--gpuid', nargs="+", type=int, default=[0],
                          help="The list of gpuid, ex:--gpuid 3 1. Negative value means cpu-only")
@@ -27,7 +33,7 @@ def create_args():
     parser.add_argument('--gen_model_name', type=str, default='MLP', help="The name of actual model for the generator")
     parser.add_argument('--learner_type', type=str, default='default', help="The type (filename) of learner")
     parser.add_argument('--learner_name', type=str, default='NormalNN', help="The class name of learner")
-    parser.add_argument('--dataroot', type=str, default='/data/cifar100', help="The root folder of dataset or downloaded data")
+    parser.add_argument('--dataroot', type=str, default=dataset_path, help="The root folder of dataset or downloaded data")
     parser.add_argument('--dataset', type=str, default='MNIST', help="CIFAR10|MNIST")
     parser.add_argument('--load_model_dir', type=str, default=None, help="try loading from external model directory")
     parser.add_argument('--workers', type=int, default=8, help="#Thread for dataloader")
@@ -66,6 +72,7 @@ def create_args():
     parser.add_argument('--mu', type=float, default=1.0, help="KD loss balancing weight")
     parser.add_argument('--beta', type=float, default=0.5, help="FT loss balancing weight")
 
+    parser.add_argument('--teacher_type', type=str, default='DI', help="DI or NI if in not datafree train_type it is not available",choices=('NI','DI'))
     return parser
 
 def get_args(argv):

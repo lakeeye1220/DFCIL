@@ -5,7 +5,7 @@ from torch.nn import functional as F
 import models
 from utils.metric import AverageMeter, Timer
 import numpy as np
-from .datafree_helper import Teacher
+from learners.datafree_helper import NITeacher, Teacher
 from .default import NormalNN, weight_reset, accumulate_acc, loss_fn_kd
 import copy
 from torch.optim import Adam
@@ -26,6 +26,8 @@ class DeepInversionGenBN(NormalNN):
         self.generator = self.create_generator()
         self.generator_optimizer = Adam(params=self.generator.parameters(), lr=self.deep_inv_params[0])
         self.beta = self.config['beta']
+
+        self.teacher_type = self.config['teacher_type']
 
         # repeat call for generator network
         if self.gpu:
@@ -149,8 +151,18 @@ class DeepInversionGenBN(NormalNN):
         
         # new teacher
         if (self.out_dim == self.valid_out_dim): need_train = False
-        self.previous_teacher = Teacher(solver=copy.deepcopy(self.model), generator=self.generator, gen_opt = self.generator_optimizer, img_shape = (-1, train_dataset.nch,train_dataset.im_size, train_dataset.im_size), iters = self.power_iters, deep_inv_params = self.deep_inv_params, class_idx = np.arange(self.valid_out_dim), train = need_train, config = self.config)
-        self.sample(self.previous_teacher, self.batch_size, self.device, return_scores=False)
+        
+        if self.teacher_type =='DI':
+            self.previous_teacher = Teacher(solver=copy.deepcopy(self.model), generator=self.generator, gen_opt = self.generator_optimizer, img_shape = (-1, train_dataset.nch,train_dataset.im_size, train_dataset.im_size), iters = self.power_iters, deep_inv_params = self.deep_inv_params, class_idx = np.arange(self.valid_out_dim), train = need_train, config = self.config)
+            self.sample(self.previous_teacher, self.batch_size, self.device, return_scores=False)
+        elif self.teacher_type =='NI': # NI
+            print("===hi"*20)
+            self.previous_teacher = NITeacher(solver=copy.deepcopy(self.model), generator=self.generator, gen_opt = self.generator_optimizer, img_shape = (-1, train_dataset.nch,train_dataset.im_size, train_dataset.im_size), iters = self.power_iters, deep_inv_params = self.deep_inv_params, class_idx = np.arange(self.valid_out_dim), train = need_train, config = self.config)
+            self.previous_teacher.get_images(2000, self.power_iters, self.last_valid_out_dim)
+        else:
+            raise NotImplementedError
+
+
         if len(self.config['gpuid']) > 1:
             self.previous_linear = copy.deepcopy(self.model.module.last)
         else:
@@ -294,6 +306,7 @@ class AlwaysBeDreaming(DeepInversionGenBN):
     def __init__(self, learner_config):
         super(AlwaysBeDreaming, self).__init__(learner_config)
         self.kl_loss = nn.KLDivLoss(reduction='batchmean').cuda()
+        self.teacher_type = self.config['teacher_type']
 
     def update_model(self, inputs, targets, target_scores = None, dw_force = None, kd_index = None):
         
