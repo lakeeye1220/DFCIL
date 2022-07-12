@@ -235,7 +235,7 @@ class BiC(EEIL):
         for images, target, indices in loader:
             # measure data loading time
             images, target = images.to(
-                self.device), target.to(self.device)
+                self.device), target.long().to(self.device)
             # target_reweighted = get_one_hot(target, self.current_num_classes)
             outputs, _ = self.model(images)
 

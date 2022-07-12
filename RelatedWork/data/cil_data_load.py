@@ -183,8 +183,7 @@ class CILDatasetLoader:
                     transforms.RandomCrop((32, 32)),
                     transforms.RandomHorizontalFlip(),
                     transforms.ToTensor(),
-                    ColorJitter(brightness=0.63),
-                    transforms.ColorJitter(contrast=(0.2,1.8)),
+                    transforms.ColorJitter(brightness=63/255, contrast=0.8),
                     normalize,
                 ])
         elif dataset_name == 'cifar10':
