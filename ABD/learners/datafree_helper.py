@@ -278,7 +278,7 @@ class NITeacher(Teacher):
                     loss_r_feature_layers.append(NaturalInversionFeatureHook(module, 0))
         
             lim_0, lim_1 = 2, 2
-
+            best_cost=1e6
             for epoch in range(epochs):
                 inputs_jit = self.generator(z)
             
@@ -376,32 +376,33 @@ class NITeacher(Teacher):
             optimizer_g.zero_grad(set_to_none=True)
             # del generator
             # del feature_decoder
+        inv_images= best_inputs_list
+        inv_labels= best_targets_list
+        datas, labels = [], []
+        for lbl, img in zip(inv_labels, inv_images):
+            for l, i in zip(lbl, img):
 
-            datas, labels = [], []
-            for lbl, img in zip(inv_labels, inv_images):
-                for l, i in zip(lbl, img):
+                data = np.transpose(np.array(i), (1, 2, 0))
+                datas.append(data.astype(np.uint8))
+                labels.append(np.array([l]))
 
-                    data = np.transpose(np.array(i), (1, 2, 0))
-                    datas.append(data.astype(np.uint8))
-                    labels.append(np.array([l]))
-
-            # list (np.array(32,32,3),...) -> stack (bsz,32,32,3)
-            inv_images = np.stack(datas, axis=0)
-            inv_labels = np.concatenate(labels, axis=0).reshape(-1)
-            # indexing
-            inv_filtered_images = []
-            inv_filtered_labels = []
-            size_of_exemplar = num_generate_images//idx
-            for cls_idx in range(0, idx):
-                # size of exemplar is from prev task_id.
-                inv_filtered_images.append(
-                    inv_images[inv_labels == cls_idx][:size_of_exemplar])
-                inv_filtered_labels.append(
-                    inv_labels[inv_labels == cls_idx][:size_of_exemplar])
-            self.inv_images = np.concatenate(inv_filtered_images, axis=0)
-            self.inv_labels = np.concatenate(
-                inv_filtered_labels, axis=0).reshape(-1)
-            print("Length of inv_images: {}".format(len(self.inv_images)))
+        # list (np.array(32,32,3),...) -> stack (bsz,32,32,3)
+        inv_images = np.stack(datas, axis=0)
+        inv_labels = np.concatenate(labels, axis=0).reshape(-1)
+        # indexing
+        inv_filtered_images = []
+        inv_filtered_labels = []
+        size_of_exemplar = num_generate_images//idx
+        for cls_idx in range(0, idx):
+            # size of exemplar is from prev task_id.
+            inv_filtered_images.append(
+                inv_images[inv_labels == cls_idx][:size_of_exemplar])
+            inv_filtered_labels.append(
+                inv_labels[inv_labels == cls_idx][:size_of_exemplar])
+        self.inv_images = np.concatenate(inv_filtered_images, axis=0)
+        self.inv_labels = np.concatenate(
+            inv_filtered_labels, axis=0).reshape(-1)
+        print("Length of inv_images: {}".format(len(self.inv_images)))
 
             
 class ImageDatasetFromData(Dataset):
