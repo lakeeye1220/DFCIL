@@ -2,10 +2,10 @@
 
 # process inputs
 DEFAULTGPU=0
-GPUID=${1:-$DEFAULTGPU}
+GPUID=0 # ${1:-$DEFAULTGPU}
 
 # benchmark settings
-DATE=ICCV2021
+DATE=ICCV2021-PI2000
 SPLIT=20
 OUTDIR=outputs/${DATE}/DFCIL-fivetask/CIFAR100
 
@@ -23,7 +23,7 @@ MAXTASK=-1
 # hard coded inputs
 REPEAT=1
 SCHEDULE="100 150 200 250"
-PI=10000
+PI=2000
 MODELNAME=resnet32
 BS=128
 WD=0.0002
@@ -36,7 +36,8 @@ LR=0.1
 #########################
 
 # Full Method
-python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
+
+python3 -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
     --first_split_size $SPLIT --other_split_size $SPLIT --schedule $SCHEDULE --schedule_type decay --batch_size $BS \
     --optimizer $OPT --lr $LR --momentum $MOM --weight_decay $WD \
     --mu 1e-1 --memory 0 --model_name $MODELNAME --model_type resnet \
@@ -50,7 +51,7 @@ python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUI
 #########################
 
 # LWF - Synthetic
-python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
+python3 -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
     --first_split_size $SPLIT --other_split_size $SPLIT --schedule $SCHEDULE --schedule_type decay --batch_size $BS \
     --optimizer $OPT --lr $LR --momentum $MOM --weight_decay $WD \
     --mu 1e-1 --memory 0 --model_name $MODELNAME --model_type resnet \
@@ -60,7 +61,7 @@ python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUI
     --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/lwf_synthetic
 
 # DeepInv
-python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
+python3 -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
     --first_split_size $SPLIT --other_split_size $SPLIT --schedule $SCHEDULE --schedule_type decay --batch_size $BS \
     --optimizer $OPT --lr $LR --momentum $MOM --weight_decay $WD \
     --mu 1 --memory 0 --model_name $MODELNAME --model_type resnet \
@@ -74,7 +75,8 @@ python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUI
 #########################
 
 # Oracle
-python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
+'''
+python3 -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
     --first_split_size $SPLIT --other_split_size $SPLIT --schedule $SCHEDULE --schedule_type decay --batch_size $BS \
     --optimizer $OPT --lr $LR --momentum $MOM --weight_decay $WD \
     --memory 0 --model_name $MODELNAME --model_type resnet \
@@ -82,7 +84,7 @@ python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUI
     --overwrite 0 --max_task $MAXTASK --log_dir ${OUTDIR}/oracle
 
 # Base
-python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
+python3 -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
     --first_split_size $SPLIT --other_split_size $SPLIT --schedule $SCHEDULE --schedule_type decay --batch_size $BS \
     --optimizer $OPT --lr $LR --momentum $MOM --weight_decay $WD \
     --memory 0 --model_name $MODELNAME --model_type resnet \
@@ -90,7 +92,7 @@ python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUI
     --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/base
 
 # DGR
-python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
+python3 -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
     --first_split_size $SPLIT --other_split_size $SPLIT --schedule $SCHEDULE --schedule_type decay --batch_size $BS \
     --optimizer $OPT --lr $LR --momentum $MOM --weight_decay 0 \
     --mu 1 --memory 0 --model_name $MODELNAME --model_type resnet \
@@ -99,7 +101,7 @@ python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUI
     --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/dgr
 
 # LwF
-python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
+python3 -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
     --first_split_size $SPLIT --other_split_size $SPLIT --schedule $SCHEDULE --schedule_type decay --batch_size $BS \
     --optimizer $OPT --lr $LR --momentum $MOM --weight_decay $WD \
     --mu 1 --memory 0 --model_name $MODELNAME --model_type resnet \
@@ -107,7 +109,7 @@ python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUI
     --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/lwf
 
 # LwF.MC
-python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
+python3 -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
     --first_split_size $SPLIT --other_split_size $SPLIT --schedule $SCHEDULE --schedule_type decay --batch_size $BS \
     --optimizer $OPT --lr $LR --momentum $MOM --weight_decay $WD \
     --mu 1 --memory 0 --model_name $MODELNAME --model_type resnet \
@@ -115,7 +117,7 @@ python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUI
     --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/lwf_mc
 
 # Naive Rehearsal
-python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
+python3 -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
     --first_split_size $SPLIT --other_split_size $SPLIT --schedule $SCHEDULE --schedule_type decay --batch_size $BS \
     --optimizer $OPT --lr $LR --momentum $MOM --weight_decay $WD \
     --memory 2000 --model_name $MODELNAME --model_type resnet \
@@ -123,7 +125,7 @@ python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUI
     --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/rehearsal
 
 # LwF - Coreset
-python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
+python3 -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
     --first_split_size $SPLIT --other_split_size $SPLIT --schedule $SCHEDULE --schedule_type decay --batch_size $BS \
     --optimizer $OPT --lr $LR --momentum $MOM --weight_decay $WD \
     --mu 1 --memory 2000 --model_name $MODELNAME --model_type resnet \
@@ -131,7 +133,7 @@ python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUI
     --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/lwf_coreset
 
 # E2E
-python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
+python3 -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
     --first_split_size $SPLIT --other_split_size $SPLIT --schedule $SCHEDULE --schedule_type decay --batch_size $BS \
     --optimizer $OPT --lr $LR --momentum $MOM --weight_decay $WD \
     --mu 1 --memory 2000 --model_name $MODELNAME --model_type resnet \
@@ -139,9 +141,10 @@ python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUI
     --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/e2e
 
 # BiC
-python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
+python3 -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
     --first_split_size $SPLIT --other_split_size $SPLIT --schedule $SCHEDULE --schedule_type decay --batch_size $BS \
     --optimizer $OPT --lr $LR --momentum $MOM --weight_decay $WD \
     --mu 1 --memory 2000 --model_name $MODELNAME --model_type resnet \
     --learner_type kd --learner_name BIC --DW \
     --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/bic
+'''
