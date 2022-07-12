@@ -244,7 +244,9 @@ class NITeacher(Teacher):
         best_inputs_list=[]
         best_targets_list = []
         batch_size=256
+        best_cost=1e6
         while np.count_nonzero(num_cls_targets>=minimum_per_class)<num_classes:
+
             self.generator.reset(num_classes)
             self.generator=self.generator.to(self.device)
             self.generator.train()
