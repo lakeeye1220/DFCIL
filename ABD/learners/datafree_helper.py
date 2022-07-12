@@ -223,7 +223,7 @@ class NITeacher(Teacher):
 
         return (x_i, y, y_hat) if return_scores else (x_i, y)
 
-    def get_images(self, num_generate_images=256, epochs=2000, idx=-1):
+    def get_images(self, num_generate_images=2000, epochs=2000, idx=-1):
         torch.cuda.empty_cache()
         self.solver.eval()
         feature_decoder=Feature_Decoder(3)
