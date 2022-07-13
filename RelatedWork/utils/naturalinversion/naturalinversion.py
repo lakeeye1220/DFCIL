@@ -113,6 +113,7 @@ def get_inversion_images(net,
         generator_class = Generator
         #### Feature_Map Decoder
         feature_decoder_class = Feature_Decoder
+
     while np.count_nonzero(num_cls_targets>=minimum_per_class)<num_classes[0]:
         generator = generator_class(8,latent_dim+num_classes[0],3).to(device)
         feature_decoder = feature_decoder_class(feature_block_num).to(device)
@@ -134,9 +135,14 @@ def get_inversion_images(net,
 
         np_targets=np.random.choice(num_classes[0],bs)
         targets = torch.LongTensor(np_targets).to(device)
-        onehot_targets=F.one_hot(targets,num_classes[0]).float().to(device)
-        z = torch.randn((bs, latent_dim)).to(device)
-        z = torch.cat((z,onehot_targets), dim = 1)
+        if configs['network_ver']==1:
+            onehot_targets=F.one_hot(targets,num_classes[0]).float().to(device)
+            z = torch.randn((bs, latent_dim)).to(device)
+            z = torch.cat((z,onehot_targets), dim = 1)
+        elif configs['network_ver']==2:
+            z = torch.randn((bs, int(latent_dim/2))).to(device)
+            z = (z,targets)
+
         
         loss_r_feature_layers = []
         count = 0
