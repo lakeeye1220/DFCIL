@@ -174,8 +174,9 @@ class GeneratorBig(nn.Module):
 class NIGenerator(nn.Module):
     def __init__(self, zdim, in_channel,image_size, num_classes=100, initial=True):
         super(NIGenerator, self).__init__()
+        self.init_size = image_size//4
         self.image_size = image_size
-        self.l3 = nn.Linear(zdim+num_classes, 128 * image_size ** 2)
+        self.l3 = nn.Linear(zdim+num_classes, 128 * self.init_size ** 2)
         self.conv_block = nn.Sequential(
             nn.BatchNorm2d(128),
             nn.LeakyReLU(0.2, inplace=True),
@@ -212,7 +213,7 @@ class NIGenerator(nn.Module):
 
     def forward(self, z):
         out1 = self.l3(z)
-        out = out1.view(out1.shape[0], 128, self.image_size, self.image_size)
+        out = out1.view(out1.shape[0], 128, self.init_size, self.init_size)
         img = self.conv_block(out)
         return img 
 

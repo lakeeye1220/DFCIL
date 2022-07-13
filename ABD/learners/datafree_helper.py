@@ -223,7 +223,7 @@ class NITeacher(Teacher):
 
         return (x_i, y, y_hat) if return_scores else (x_i, y)
 
-    def get_images(self, bs=256, epochs=2000, idx=-1):
+    def get_images(self, num_generate_images=2000, epochs=2000, idx=-1):
         torch.cuda.empty_cache()
         self.solver.eval()
         feature_decoder=Feature_Decoder(3)
@@ -234,7 +234,6 @@ class NITeacher(Teacher):
         a_lr=0.05
         var_scale=0.001 
         l2_coeff=0.00001
-        num_generate_images=bs # 2000
         print("num generate images",num_generate_images)
         print("class idx",self.class_idx)
 
@@ -245,7 +244,9 @@ class NITeacher(Teacher):
         best_inputs_list=[]
         best_targets_list = []
         batch_size=256
+        best_cost=1e6
         while np.count_nonzero(num_cls_targets>=minimum_per_class)<num_classes:
+
             self.generator.reset(num_classes)
             self.generator=self.generator.to(self.device)
             self.generator.train()
@@ -279,7 +280,7 @@ class NITeacher(Teacher):
                     loss_r_feature_layers.append(NaturalInversionFeatureHook(module, 0))
         
             lim_0, lim_1 = 2, 2
-
+            best_cost=1e6
             for epoch in range(epochs):
                 inputs_jit = self.generator(z)
             
@@ -377,32 +378,33 @@ class NITeacher(Teacher):
             optimizer_g.zero_grad(set_to_none=True)
             # del generator
             # del feature_decoder
+        inv_images= best_inputs_list
+        inv_labels= best_targets_list
+        datas, labels = [], []
+        for lbl, img in zip(inv_labels, inv_images):
+            for l, i in zip(lbl, img):
 
-            datas, labels = [], []
-            for lbl, img in zip(inv_labels, inv_images):
-                for l, i in zip(lbl, img):
+                data = np.transpose(np.array(i), (1, 2, 0))
+                datas.append(data.astype(np.uint8))
+                labels.append(np.array([l]))
 
-                    data = np.transpose(np.array(i), (1, 2, 0))
-                    datas.append(data.astype(np.uint8))
-                    labels.append(np.array([l]))
-
-            # list (np.array(32,32,3),...) -> stack (bsz,32,32,3)
-            inv_images = np.stack(datas, axis=0)
-            inv_labels = np.concatenate(labels, axis=0).reshape(-1)
-            # indexing
-            inv_filtered_images = []
-            inv_filtered_labels = []
-            size_of_exemplar = num_generate_images//idx
-            for cls_idx in range(0, idx):
-                # size of exemplar is from prev task_id.
-                inv_filtered_images.append(
-                    inv_images[inv_labels == cls_idx][:size_of_exemplar])
-                inv_filtered_labels.append(
-                    inv_labels[inv_labels == cls_idx][:size_of_exemplar])
-            self.inv_images = np.concatenate(inv_filtered_images, axis=0)
-            self.inv_labels = np.concatenate(
-                inv_filtered_labels, axis=0).reshape(-1)
-            print("Length of inv_images: {}".format(len(self.inv_images)))
+        # list (np.array(32,32,3),...) -> stack (bsz,32,32,3)
+        inv_images = np.stack(datas, axis=0)
+        inv_labels = np.concatenate(labels, axis=0).reshape(-1)
+        # indexing
+        inv_filtered_images = []
+        inv_filtered_labels = []
+        size_of_exemplar = num_generate_images//idx
+        for cls_idx in range(0, idx):
+            # size of exemplar is from prev task_id.
+            inv_filtered_images.append(
+                inv_images[inv_labels == cls_idx][:size_of_exemplar])
+            inv_filtered_labels.append(
+                inv_labels[inv_labels == cls_idx][:size_of_exemplar])
+        self.inv_images = np.concatenate(inv_filtered_images, axis=0)
+        self.inv_labels = np.concatenate(
+            inv_filtered_labels, axis=0).reshape(-1)
+        print("Length of inv_images: {}".format(len(self.inv_images)))
 
             
 class ImageDatasetFromData(Dataset):
