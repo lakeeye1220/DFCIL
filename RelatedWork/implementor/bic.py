@@ -59,7 +59,8 @@ class BiC(EEIL):
         for task_num in range(1, self.configs['task_size']+1):
             task_tik = time.time()
             if self.configs['task_size'] > 0:
-                self.incremental_weight(task_num)
+                if self.configs['weight_change']:
+                    self.incremental_weight(task_num)
                 self.model.train()
                 self.model.to(self.device)
 
