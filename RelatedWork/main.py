@@ -75,6 +75,8 @@ def parse_args(args):
 
         parser.add_argument('--natural-inversion','-ni', default=False,help='natural inversion')
         parser.add_argument('--generative-inversion','-gi', default=False,help='natural inversion')
+        parser.add_argument(
+            '--weight-change', type=str2bool, default=True, help='weight change in class increment time')
 
         if parser.parse_known_args(args)[0].natural_inversion or parser.parse_known_args(args)[0].generative_inversion:
             parser.add_argument('--inversion-epochs', default=2000, type=int, help='natural inversion epoch')
