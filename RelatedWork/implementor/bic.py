@@ -8,10 +8,16 @@ import pandas as pd
 from utils.calc_score import AverageMeter, ProgressMeter, accuracy
 from utils.logger import convert_secs2time
 import numpy as np
-from utils.onehot import get_one_hot
 from implementor.eeil import EEIL
 import torch.nn.functional as F
 
+def bias_forward(x, task_num, bias_layer,task_step):
+    if task_num == 1:
+        return x
+    else:
+        x_old = x[:, :task_step*(task_num-1)]
+        x_new = bias_layer(x[:, task_step*(task_num-1):])
+        return torch.cat((x_old, x_new), dim=1)
 
 class BiasLayer(nn.Module):
     def __init__(self):
@@ -29,14 +35,6 @@ class BiC(EEIL):
             model, time_data, save_path, device, configs)
         self.bias_layers = []
 
-    def bias_forward(self, x, task_num, bias_layer):
-        if task_num == 1:
-            return x
-        else:
-            idx = self.task_step
-            x_old = x[:, :idx*(task_num-1)]
-            x_new = bias_layer(x[:, idx*(task_num-1):])
-            return torch.cat((x_old, x_new), dim=1)
 
     def run(self, dataset_path):
         self.datasetloader = CILDatasetLoader(
@@ -245,7 +243,7 @@ class BiC(EEIL):
                 cls_loss = self.criterion(outputs, target)
                 with torch.no_grad():
                     score, _ = self.old_model(images)
-                    score=self.bias_forward(score, task_num, self.bias_layers[task_num-1])
+                    score= bias_forward(score, task_num, self.bias_layers[task_num-1], self.task_step)
                 kd_loss = torch.zeros(task_num)
                 for t in range(task_num-1):
                     # local distillation
@@ -361,7 +359,7 @@ class BiC(EEIL):
                 # target_reweighted = get_one_hot(target, self.current_num_classes)
                 with torch.no_grad():
                     outputs, _ = self.model(images)
-                outputs = self.bias_forward(
+                outputs = bias_forward(
                     outputs, task_num, self.bias_layers[task_num-1])
                 loss = self.criterion(
                     outputs, target)

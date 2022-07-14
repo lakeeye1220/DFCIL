@@ -416,6 +416,10 @@ class ICARL(Baseline):
         ## after train- process exemplar set ##
 
         if task_num >1:
+            if self.configs['train_mode']=='bic':
+                self.bias_layers[task_num-2].eval()
+                bias_correction_layer=self.bias_layers[task_num-2]
+            else: bias_correction_layer=None
 
             if self.configs['natural_inversion']:
                 from utils.naturalinversion.naturalinversion import get_inversion_images
@@ -434,6 +438,7 @@ class ICARL(Baseline):
                                                                 bs=self.configs['inversion_batch_size'],
                                                                 num_generate_images=self.configs['memory_size'],
                                                                 feature_block_num=self.model.module.residual_len,
+                                                                bias_correction_layer=bias_correction_layer,
                                                                 latent_dim=self.configs['latent_dim'],
                                                                 configs=self.configs,
                                                                 device=self.device)
@@ -454,6 +459,7 @@ class ICARL(Baseline):
                                                                 bs=self.configs['inversion_batch_size'],
                                                                 num_generate_images=self.configs['memory_size'],
                                                                 feature_block_num=self.model.module.residual_len,
+                                                                bias_correction_layer=bias_correction_layer,
                                                                 latent_dim=self.configs['latent_dim'],
                                                                 configs=self.configs,
                                                                 device=self.device)
