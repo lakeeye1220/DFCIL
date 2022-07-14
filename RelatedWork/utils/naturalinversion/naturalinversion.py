@@ -189,7 +189,7 @@ def get_inversion_images(net,
             if flip:
                 inputs_jit = torch.flip(inputs_jit, dims = (3,))
             outputs, features = net(inputs_jit)
-            if bias_forward is not None:
+            if bias_correction_layer is not None:
                 outputs = bias_forward(outputs,task,bias_correction_layer,num_classes[0]//task)
             cat_zero= torch.zeros((bs,100-num_classes[0]),device=device)
             outputs=torch.cat((outputs,cat_zero),dim=1)

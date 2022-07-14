@@ -299,7 +299,8 @@ class BiC(EEIL):
                 # compute output
                 output, feature = self.model(images)
                 if bias_correct:
-                    output = self.bias_forward(output, task_num,self.bias_layers[task_num-1])
+                    outputs = bias_forward(
+                        outputs, task_num, self.bias_layers[task_num-1],task_step=self.task_step)
 
                 features = F.normalize(feature[-1])
                 if task_num > 1 and not (self.configs['natural_inversion'] or self.configs['generative_inversion']):
@@ -360,7 +361,7 @@ class BiC(EEIL):
                 with torch.no_grad():
                     outputs, _ = self.model(images)
                 outputs = bias_forward(
-                    outputs, task_num, self.bias_layers[task_num-1])
+                    outputs, task_num, self.bias_layers[task_num-1],task_step=self.task_step)
                 loss = self.criterion(
                     outputs, target)
 
