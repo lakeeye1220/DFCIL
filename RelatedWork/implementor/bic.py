@@ -299,8 +299,8 @@ class BiC(EEIL):
                 # compute output
                 output, feature = self.model(images)
                 if bias_correct:
-                    outputs = bias_forward(
-                        outputs, task_num, self.bias_layers[task_num-1],task_step=self.task_step)
+                    output = bias_forward(
+                        output, task_num, self.bias_layers[task_num-1],task_step=self.task_step)
 
                 features = F.normalize(feature[-1])
                 if task_num > 1 and not (self.configs['natural_inversion'] or self.configs['generative_inversion']):
