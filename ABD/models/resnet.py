@@ -112,6 +112,7 @@ class ResNet(nn.Module):
         if pen:
             return out
         elif feature:
+            out = self.last(out)
             return out,features
         else:
             out = self.last(out)
