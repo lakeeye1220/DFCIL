@@ -344,6 +344,7 @@ class AlwaysBeDreaming(DeepInversionGenBN):
             
         else: # start 
             loss_class = self.criterion(logits[class_idx], targets[class_idx].long(), dw_cls[class_idx])
+            # loss_class = self.criterion(logits[class_idx,self.last_valid_out_dim:self.valid_out_dim], targets[class_idx].long(), dw_cls[class_idx]) # 211 no split logits
 
         # KD
         if target_scores is not None:
