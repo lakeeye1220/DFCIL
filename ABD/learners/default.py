@@ -295,8 +295,8 @@ class NormalNN(nn.Module):
             
         if self.inversion_replay and self.config['finetuning_strategy']:
             self.log('=> Using finetune strategy')
-            optimizer_arg = [{'params': list(self.model.parameters())[:-1], 'lr': 1e-4, 'weight_decay': self.config['weight_decay']},
-            {'params': list(self.model.parameters())[-1], 'lr': self.config['lr'], 'weight_decay': self.config['weight_decay']}]
+            optimizer_arg = [{'params': list(self.model.parameters())[:-2], 'lr': 1e-4, 'weight_decay': self.config['weight_decay']},
+            {'params': list(self.model.parameters())[-2:], 'lr': self.config['lr'], 'weight_decay': self.config['weight_decay']}]
         else:
             optimizer_arg = [{'params':list(self.model.parameters()),
                             'lr':self.config['lr'],
