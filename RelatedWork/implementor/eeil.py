@@ -50,7 +50,8 @@ class EEIL(ICARL):
             task_tik = time.time()
 
             if self.configs['task_size'] > 0:
-                self.incremental_weight(task_num)
+                if self.configs['weight_change']:
+                    self.incremental_weight(task_num)
                 self.model.train()
                 self.model.to(self.device)
 
@@ -234,6 +235,9 @@ class EEIL(ICARL):
                     target_reweighted[..., :old_task_size] = old_target
                     loss = F.binary_cross_entropy_with_logits(
                         outputs, target_reweighted)
+                else:
+                    print(task_num,'error point')
+                    raise NotImplementedError
             elif self.configs['train_mode']=='eeil_loss_bce':
                 if task_num==1:
                     loss = F.binary_cross_entropy_with_logits(
@@ -313,7 +317,7 @@ class EEIL(ICARL):
         print('==start fine-tuning==')
         for epoch in range(1, bftepoch+1):
             self._train(train_loader, optimizer, epoch,
-                        0, balance_finetune=True)
+                        task_num, balance_finetune=True)
             optimizer.zero_grad(set_to_none=True)
             lr_scheduler.step()
             valid_info = self._eval(valid_loader, epoch, 0)

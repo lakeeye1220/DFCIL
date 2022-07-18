@@ -8,10 +8,16 @@ import pandas as pd
 from utils.calc_score import AverageMeter, ProgressMeter, accuracy
 from utils.logger import convert_secs2time
 import numpy as np
-from utils.onehot import get_one_hot
 from implementor.eeil import EEIL
 import torch.nn.functional as F
 
+def bias_forward(x, task_num, bias_layer,task_step):
+    if task_num == 1:
+        return x
+    else:
+        x_old = x[:, :task_step*(task_num-1)]
+        x_new = bias_layer(x[:, task_step*(task_num-1):])
+        return torch.cat((x_old, x_new), dim=1)
 
 class BiasLayer(nn.Module):
     def __init__(self):
@@ -29,14 +35,6 @@ class BiC(EEIL):
             model, time_data, save_path, device, configs)
         self.bias_layers = []
 
-    def bias_forward(self, x, task_num, bias_layer):
-        if task_num == 1:
-            return x
-        else:
-            idx = self.task_step
-            x_old = x[:, :idx*(task_num-1)]
-            x_new = bias_layer(x[:, idx*(task_num-1):])
-            return torch.cat((x_old, x_new), dim=1)
 
     def run(self, dataset_path):
         self.datasetloader = CILDatasetLoader(
@@ -61,7 +59,8 @@ class BiC(EEIL):
         for task_num in range(1, self.configs['task_size']+1):
             task_tik = time.time()
             if self.configs['task_size'] > 0:
-                self.incremental_weight(task_num)
+                if self.configs['weight_change']:
+                    self.incremental_weight(task_num)
                 self.model.train()
                 self.model.to(self.device)
 
@@ -235,7 +234,7 @@ class BiC(EEIL):
         for images, target, indices in loader:
             # measure data loading time
             images, target = images.to(
-                self.device), target.to(self.device)
+                self.device), target.long().to(self.device)
             # target_reweighted = get_one_hot(target, self.current_num_classes)
             outputs, _ = self.model(images)
 
@@ -245,7 +244,7 @@ class BiC(EEIL):
                 cls_loss = self.criterion(outputs, target)
                 with torch.no_grad():
                     score, _ = self.old_model(images)
-                    score=self.bias_forward(score, task_num, self.bias_layers[task_num-1])
+                    score= bias_forward(score, task_num, self.bias_layers[task_num-1], self.task_step)
                 kd_loss = torch.zeros(task_num)
                 for t in range(task_num-1):
                     # local distillation
@@ -301,7 +300,8 @@ class BiC(EEIL):
                 # compute output
                 output, feature = self.model(images)
                 if bias_correct:
-                    output = self.bias_forward(output, task_num,self.bias_layers[task_num-1])
+                    output = bias_forward(
+                        output, task_num, self.bias_layers[task_num-1],task_step=self.task_step)
 
                 features = F.normalize(feature[-1])
                 if task_num > 1 and not (self.configs['natural_inversion'] or self.configs['generative_inversion']):
@@ -351,10 +351,6 @@ class BiC(EEIL):
             losses = AverageMeter('Loss', ':.4e')
             top1 = AverageMeter('Acc@1', ':6.2f')
             top5 = AverageMeter('Acc@5', ':6.2f')
-            progress = ProgressMeter(
-                len(train_loader),
-                [batch_time, losses, top1, top5],
-                prefix="Epoch: [{}]".format(e))
             i = 0
             end = time.time()
             self.bias_layers[task_num-1].train()
@@ -365,8 +361,8 @@ class BiC(EEIL):
                 # target_reweighted = get_one_hot(target, self.current_num_classes)
                 with torch.no_grad():
                     outputs, _ = self.model(images)
-                outputs = self.bias_forward(
-                    outputs, task_num, self.bias_layers[task_num-1])
+                outputs = bias_forward(
+                    outputs, task_num, self.bias_layers[task_num-1],task_step=self.task_step)
                 loss = self.criterion(
                     outputs, target)
 
@@ -383,8 +379,6 @@ class BiC(EEIL):
                 # measure elapsed time
                 batch_time.update(time.time() - end)
                 end = time.time()
-                if i % int(len(train_loader)//2) == 0:
-                    progress.display(i)
                 i += 1
             lr_scheduler.step()
             tok = time.time()

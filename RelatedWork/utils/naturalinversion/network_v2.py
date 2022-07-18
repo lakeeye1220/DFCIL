@@ -3,10 +3,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class Generator(nn.Module):
-    def __init__(self, image_size, latent_dim, channel, initial=True):
+    def __init__(self, image_size, latent_dim, numclass, initial=True):
         super(Generator, self).__init__()
-        self.init_size = image_size
-        self.l3 = nn.Linear(latent_dim, 128 * image_size ** 2)
+        self.init_size = image_size//4
+        self.embed=nn.Embedding(numclass,int(latent_dim/2))
+        self.l3 = nn.Linear(latent_dim, 128 * self.init_size ** 2)
         self.conv_block = nn.Sequential(
             nn.BatchNorm2d(128),
             nn.LeakyReLU(0.2, inplace=True),
@@ -37,68 +38,60 @@ class Generator(nn.Module):
                 nn.init.normal_(module.weight.data, 0.0, 0.02)
 
     def forward(self, z):
-        out1 = self.l3(z)
+        latent_vec=self.embed(z[1])
+        out1 = self.l3(torch.cat([z[0],latent_vec],1))
         out = out1.view(out1.shape[0], 128, self.init_size, self.init_size)
         img = self.conv_block(out)
         return img 
 
 
 class Feature_Decoder(nn.Module):
-    def __init__(self):
+    def __init__(self,feature_block_num=4):
         super(Feature_Decoder, self).__init__()
         self.upsample = nn.Upsample(scale_factor = 2)
-        self.conv1 = nn.Conv2d(512, 256, 1, stride = 1, padding = 0,bias=False)
-        self.bn1 = nn.BatchNorm2d(256)
-        self.conv2 = nn.Conv2d(256, 128, 1, stride = 1, padding = 0,bias=False)
-        self.bn2 = nn.BatchNorm2d(128)
-        self.conv3 = nn.Conv2d(128, 64, 1, stride = 1, padding = 0,bias=False)
-        self.bn3 = nn.BatchNorm2d(64)
-        self.conv4 = nn.Conv2d(64, 3, 1, stride = 1, padding = 0,bias=False)
-        self.bn4 = nn.BatchNorm2d(3)
-        self.conv5 = nn.Conv2d(3, 3, 1, stride = 1, padding = 0,bias=False)
-        self.bn5 = nn.BatchNorm2d(3)
-        self.conv_31 = nn.Conv2d(256, 256, 3, stride=1, padding=1,bias=False)
-        self.bn_31 = nn.BatchNorm2d(256)
-        self.conv_32 = nn.Conv2d(128, 128, 3, stride=1, padding=1,bias=False)
-        self.bn_32 = nn.BatchNorm2d(128)
-        self.conv_33 = nn.Conv2d(64, 64, 3, stride=1, padding=1,bias=False)
-        self.bn_33 = nn.BatchNorm2d(64)
-        self.relu= nn.ReLU()
+        self.feature_block_num = feature_block_num
+        if feature_block_num==4:
+            self.conv1 = nn.Conv2d(512, 256, 1, stride = 1, padding = 0)
+            self.conv2 = nn.Conv2d(256, 128, 1, stride = 1, padding = 0)
+            self.conv3 = nn.Conv2d(128, 64, 1, stride = 1, padding = 0)
+            self.conv4 = nn.Conv2d(64, 3, 1, stride = 1, padding = 0)
+            self.conv5 = nn.Conv2d(3, 3, 1, stride = 1, padding = 0)
+            self.conv_31 = nn.Conv2d(256, 256, 3, stride=1, padding=1)
+            self.conv_32 = nn.Conv2d(128, 128, 3, stride=1, padding=1)
+            self.conv_33 = nn.Conv2d(64, 64, 3, stride=1, padding=1)
+        elif feature_block_num==3:
+            self.conv1 = nn.Conv2d(64, 32, 1, stride = 1, padding = 0)
+            self.conv2 = nn.Conv2d(32, 16, 1, stride = 1, padding = 0)
+            self.conv3 = nn.Conv2d(16, 3, 1, stride = 1, padding = 0)
+            self.conv4 = nn.Conv2d(3, 3, 1, stride = 1, padding = 0)
+            self.conv_31 = nn.Conv2d(32, 32, 3, stride=1, padding=1)
+            self.conv_32 = nn.Conv2d(16, 16, 3, stride=1, padding=1)
+
 
     def forward(self, x, features):
-        out = self.conv1(self.upsample(features[-2]))
-        out = self.bn1(out)
-        out1 = self.relu(out)
-        out = self.conv_31(out1)# + features[-3]) #no ftp
-        out = self.bn_31(out)
-        out+=out1
-        out = self.relu(out)
-
-        out = self.conv2(self.upsample(out))
-        out = self.bn2(out)
-        out2 = self.relu(out)
-
-        out = self.conv_32(out2)# + features[-4]) # no ftp
-        out = self.bn_32(out)
-        out += out2
-        out = self.relu(out)
-
-        out = self.conv3(self.upsample(out))
-        out = self.bn3(out)
-        out3 = self.relu(out)
-
-        out = self.conv_33(out3) # + features[-5]) # no ftp
-        out = self.bn_33(out)
-        out += out3
-        out = self.relu(out)
-
-        
-        out_ = self.conv4(out)
-        out_ = self.bn4(out_)
-        out = (x + out_)
-        out_ = self.relu(out_)
-        out = self.conv5(out)
-        out = self.bn5(out)
+        if self.feature_block_num==4:
+            out = self.conv1(self.upsample(features[-2]))
+            out = self.conv_31(out + features[-3])
+            
+            out = self.conv2(self.upsample(out))
+            out = self.conv_32(out + features[-4])
+            
+            out = self.conv3(self.upsample(out))
+            out = self.conv_33(out + features[-5])
+            
+            out_ = self.conv4(out)
+            out = (x + out_)
+            out = self.conv5(out)
+        elif self.feature_block_num==3:
+            out = self.conv1(self.upsample(features[-2]))
+            out = self.conv_31(out + features[-3])
+            
+            out = self.conv2(self.upsample(out))
+            out = self.conv_32(out + features[-4])
+            
+            out_ = self.conv3(out)
+            out = (x + out_)
+            out = self.conv4(out)
         out = torch.tanh(out)
         
         return out, out_

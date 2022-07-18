@@ -3,9 +3,9 @@ from torchvision import datasets
 import numpy as np
 from PIL import Image
 import copy
+import torch
 
 from utils.eeil_aug import data_augmentation_e2e
-
 
 class iCIFAR100(datasets.CIFAR100):
     def __init__(self, root,
@@ -68,7 +68,7 @@ class iCIFAR100(datasets.CIFAR100):
             str_train, self.targets.shape))
 
     def __getitem__(self, index):
-        img, target = Image.fromarray(self.data[index]), self.targets[index]
+        img, target = Image.fromarray(self.data[index]), torch.tensor(self.targets[index],dtype=torch.long)
 
         if self.transform:
             img = self.transform(img)

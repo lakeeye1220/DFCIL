@@ -1,6 +1,8 @@
 from torch.utils.data.dataset import Dataset
 from torchvision.datasets.folder import default_loader
 from PIL import Image
+import torch 
+
 class ImageDataset(Dataset):
     def __init__(self, images, labels=None, transform=None,target_transform=None,no_return_target=False,return_index=False):
         self.X = images
@@ -104,13 +106,14 @@ class ImageDatasetFromData(Dataset):
         if self.transform:
             data = self.transform(data)
         
-        if self.target_transform:
-            target = self.target_transform(target)
 
         if self.y is not None:
+            target=torch.tensor(self.y[i],dtype=torch.long)
+            if self.target_transform:
+                target = self.target_transform(target)
             if self.return_idx:
-                return data, self.y[i], i
-            return (data, self.y[i])
+                return data, target, i
+            return (data, target)
         else:
             if self.return_idx:
                 return data, i
