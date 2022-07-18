@@ -130,6 +130,8 @@ class Trainer:
                         'top_k': self.top_k,
                         'teacher_type': args.teacher_type,
                         'finetuning_strategy': args.finetuning_strategy,
+                        'gamma': args.gamma,
+                        'p_order': args.p_order,
                         }
         self.learner_type, self.learner_name = args.learner_type, args.learner_name
         self.learner = learners.__dict__[self.learner_type].__dict__[self.learner_name](self.learner_config)
