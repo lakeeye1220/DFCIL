@@ -104,7 +104,33 @@ class Trainer:
         self.add_dim = 0
 
         # Prepare the self.learner (model)
-        self.learner_config = vars(args)
+        self.learner_config = {'num_classes': num_classes,
+                        'lr': args.lr,
+                        'momentum': args.momentum,
+                        'weight_decay': args.weight_decay,
+                        'schedule': args.schedule,
+                        'schedule_type': args.schedule_type,
+                        'model_type': args.model_type,
+                        'model_name': args.model_name,
+                        'gen_model_type': args.gen_model_type,
+                        'gen_model_name': args.gen_model_name,
+                        'optimizer': args.optimizer,
+                        'gpuid': args.gpuid,
+                        'memory': args.memory,
+                        'temp': args.temp,
+                        'out_dim': num_classes,
+                        'overwrite': args.overwrite == 1,
+                        'beta': args.beta,
+                        'mu': args.mu,
+                        'DW': args.DW,
+                        'batch_size': args.batch_size,
+                        'power_iters': args.power_iters,
+                        'deep_inv_params': args.deep_inv_params,
+                        'tasks': self.tasks_logits,
+                        'top_k': self.top_k,
+                        'teacher_type': args.teacher_type,
+                        'finetuning_strategy': args.finetuning_strategy,
+                        }
         self.learner_type, self.learner_name = args.learner_type, args.learner_name
         self.learner = learners.__dict__[self.learner_type].__dict__[self.learner_name](self.learner_config)
         self.learner.print_model()
