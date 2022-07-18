@@ -2,7 +2,7 @@ from __future__ import print_function
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
-from ABD.utils.cc import CC
+from utils.cc import CC
 import models
 from utils.metric import AverageMeter, Timer
 import numpy as np

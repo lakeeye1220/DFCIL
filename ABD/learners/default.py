@@ -1,4 +1,5 @@
 from __future__ import print_function
+from pickletools import optimize
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
@@ -21,6 +22,7 @@ class NormalNN(nn.Module):
     def __init__(self, learner_config):
 
         super(NormalNN, self).__init__()
+        self.inversion_replay=None
         self.log = print
         self.config = learner_config
         self.out_dim = learner_config['out_dim']
@@ -290,21 +292,31 @@ class NormalNN(nn.Module):
     def init_optimizer(self):
 
         # parse optimizer args
-        optimizer_arg = {'params':self.model.parameters(),
-                         'lr':self.config['lr'],
-                         'weight_decay':self.config['weight_decay']}
+            
+        if self.inversion_replay and self.config['finetuning_strategy']:
+            self.log('=> Using finetune strategy')
+            optimizer_arg = [{'params': list(self.model.parameters())[:-1], 'lr': 1e-4, 'weight_decay': self.config['weight_decay']},
+            {'params': list(self.model.parameters())[-1], 'lr': self.config['lr'], 'weight_decay': self.config['weight_decay']}]
+            print(list(self.model.parameters())[-1])
+        else:
+            optimizer_arg = [{'params':list(self.model.parameters()),
+                            'lr':self.config['lr'],
+                            'weight_decay':self.config['weight_decay']}]
+        dict_optimizer_arg={}
         if self.config['optimizer'] in ['SGD','RMSprop']:
-            optimizer_arg['momentum'] = self.config['momentum']
+            dict_optimizer_arg['momentum'] = self.config['momentum']
         elif self.config['optimizer'] in ['Rprop']:
-            optimizer_arg.pop('weight_decay')
+            dict_optimizer_arg.pop('weight_decay')
         elif self.config['optimizer'] == 'amsgrad':
-            optimizer_arg['amsgrad'] = True
+            dict_optimizer_arg['amsgrad'] = True
             self.config['optimizer'] = 'Adam'
         elif self.config['optimizer'] == 'Adam':
-            optimizer_arg['betas'] = (self.config['momentum'],0.999)
-
+            dict_optimizer_arg['betas'] = (self.config['momentum'],0.999)
+        
+        for i in range(len(optimizer_arg)):
+            optimizer_arg[i].update(dict_optimizer_arg)
         # create optimizers
-        self.optimizer = torch.optim.__dict__[self.config['optimizer']](**optimizer_arg)
+        self.optimizer = torch.optim.__dict__[self.config['optimizer']](optimizer_arg)
         
         # create schedulesif self.schedule_type == 'decay':
         self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=self.schedule, gamma=0.1)
