@@ -191,8 +191,8 @@ def get_inversion_images(net,
             outputs, features = net(inputs_jit)
             if bias_correction_layer is not None:
                 outputs = bias_forward(outputs,task,bias_correction_layer,num_classes[0]//task)
-            cat_zero= torch.zeros((bs,100-num_classes[0]),device=device)
-            outputs=torch.cat((outputs,cat_zero),dim=1)
+            #cat_zero= torch.zeros((bs,100-num_classes[0]),device=device)
+            #outputs=torch.cat((outputs,cat_zero),dim=1)
             loss_target = criterion(outputs, targets)
             loss = loss_target
 
