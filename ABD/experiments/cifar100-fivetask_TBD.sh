@@ -5,7 +5,7 @@ DEFAULTGPU=0
 GPUID=0 # ${1:-$DEFAULTGPU}
 
 # benchmark settings
-DATE=ICCV2021
+DATE=TBD
 SPLIT=20
 OUTDIR=outputs/${DATE}/DFCIL-fivetask/CIFAR100
 
@@ -45,7 +45,7 @@ python3 -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPU
     --gen_model_name CIFAR_GEN --gen_model_type generator \
     --beta 1 --power_iters $PI --deep_inv_params 1e-3 5e1 1e-3 1e3 1 \
     --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/abd \
-    --teacher_type DI
+    --teacher_type DI --gamma 0.4 --p_order 2.0
 
 #########################
 #    BASELINES  OURS    #
