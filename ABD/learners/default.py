@@ -297,7 +297,6 @@ class NormalNN(nn.Module):
             self.log('=> Using finetune strategy')
             optimizer_arg = [{'params': list(self.model.parameters())[:-1], 'lr': 1e-4, 'weight_decay': self.config['weight_decay']},
             {'params': list(self.model.parameters())[-1], 'lr': self.config['lr'], 'weight_decay': self.config['weight_decay']}]
-            print(list(self.model.parameters())[-1])
         else:
             optimizer_arg = [{'params':list(self.model.parameters()),
                             'lr':self.config['lr'],
