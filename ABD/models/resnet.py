@@ -85,6 +85,10 @@ class ResNet(nn.Module):
         self.layer3 = self._make_layer(block, 64, num_blocks[2], stride=2)
         self.last = nn.Linear(64, num_classes)
 
+        self.middle1=nn.Linear(16,16)
+        self.middle2=nn.Linear(32,32)
+        self.middle3=nn.Linear(64,64)
+
         self.apply(_weights_init)
 
     def _make_layer(self, block, planes, num_blocks, stride):
@@ -96,7 +100,7 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def forward(self, x, pen=False,feature=False):
+    def forward(self, x, pen=False,middle=False,feature=False):
         features=[]
         out = F.relu(self.bn1(self.conv1(x)))
         features.append(out)
@@ -114,6 +118,12 @@ class ResNet(nn.Module):
         elif feature:
             out = self.last(out)
             return out,features
+        elif middle:
+            B=x.shape[0]
+            middle_out1=self.middle1(F.adaptive_avg_pool2d(features[1],(1,1)).view(B,-1))
+            middle_out2=self.middle2(F.adaptive_avg_pool2d(features[2],(1,1)).view(B,-1))
+            middle_out3=self.middle3(F.adaptive_avg_pool2d(features[3],(1,1)).view(B,-1))
+            return out,middle_out1,middle_out2,middle_out3
         else:
             out = self.last(out)
             return out
