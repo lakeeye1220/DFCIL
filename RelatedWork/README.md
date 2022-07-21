@@ -5,11 +5,15 @@
     python main.py train --train-mode icarl --gpu-ids 0,1 --model resnet32
 ```
 
+- How to Implement (Original EEIL)
+```
+    python main.py train --train-mode eeil --gpu-ids 2 --task-size 10 --model resnet32 --batch-size 128 --lr 0.1 --gamma 0.1 --epochs 40 --lr-steps 10,20,30 --weight-decay 0.0001
+```
+
 - How to Implement (EEIL)
 ```
     python main.py train --train-mode eeil --gpu-ids 2 --task-size 10 --model resnet32 --batch-size 128 --lr 0.1 --gamma 0.1 --epochs 250 --lr-steps 100,150,200 --weight-decay 0.0002
 ```
-
 
 - How to Implement (EEIL+NI)
 ```
@@ -17,7 +21,7 @@
 ``` 
 - How to Implement (EEIL+NI)
 ```
-    python main.py train --train-mode eeil --gpu-ids 1 --task-size 10 --model resnet34 --batch-size 128 --lr 0.1 --gamma 0.1 --epochs 250 --lr-steps 100,150,200 --weight-decay 0.0002 --natural-inversion True --inversion_epochs 2000
+    python main.py train --train-mode eeil --gpu-ids 1 --task-size 10 --model resnet34 --batch-size 128 --lr 0.1 --gamma 0.1 --epochs 250 --lr-steps 100,150,200 --weight-decay 0.0002 --natural-inversion True --inversion_epochs 2000 --eeil-aug True
 ``` 
 - How to Implement (EEIL+NI+BCE)
 ```

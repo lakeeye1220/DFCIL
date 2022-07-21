@@ -537,10 +537,10 @@ class ICARL(Baseline):
     
     def visualize_weight(self,task_num):
         class_norm=[]
-        for i in range(task_num*self.task_step):
-            for module in self.model.modules():
-                if isinstance(module, nn.Linear):
-                    class_norm.append(module.weight[:,i].norm(2).item())
+        for module in self.model.modules():
+            if isinstance(module, nn.Linear):
+                for i in range(module.weight.shape[1]):
+                    class_norm.append(torch.norm(module.weight[:,i]).norm(2).item())
         plt.figure()
         plt.plot(class_norm)
         plt.xlabel('Class Index')
