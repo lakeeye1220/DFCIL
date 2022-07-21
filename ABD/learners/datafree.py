@@ -483,7 +483,7 @@ class TBD2(DeepInversionGenBN):
             norm_out1_pm=out1_pm/torch.norm(out1_pm,dim=[2,3],keepdim=True)
             norm_out2_pm=out2_pm/torch.norm(out2_pm,dim=[2,3],keepdim=True)
             norm_out3_pm=out3_pm/torch.norm(out3_pm,dim=[2,3],keepdim=True)
-            loss_kd=(F.l1_loss(norm_out1_m,norm_out1_pm)+F.l1_loss(norm_out2_m,norm_out2_pm)+F.l1_loss(norm_out3_m,norm_out3_pm)*0.1)
+            loss_kd=(F.mse_loss(norm_out1_m,norm_out1_pm)+F.mse_loss(norm_out2_m,norm_out2_pm)+F.mse_loss(norm_out3_m,norm_out3_pm))/3.0
 
         else:
             loss_kd = torch.zeros((1,), requires_grad=True).cuda()
@@ -560,7 +560,7 @@ class TBD3(DeepInversionGenBN):
             norm_out1_pm=out1_pm/torch.norm(out1_pm,dim=[2,3],keepdim=True)
             norm_out2_pm=out2_pm/torch.norm(out2_pm,dim=[2,3],keepdim=True)
             norm_out3_pm=out3_pm/torch.norm(out3_pm,dim=[2,3],keepdim=True)
-            loss_kd=(F.l1_loss(norm_out1_m,norm_out1_pm)+F.l1_loss(norm_out2_m,norm_out2_pm)+F.l1_loss(norm_out3_m,norm_out3_pm)*0.1)
+            loss_kd=(F.mse_loss(norm_out1_m,norm_out1_pm)+F.mse_loss(norm_out2_m,norm_out2_pm)+F.mse_loss(norm_out3_m,norm_out3_pm))/3.0
 
         else:
             loss_kd = torch.zeros((1,), requires_grad=True).cuda()
@@ -574,11 +574,10 @@ class TBD3(DeepInversionGenBN):
 
         return total_loss.detach(), loss_class.detach(), loss_kd.detach(), logits
 
-
-class TBD4(DeepInversionGenBN):
+class TBD(DeepInversionGenBN):
     # HARD KD in logits #
     def __init__(self, learner_config):
-        super(TBD4, self).__init__(learner_config)
+        super(TBD, self).__init__(learner_config)
         self.kl_loss = nn.KLDivLoss(reduction='batchmean').cuda()
         self.teacher_type = self.config['teacher_type']
 
