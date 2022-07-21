@@ -483,7 +483,7 @@ class TBD2(DeepInversionGenBN):
             norm_out1_pm=out1_pm/torch.norm(out1_pm,dim=1,keepdim=True)
             norm_out2_pm=out2_pm/torch.norm(out2_pm,dim=1,keepdim=True)
             norm_out3_pm=out3_pm/torch.norm(out3_pm,dim=1,keepdim=True)
-            loss_kd=self.mu(F.mse_loss(norm_out1_m,norm_out1_pm)+F.mse_loss(norm_out2_m,norm_out2_pm)+F.mse_loss(norm_out3_m,norm_out3_pm))/3.0
+            loss_kd=self.mu*(F.mse_loss(norm_out1_m,norm_out1_pm)+F.mse_loss(norm_out2_m,norm_out2_pm)+F.mse_loss(norm_out3_m,norm_out3_pm))
 
         else:
             loss_kd = torch.zeros((1,), requires_grad=True).cuda()
@@ -560,7 +560,7 @@ class TBD3(DeepInversionGenBN):
             norm_out1_pm=out1_pm/torch.norm(out1_pm,dim=1,keepdim=True)
             norm_out2_pm=out2_pm/torch.norm(out2_pm,dim=1,keepdim=True)
             norm_out3_pm=out3_pm/torch.norm(out3_pm,dim=1,keepdim=True)
-            loss_kd=self.mu(F.mse_loss(norm_out1_m,norm_out1_pm)+F.mse_loss(norm_out2_m,norm_out2_pm)+F.mse_loss(norm_out3_m,norm_out3_pm))/3.0
+            loss_kd=self.mu*(F.mse_loss(norm_out1_m,norm_out1_pm)+F.mse_loss(norm_out2_m,norm_out2_pm)+F.mse_loss(norm_out3_m,norm_out3_pm))
 
         else:
             loss_kd = torch.zeros((1,), requires_grad=True).cuda()
@@ -700,7 +700,7 @@ class TBD5(DeepInversionGenBN):
             norm_out1_pm=out1_pm/torch.norm(out1_pm,dim=1,keepdim=True)
             norm_out2_pm=out2_pm/torch.norm(out2_pm,dim=1,keepdim=True)
             norm_out3_pm=out3_pm/torch.norm(out3_pm,dim=1,keepdim=True)
-            loss_kd=(F.l1_loss(norm_out1_m,norm_out1_pm)+F.l1_loss(norm_out2_m,norm_out2_pm)+F.l1_loss(norm_out3_m,norm_out3_pm))/3.0
+            loss_kd=self.mu*(F.l1_loss(norm_out1_m,norm_out1_pm)+F.l1_loss(norm_out2_m,norm_out2_pm)+F.l1_loss(norm_out3_m,norm_out3_pm))
 
         else:
             loss_kd = torch.zeros((1,), requires_grad=True).cuda()

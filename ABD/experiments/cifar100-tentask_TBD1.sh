@@ -5,7 +5,7 @@ DEFAULTGPU=0
 GPUID=0
 
 # benchmark settings
-DATE=mid_CC_with_all_batch
+DATE=TBD1-CC
 SPLIT=10
 OUTDIR=outputs/${DATE}/DFCIL-tentask/CIFAR100
 
