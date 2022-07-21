@@ -36,7 +36,7 @@ class EEIL(ICARL):
         self.criterion = nn.CrossEntropyLoss().to(self.device)
         self.none_reduction_criterion = nn.CrossEntropyLoss(
             reduction='none').to(self.device)
-        self.hkd=HKD()
+        self.hkd=nn.MSELoss()
 
         ## training ##
         tik = time.time()

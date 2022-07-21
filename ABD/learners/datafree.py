@@ -414,8 +414,8 @@ class TBD1(DeepInversionGenBN):
 
         # KD
         if target_scores is not None:
-            last_logits_pen=self.previous_teacher.generate_scores_pen(inputs[kd_index])
-            loss_kd=self.kd_criterion(logits_pen[kd_index], last_logits_pen)*self.mu
+            last_logits_pen=self.previous_teacher.generate_scores_pen(inputs)
+            loss_kd=self.kd_criterion(logits_pen, last_logits_pen)*self.mu
 
         else:
             loss_kd = torch.zeros((1,), requires_grad=True).cuda()
