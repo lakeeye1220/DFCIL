@@ -477,7 +477,13 @@ class TBD2(DeepInversionGenBN):
         if target_scores is not None:
             logits_middle,out1_m,out2_m,out3_m = self.model.forward(inputs, middle=True)
             logits_prev_middle,out1_pm, out2_pm, out3_pm = self.previous_teacher.solver.forward(inputs,middle=True)
-            loss_kd=(F.mse_loss(out1_m,out1_pm)+F.mse_loss(out2_m,out2_pm)+F.mse_loss(out3_m,out3_pm))/3.0
+            norm_out1_m=out1_m/torch.norm(out1_m,dim=[1,2,3],keepdim=True)
+            norm_out2_m=out2_m/torch.norm(out2_m,dim=[1,2,3],keepdim=True)
+            norm_out3_m=out3_m/torch.norm(out3_m,dim=[1,2,3],keepdim=True)
+            norm_out1_pm=out1_pm/torch.norm(out1_pm,dim=[1,2,3],keepdim=True)
+            norm_out2_pm=out2_pm/torch.norm(out2_pm,dim=[1,2,3],keepdim=True)
+            norm_out3_pm=out3_pm/torch.norm(out3_pm,dim=[1,2,3],keepdim=True)
+            loss_kd=(F.mse_loss(norm_out1_m,norm_out1_pm)+F.mse_loss(norm_out2_m,norm_out2_pm)+F.mse_loss(norm_out3_m,norm_out3_pm))/3.0
 
         else:
             loss_kd = torch.zeros((1,), requires_grad=True).cuda()
