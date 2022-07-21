@@ -133,6 +133,9 @@ class EEIL(ICARL):
             self.current_num_classes += self.task_step
             #######################################
 
+            ## Weight Biasing Visualization ##
+            self.visualize_weight(task_num)
+            ##################################
         tok = time.time()
         h, m, s = convert_secs2time(tok-tik)
         print('Total Learning Time: {:2d}h {:2d}m {:2d}s'.format(

@@ -6,6 +6,7 @@ import torch.nn as nn
 import time
 import os
 import pandas as pd
+import matplotlib.pyplot as plt
 from utils.calc_score import AverageMeter, ProgressMeter, accuracy
 from utils.logger import convert_secs2time
 import torch.nn.functional as F
@@ -131,6 +132,11 @@ class ICARL(Baseline):
             self.update_old_model()
             self.current_num_classes += self.task_step
             #######################################
+
+            ## Weight Biasing Visualization ##
+            self.visualize_weight(task_num)
+            ##################################
+
         tok = time.time()
         h, m, s = convert_secs2time(tok-tik)
         print('Total Learning Time: {:2d}h {:2d}m {:2d}s'.format(
@@ -528,3 +534,16 @@ class ICARL(Baseline):
         self.datasetloader.test_data.update(
             adding_classes_list, self.exemplar_set)  # Don't need to update loader
         self.model.train()
+    
+    def visualize_weight(self,task_num):
+        class_norm=[]
+        for i in range(task_num*self.task_step):
+            for module in self.model.modules():
+                if isinstance(module, nn.Linear):
+                    class_norm.append(module.weight[:,i].norm(2).item())
+        plt.figure()
+        plt.plot(class_norm)
+        plt.xlabel('Class Index')
+        plt.ylabel('Weight Norm')
+        plt.xlim(0,self.configs['num_classes'])
+        plt.savefig(os.path.join(self.save_path,self.time_data,'{}task_class_norm.png'.format(task_num)))
