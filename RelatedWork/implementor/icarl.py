@@ -537,10 +537,16 @@ class ICARL(Baseline):
     
     def visualize_weight(self,task_num):
         class_norm=[]
-        for module in self.model.modules():
-            if isinstance(module, nn.Linear):
-                for i in range(module.weight.shape[1]):
-                    class_norm.append(torch.norm(module.weight[:,i]).norm(2).item())
+        if 'resnet' in self.configs['model']:
+            weight=self.model.module.fc.weight
+        elif 'densenet' in self.configs['model']:
+            weight = self.model.module.linear.weight
+        else:
+            raise ValueError(
+                '{} model not supported'.format(self.configs['model']))
+            for i in range(weight.shape[1]):
+                class_norm.append(torch.norm(weight[:,i]).item())
+
         plt.figure()
         plt.plot(class_norm)
         plt.xlabel('Class Index')
