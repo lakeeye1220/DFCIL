@@ -544,8 +544,8 @@ class ICARL(Baseline):
         else:
             raise ValueError(
                 '{} model not supported'.format(self.configs['model']))
-            for i in range(weight.shape[1]):
-                class_norm.append(torch.norm(weight[:,i]).item())
+        for i in range(weight.shape[1]):
+            class_norm.append(torch.norm(weight[:,i]).item())
 
         plt.figure()
         plt.plot(class_norm)
