@@ -217,7 +217,7 @@ def main(args):
             'icarl': ICARL,
             'eeil': EEIL,
             'eeil_loss_icarl':EEIL,
-            'eeil_loss_bce':EEIL,
+            'eeil_hkd':EEIL,
             'bic': BiC,
         }
         learner = LEARNER[configs['train_mode']](
