@@ -1,4 +1,4 @@
-from utils.onehot_crossentropy import HKD
+from utils.crossentropy import HKD
 from data.custom_dataset import ImageDatasetFromData
 from data.cil_data_load import CILDatasetLoader
 from data.custom_dataset import ImageDataset

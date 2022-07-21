@@ -11,7 +11,7 @@ from utils.expected_calibration_error import batch_calibration_stats, ece_bin_me
 from utils.logger import convert_secs2time, set_logging_defaults
 import pandas as pd
 
-from utils.onehot_crossentropy import OnehotCrossEntropyLoss
+from utils.crossentropy import OnehotCrossEntropyLoss
 
 class Baseline:
     def __init__(self, model, time_data, save_path, device, configs):
