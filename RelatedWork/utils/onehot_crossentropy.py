@@ -13,3 +13,17 @@ class OnehotCrossEntropyLoss(nn.Module):
             return torch.sum(torch.sum(-target * self.logsoftmax(prediction), dim=1))
         else:
             return torch.sum(-target * self.logsoftmax(prediction), dim=1)
+
+
+class HKD(nn.Module):
+    def __init__(self,reduction='mean'):
+        super(OnehotCrossEntropyLoss,self).__init__()
+        self.reduction=reduction
+
+    def forward(self,prediction,target):
+        if self.reduction=='mean':
+            return torch.mean(torch.sum(-target * torch.log(prediction), dim=1))
+        elif self.reduction=='sum':
+            return torch.sum(torch.sum(-target * torch.log(prediction), dim=1))
+        else:
+            return torch.sum(-target * torch.log(prediction), dim=1)

@@ -1,3 +1,4 @@
+from utils.onehot_crossentropy import HKD
 from data.custom_dataset import ImageDatasetFromData
 from data.cil_data_load import CILDatasetLoader
 from data.custom_dataset import ImageDataset
@@ -35,6 +36,7 @@ class EEIL(ICARL):
         self.criterion = nn.CrossEntropyLoss().to(self.device)
         self.none_reduction_criterion = nn.CrossEntropyLoss(
             reduction='none').to(self.device)
+        self.hkd=HKD()
 
         ## training ##
         tik = time.time()
@@ -241,35 +243,31 @@ class EEIL(ICARL):
                 else:
                     print(task_num,'error point')
                     raise NotImplementedError
-            elif self.configs['train_mode']=='eeil_loss_bce':
-                if task_num==1:
-                    loss = F.binary_cross_entropy_with_logits(
-                        outputs, target_reweighted)
-                else:
+            elif self.configs['train_mode']=='eeil_hkd':
+                if task_num == 1:
+                    loss = self.criterion(outputs, target)
+                else:  # after the normal learning
+                    cls_loss = self.criterion(outputs, target)
                     with torch.no_grad():
                         score, _ = self.old_model(images)
-                    cls_loss = F.binary_cross_entropy_with_logits(
-                        outputs, target_reweighted)
                     if balance_finetune:
-                        soft_target = torch.sigmoid(score[:, self.current_num_classes -
-                                                        self.task_step:self.current_num_classes])/self.configs['temperature']
-                        output_logits = torch.sigmoid(outputs[:, self.current_num_classes -
-                                                self.task_step:self.current_num_classes])/self.configs['temperature']
-                                                                   # distillation entropy loss
+                        soft_target = score[:, self.current_num_classes -
+                                                        self.task_step:self.current_num_classes]
+                        output_logits = outputs[:, self.current_num_classes -
+                                                self.task_step:self.current_num_classes]
+                        # distillation entropy loss
                         kd_loss = self.configs['lamb'] * \
-                            F.binary_cross_entropy(output_logits, soft_target)
+                            self.hkd(output_logits, soft_target)
                     else:
                         kd_loss = torch.zeros(task_num)
                         for t in range(task_num-1):
                             # local distillation
-                            soft_target = torch.sigmoid(
-                                score[:, self.task_step*t:self.task_step*(t+1)]) / self.configs['temperature']
-                            output_logits = torch.sigmoid(
-                                outputs[:, self.task_step*t:self.task_step*(t+1)]) / self.configs['temperature']
+                            soft_target = score[:, self.task_step*t:self.task_step*(t+1)]
+                            output_logits = outputs[:, self.task_step*t:self.task_step*(t+1)]
                             kd_loss[t] = self.configs['lamb'] * \
-                                F.binary_cross_entropy(output_logits, soft_target)
+                                self.hkd(output_logits, soft_target)
                         kd_loss = kd_loss.sum()
-                    loss=cls_loss+kd_loss
+                    loss = kd_loss+cls_loss
                     
             else:
                 raise NotImplementedError
