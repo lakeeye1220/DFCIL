@@ -426,7 +426,7 @@ class TBD1(DeepInversionGenBN):
             kd_index = np.arange(2 * self.batch_size)
             dw_KD = self.dw_k[-1 * torch.ones(len(kd_index),).long()]
             last_logits_pen=self.previous_teacher.generate_scores_pen(inputs[kd_index])
-            loss_kd=self.kd_criterion(logits_pen[kd_index], last_logits_pen)*dw_KD*self.mu
+            loss_kd=(self.kd_criterion(logits_pen[kd_index], last_logits_pen)*dw_KD).mean()*self.mu
 
         else:
             loss_kd = torch.zeros((1,), requires_grad=True).cuda()
@@ -497,7 +497,7 @@ class TBD2(DeepInversionGenBN):
             norm_out1_pm=(out1_pm/torch.norm(out1_pm,dim=1,keepdim=True))
             norm_out2_pm=(out2_pm/torch.norm(out2_pm,dim=1,keepdim=True))
             norm_out3_pm=(out3_pm/torch.norm(out3_pm,dim=1,keepdim=True))
-            loss_kd=self.mu*(F.mse_loss(norm_out1_m,norm_out1_pm)+F.mse_loss(norm_out2_m,norm_out2_pm)+F.mse_loss(norm_out3_m,norm_out3_pm))*dw_KD
+            loss_kd=self.mu*((F.mse_loss(norm_out1_m,norm_out1_pm)+F.mse_loss(norm_out2_m,norm_out2_pm)+F.mse_loss(norm_out3_m,norm_out3_pm))*dw_KD).mean()
 
         else:
             loss_kd = torch.zeros((1,), requires_grad=True).cuda()
@@ -568,17 +568,16 @@ class TBD3(DeepInversionGenBN):
             # middle kd
             kd_index=self.get_kd_index()
             dw_KD = self.dw_k[-1 * torch.ones(len(kd_index),).long()]
-            logits_middle,out1_m,out2_m,out3_m = self.model.forward(inputs[dw_KD], middle=True)
+            logits_middle,out1_m,out2_m,out3_m = self.model.forward(inputs[kd_index], middle=True)
             with torch.no_grad():
-                logits_prev_middle,out1_pm, out2_pm, out3_pm = self.previous_teacher.solver.forward(inputs[dw_KD],middle=True)
+                logits_prev_middle,out1_pm, out2_pm, out3_pm = self.previous_teacher.solver.forward(inputs[kd_index],middle=True)
             norm_out1_m=(out1_m/torch.norm(out1_m,dim=1,keepdim=True))[kd_index]
             norm_out2_m=(out2_m/torch.norm(out2_m,dim=1,keepdim=True))[kd_index]
             norm_out3_m=(out3_m/torch.norm(out3_m,dim=1,keepdim=True))[kd_index]
             norm_out1_pm=(out1_pm/torch.norm(out1_pm,dim=1,keepdim=True))
             norm_out2_pm=(out2_pm/torch.norm(out2_pm,dim=1,keepdim=True))
             norm_out3_pm=(out3_pm/torch.norm(out3_pm,dim=1,keepdim=True))
-            loss_kd=self.mu*(F.mse_loss(norm_out1_m,norm_out1_pm)+F.mse_loss(norm_out2_m,norm_out2_pm)+F.mse_loss(norm_out3_m,norm_out3_pm))*dw_KD
-
+            loss_kd=self.mu*((F.mse_loss(norm_out1_m,norm_out1_pm)+F.mse_loss(norm_out2_m,norm_out2_pm)+F.mse_loss(norm_out3_m,norm_out3_pm))*dw_KD).mean()
         else:
             loss_kd = torch.zeros((1,), requires_grad=True).cuda()
             
@@ -640,7 +639,7 @@ class TBD4(DeepInversionGenBN):
             # middle kd
             logits_middle,out1_m,out2_m,out3_m = self.model.forward(inputs[kd_index], middle=True)
             logits_prev_middle,out1_pm, out2_pm, out3_pm = self.previous_teacher.solver.forward(inputs[kd_index],middle=True)
-            loss_kd=self.mu*(F.mse_loss(out1_m,out1_pm)+F.mse_loss(out2_m,out2_pm)+F.mse_loss(out3_m,out3_pm)*0.1)*dw_KD
+            loss_kd=self.mu*((F.mse_loss(out1_m,out1_pm)+F.mse_loss(out2_m,out2_pm)+F.mse_loss(out3_m,out3_pm)*0.1)*dw_KD).mean()
 
         else:
             loss_kd = torch.zeros((1,), requires_grad=True).cuda()
@@ -675,7 +674,7 @@ class TBD5(DeepInversionGenBN):
         dw_cls = mappings[targets.long()]
 
         # forward pass
-        logits_pen,out1_m,out2_m,out3_m = self.model.forward(inputs[kd_index], middle=True)
+        logits_pen,out1_m,out2_m,out3_m = self.model.forward(inputs, middle=True)
 
         if len(self.config['gpuid']) > 1:
             logits = self.model.module.last(logits_pen)
@@ -721,7 +720,7 @@ class TBD5(DeepInversionGenBN):
             norm_out1_pm=out1_pm/torch.norm(out1_pm,dim=1,keepdim=True)
             norm_out2_pm=out2_pm/torch.norm(out2_pm,dim=1,keepdim=True)
             norm_out3_pm=out3_pm/torch.norm(out3_pm,dim=1,keepdim=True)
-            loss_kd=self.mu*(F.l1_loss(norm_out1_m,norm_out1_pm)+F.l1_loss(norm_out2_m,norm_out2_pm)+F.l1_loss(norm_out3_m,norm_out3_pm))*dw_KD
+            loss_kd=self.mu*((F.l1_loss(norm_out1_m,norm_out1_pm)+F.l1_loss(norm_out2_m,norm_out2_pm)+F.l1_loss(norm_out3_m,norm_out3_pm))*dw_KD).mean()
 
         else:
             loss_kd = torch.zeros((1,), requires_grad=True).cuda()
