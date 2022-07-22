@@ -7,7 +7,8 @@ GPUID=0
 # benchmark settings
 DATE=TBD2
 SPLIT=10
-OUTDIR=outputs/${DATE}/DFCIL-tentask/CIFAR100
+KD_DATASET=real_fake
+OUTDIR=outputs/${DATE}_$KD_DATASET/DFCIL-tentask/CIFAR100
 
 ###############################################################
 
@@ -44,4 +45,4 @@ python3 -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPU
     --gen_model_name CIFAR_GEN --gen_model_type generator \
     --beta 1 --power_iters $PI --deep_inv_params 1e-3 5e1 1e-3 1e3 1 \
     --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/abd \
-    --teacher_type DI
+    --teacher_type DI --kd_dataset $KD_DATASET

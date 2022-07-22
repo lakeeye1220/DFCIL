@@ -7,7 +7,8 @@ GPUID=0
 # benchmark settings
 DATE=TBD1-CC
 SPLIT=10
-OUTDIR=outputs/${DATE}/DFCIL-tentask/CIFAR100
+KD_DATASET=real_fake
+OUTDIR=outputs/${DATE}_$KD_DATASET/DFCIL-tentask/CIFAR100
 
 ###############################################################
 

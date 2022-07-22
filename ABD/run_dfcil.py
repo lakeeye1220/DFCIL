@@ -74,7 +74,7 @@ def create_args():
     parser.add_argument('--gamma', type=float, default=0.4, help="KD loss 'CC'")
     parser.add_argument('--p_order', type=int, default=2, help="CC kd loss p_order")
     parser.add_argument('--finetuning_strategy','-fs', type=bool, default=False, help="Finetuning strategy on optimizer when using kd")
-    # parser.add_argument('--abd_type', type=str, default='basic', help=" choic")
+    parser.add_argument('--kd_dataset', type=str, default='real_fake', help="real_fake|real|fake")
 
     parser.add_argument('--teacher_type', type=str, default='DI', help="DI or NI if in not datafree train_type it is not available",choices=('NI','DI'))
     return parser
