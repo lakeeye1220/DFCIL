@@ -26,7 +26,7 @@ class CC(nn.Module):
 		corr_mat_s = self.get_correlation_matrix(feat_s)
 		corr_mat_t = self.get_correlation_matrix(feat_t)
 
-		loss = F.mse_loss(corr_mat_s, corr_mat_t)
+		loss = F.mse_loss(corr_mat_s, corr_mat_t,reduction='none')
 
 		return loss
 
