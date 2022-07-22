@@ -27,7 +27,7 @@ def create_args():
     parser.add_argument('--gen_model_name', type=str, default='MLP', help="The name of actual model for the generator")
     parser.add_argument('--learner_type', type=str, default='default', help="The type (filename) of learner")
     parser.add_argument('--learner_name', type=str, default='NormalNN', help="The class name of learner")
-    parser.add_argument('--dataroot', type=str, default='../data/', help="The root folder of dataset or downloaded data")
+    parser.add_argument('--dataroot', type=str, default='../../data/dataset/cifar100', help="The root folder of dataset or downloaded data")
     parser.add_argument('--dataset', type=str, default='MNIST', help="CIFAR10|MNIST")
     parser.add_argument('--load_model_dir', type=str, default=None, help="try loading from external model directory")
     parser.add_argument('--workers', type=int, default=8, help="#Thread for dataloader")
@@ -64,8 +64,11 @@ def create_args():
     parser.add_argument('--memory', type=int, default=0, help="size of memory for replay")
     parser.add_argument('--temp', type=float, default=2., dest='temp', help="temperature for distillation")
     parser.add_argument('--mu', type=float, default=1.0, help="KD loss balancing weight")
+    parser.add_argument('--middle_mu', type=float, default=1.0, help="Middle KD loss balancing weight")
+    parser.add_argument('--balancing_mu', type=float, default=1.0, help="Balancing KD loss balancing weight")
     parser.add_argument('--beta', type=float, default=0.5, help="FT loss balancing weight")
     parser.add_argument('--middle',default=True,action='store_true',help='middle distillation using real data')
+    parser.add_argument('--balancing',default=False,action='store_true',help='balancing')
     return parser
 
 def get_args(argv):

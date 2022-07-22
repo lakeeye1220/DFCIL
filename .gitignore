@@ -130,3 +130,5 @@ dmypy.json
 outputs/*
 *.csv
 RelatedWork/outputs
+*.pyc
+*.pth

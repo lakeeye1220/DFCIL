@@ -128,7 +128,10 @@ class Trainer:
                         'deep_inv_params': args.deep_inv_params,
                         'tasks': self.tasks_logits,
                         'top_k': self.top_k,
-                        'middle':args.middle
+                        'middle':args.middle,
+                        'middle_mu':args.middle_mu,
+                        'balancing_mu':args.balancing_mu,
+                        'balancing':args.balancing,
                         }
         self.learner_type, self.learner_name = args.learner_type, args.learner_name
         self.learner = learners.__dict__[self.learner_type].__dict__[self.learner_name](self.learner_config)
