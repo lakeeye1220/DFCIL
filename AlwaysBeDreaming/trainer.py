@@ -133,6 +133,7 @@ class Trainer:
                         'balancing_mu':args.balancing_mu,
                         'balancing':args.balancing,
                         'balancing_loss_type':args.balancing_loss_type,
+                        'abd_kd':args.abd_kd,
                         }
         self.learner_type, self.learner_name = args.learner_type, args.learner_name
         self.learner = learners.__dict__[self.learner_type].__dict__[self.learner_name](self.learner_config)

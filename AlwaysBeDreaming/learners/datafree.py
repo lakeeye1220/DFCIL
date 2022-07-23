@@ -167,7 +167,7 @@ class DeepInversionGenBN(NormalNN):
 
                 # eval update
                 self.log('Epoch:{epoch:.0f}/{total:.0f}'.format(epoch=self.epoch+1,total=self.config['schedule'][-1]))
-                self.log(' * Loss {loss.avg:.3f} | CE Loss {lossb.avg:.3f} | hard KD Loss {lossc.avg:.3f}  | Middle loss {middle.avg:.3f} | Balancing loss {balancing.avg:.3f}'.format(loss=losses[0],lossb=losses[1],lossc=losses[2],middle=losses[3],balancing=losses[4]))
+                self.log(' * Loss {loss.avg:.3e} | CE Loss {lossb.avg:.3e} | hard KD Loss {lossc.avg:.3f}  | Middle loss {middle.avg:.3e} | Balancing loss {balancing.avg:.3e}'.format(loss=losses[0],lossb=losses[1],lossc=losses[2],middle=losses[3],balancing=losses[4]))
                 self.log(' * Train Acc {acc.avg:.3f} | Train Acc Gen {accg.avg:.3f}'.format(acc=acc,accg=accg))
 
                 # Evaluate the performance of current task
@@ -429,7 +429,7 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
             loss_class = self.criterion(logits[class_idx], targets[class_idx].long(), dw_cls[class_idx])
 
         # KD
-        if target_scores is not None:
+        if target_scores is not None and self.config['abd_kd']:
             # hard - linear
             kd_index = np.arange(2 * self.batch_size)
             #print("kd index : ",kd_index)
