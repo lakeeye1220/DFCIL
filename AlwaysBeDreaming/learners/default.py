@@ -79,11 +79,11 @@ class NormalNN(nn.Module):
             class_norm.append(torch.norm(weight[i]).item())
 
         plt.figure()
-        classes=np.arange(weight.shape[0])
+        classes=np.arange(self.valid_out_dim)
         plt.scatter(classes,class_norm)
         plt.xlabel('Class Index')
         plt.ylabel('Weight Norm')
-        plt.xlim(0,self.configs['num_classes'])
+        plt.xlim(0,weight.shape[0])
         plt.savefig(os.path.join(filename,'{}task_class_norm.png'.format(task_num)))
 
     ##########################################
