@@ -15,7 +15,12 @@ def create_args():
     
     # This function prepares the variables shared across demo.py
     parser = argparse.ArgumentParser()
-
+    if sys.platform == 'linux':
+        dataset_path = '/data/cifar100'
+    elif sys.platform == 'win32':
+        dataset_path = '..\..\data\dataset\cifar100'
+    else:
+        dataset_path = '\dataset'
     # standard Args
     parser.add_argument('--gpuid', nargs="+", type=int, default=[0],
                          help="The list of gpuid, ex:--gpuid 3 1. Negative value means cpu-only")

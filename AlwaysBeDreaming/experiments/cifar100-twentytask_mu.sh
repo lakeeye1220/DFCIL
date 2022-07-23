@@ -1,13 +1,13 @@
-# sh experiments/cifar100-fivetask.sh n
+# sh experiments/cifar100-twentytask.sh n
 
 # process inputs
 DEFAULTGPU=0
 GPUID=1
 
 # benchmark settings
-DATE=balancing_mu1_
-SPLIT=20
-OUTDIR=outputs/${DATE}/DFCIL-fivetask/CIFAR100
+DATE=balancing_mu1e-1_
+SPLIT=5
+OUTDIR=outputs/${DATE}/DFCIL-twentytask/CIFAR100
 
 ###############################################################
 
@@ -43,15 +43,15 @@ python3 -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPU
     --learner_type datafree --learner_name AlwaysBeDreamingBalancing \
     --gen_model_name CIFAR_GEN --gen_model_type generator \
     --beta 1 --power_iters $PI --deep_inv_params 1e-3 5e1 1e-3 1e3 1 \
-    --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/abd \
-    --balancing --balancing_mu 1
-'''
+    --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/abd\
+    --balancing --balancing_mu 1e-1
+
 #########################
 #    BASELINES  OURS    #
 #########################
-
+'''
 # LWF - Synthetic
-CUDA_VISIBLE_DEVICES=5 python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
+CUDA_VISIBLE_DEVICES=7 python3 -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
     --first_split_size $SPLIT --other_split_size $SPLIT --schedule $SCHEDULE --schedule_type decay --batch_size $BS \
     --optimizer $OPT --lr $LR --momentum $MOM --weight_decay $WD \
     --mu 1e-1 --memory 0 --model_name $MODELNAME --model_type resnet \
@@ -61,7 +61,7 @@ CUDA_VISIBLE_DEVICES=5 python -u run_dfcil.py --dataset CIFAR100 --train_aug --r
     --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/lwf_synthetic
 
 # DeepInv
-CUDA_VISIBLE_DEVICES=5 python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
+CUDA_VISIBLE_DEVICES=7 python3 -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
     --first_split_size $SPLIT --other_split_size $SPLIT --schedule $SCHEDULE --schedule_type decay --batch_size $BS \
     --optimizer $OPT --lr $LR --momentum $MOM --weight_decay $WD \
     --mu 1 --memory 0 --model_name $MODELNAME --model_type resnet \
@@ -75,7 +75,7 @@ CUDA_VISIBLE_DEVICES=5 python -u run_dfcil.py --dataset CIFAR100 --train_aug --r
 #########################
 
 # Oracle
-CUDA_VISIBLE_DEVICES=5 python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
+CUDA_VISIBLE_DEVICES=7 python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
     --first_split_size $SPLIT --other_split_size $SPLIT --schedule $SCHEDULE --schedule_type decay --batch_size $BS \
     --optimizer $OPT --lr $LR --momentum $MOM --weight_decay $WD \
     --memory 0 --model_name $MODELNAME --model_type resnet \
@@ -83,7 +83,7 @@ CUDA_VISIBLE_DEVICES=5 python -u run_dfcil.py --dataset CIFAR100 --train_aug --r
     --overwrite 0 --max_task $MAXTASK --log_dir ${OUTDIR}/oracle
 
 # Base
-CUDA_VISIBLE_DEVICES=5 python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
+CUDA_VISIBLE_DEVICES=7 python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
     --first_split_size $SPLIT --other_split_size $SPLIT --schedule $SCHEDULE --schedule_type decay --batch_size $BS \
     --optimizer $OPT --lr $LR --momentum $MOM --weight_decay $WD \
     --memory 0 --model_name $MODELNAME --model_type resnet \
@@ -91,7 +91,7 @@ CUDA_VISIBLE_DEVICES=5 python -u run_dfcil.py --dataset CIFAR100 --train_aug --r
     --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/base
 
 # DGR
-CUDA_VISIBLE_DEVICES=5 python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
+CUDA_VISIBLE_DEVICES=7 python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
     --first_split_size $SPLIT --other_split_size $SPLIT --schedule $SCHEDULE --schedule_type decay --batch_size $BS \
     --optimizer $OPT --lr $LR --momentum $MOM --weight_decay 0 \
     --mu 1 --memory 0 --model_name $MODELNAME --model_type resnet \

@@ -373,10 +373,10 @@ class DeepInversionLWF(DeepInversionGenBN):
         #return total_loss.detach(), loss_class.detach(), loss_kd.detach(),loss_middle.detach(), logits
         return total_loss.detach(), loss_class.detach(), loss_kd.detach(), loss_middle.detach(), logits
 
-class AlwaysBeDreamingBalacing(DeepInversionGenBN):
+class AlwaysBeDreamingBalancing(DeepInversionGenBN):
 
     def __init__(self, learner_config):
-        super(AlwaysBeDreamingBalacing, self).__init__(learner_config)
+        super(AlwaysBeDreamingBalancing, self).__init__(learner_config)
         self.kl_loss = nn.KLDivLoss(reduction='batchmean').cuda()
         self.md_criterion = SP().cuda()
 

@@ -2,10 +2,10 @@
 
 # process inputs
 DEFAULTGPU=0
-GPUID=1
+GPUID=0
 
 # benchmark settings
-DATE=balancing_mu1_
+DATE=balancing_mu1e-1_
 SPLIT=20
 OUTDIR=outputs/${DATE}/DFCIL-fivetask/CIFAR100
 
@@ -44,7 +44,7 @@ python3 -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPU
     --gen_model_name CIFAR_GEN --gen_model_type generator \
     --beta 1 --power_iters $PI --deep_inv_params 1e-3 5e1 1e-3 1e3 1 \
     --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/abd \
-    --balancing --balancing_mu 1
+    --balancing --balancing_mu 1e-1
 '''
 #########################
 #    BASELINES  OURS    #
