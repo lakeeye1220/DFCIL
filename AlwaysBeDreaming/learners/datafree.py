@@ -487,7 +487,7 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
                 if i==0:
                     oldest_task_weights=task_weights[i].detach()
                 else:
-                    loss_balancing+=torch.norm(task_weights[i].norm()-oldest_task_weights.norm(),self.norm_type)
+                    loss_balancing+=torch.norm((task_weights[i].norm()-oldest_task_weights.norm())/task_step,self.norm_type)
             loss_balancing*=self.config['balancing_mu']
         else:
             loss_balancing=torch.zeros((1,),requires_grad=True).cuda()
