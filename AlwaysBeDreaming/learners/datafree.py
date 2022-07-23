@@ -463,14 +463,7 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
             with torch.no_grad():
                 logits_prev_middle,out1_pm, out2_pm, out3_pm = self.previous_teacher.solver.forward(inputs,middle=True)
             loss_middle = (self.md_criterion(out1_m,out1_pm)+self.md_criterion(out2_m,out2_pm)+self.md_criterion(out3_m,out3_pm))*self.middle_mu
-            if self.config['dw_middle']:
-                kd_index = np.arange(2 * self.batch_size)
-                #print("kd index : ",kd_index)
-                dw_KD = self.dw_k[-1 * torch.ones(len(kd_index),).long()]
-                loss_middle*=dw_KD
-                loss_middle = loss_middle.mean()
-            else:
-                loss_middle = loss_middle.mean()
+            loss_middle = loss_middle.mean()
 
             #loss_middle = self.mu*(torch.norm(out1_m - out1_pm,2)+torch.norm(out2_m-out2_pm,2)+0.1*torch.norm(out3_m-out3_pm,2)).mean()
             #print("layer 1 difference : ",torch.norm(out1_m-out1_pm,1), "l2 : ",torch.norm(out1_m-out1_pm,2))
@@ -504,7 +497,10 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
                 if i==0:
                     oldest_task_weights=task_weights[i].detach()
                 else:
-                    loss_balancing+=torch.norm((task_weights[i].norm()-oldest_task_weights.norm())/task_step,self.norm_type)
+                    if self.config['balancing_loss_type']=='l1':
+                        loss_balancing+=F.l1_loss(task_weights[i].norm()-oldest_task_weights.norm())/task_step
+                    elif self.config['balancing_loss_type']=='l2':
+                        loss_balancing+=F.mse_loss(task_weights[i].norm()-oldest_task_weights.norm())/task_step
             loss_balancing*=self.config['balancing_mu']
         else:
             loss_balancing=torch.zeros((1,),requires_grad=True).cuda()
