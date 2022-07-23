@@ -6,7 +6,8 @@ import models
 from utils.metric import accuracy, AverageMeter, Timer
 import copy
 import numpy as np
-
+import matplotlib.pyplot as plt
+import os
 class NormalNN(nn.Module):
     """
     consider citing the benchmarking environment this was built on top of
@@ -67,6 +68,23 @@ class NormalNN(nn.Module):
 
         # initialize optimizer
         self.init_optimizer()
+
+    def visualize_weight(self,filename,task_num):
+        class_norm=[]
+        if len(self.config['gpuid'])>1:
+            weight=self.model.module.last.weight
+        else:
+            weight=self.model.last.weight
+        for i in range(self.valid_out_dim):
+            class_norm.append(torch.norm(weight[i]).item())
+
+        plt.figure()
+        classes=np.arange(weight.shape[0])
+        plt.scatter(classes,class_norm)
+        plt.xlabel('Class Index')
+        plt.ylabel('Weight Norm')
+        plt.xlim(0,self.configs['num_classes'])
+        plt.savefig(os.path.join(filename,'{}task_class_norm.png'.format(task_num)))
 
     ##########################################
     #           MODEL TRAINING               #

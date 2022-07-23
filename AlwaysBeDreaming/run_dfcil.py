@@ -72,8 +72,9 @@ def create_args():
     parser.add_argument('--middle_mu', type=float, default=1.0, help="Middle KD loss balancing weight")
     parser.add_argument('--balancing_mu', type=float, default=1.0, help="Balancing KD loss balancing weight")
     parser.add_argument('--beta', type=float, default=0.5, help="FT loss balancing weight")
-    parser.add_argument('--middle',default=True,action='store_true',help='middle distillation using real data')
+    parser.add_argument('--middle',default=False,action='store_true',help='middle distillation using real data')
     parser.add_argument('--balancing',default=False,action='store_true',help='balancing')
+    parser.add_argument('--balancing_loss_type',default='l1',type='str',help='balancing loss type')
     return parser
 
 def get_args(argv):

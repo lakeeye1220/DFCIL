@@ -132,6 +132,7 @@ class Trainer:
                         'middle_mu':args.middle_mu,
                         'balancing_mu':args.balancing_mu,
                         'balancing':args.balancing,
+                        'balancing_loss_type':args.balancing_loss_type,
                         }
         self.learner_type, self.learner_name = args.learner_type, args.learner_name
         self.learner = learners.__dict__[self.learner_type].__dict__[self.learner_name](self.learner_config)
@@ -157,6 +158,8 @@ class Trainer:
         for mkey in self.metric_keys: temp_table[mkey] = []
         temp_dir = self.log_dir + '/temp/'
         if not os.path.exists(temp_dir): os.makedirs(temp_dir)
+        visualize_path= os.path.join(self.log_dir,'visualize_weight')
+        if not os.path.exists(visualize_path): os.makedirs(visualize_path)
 
         # for each task
         for i in range(self.max_task):
@@ -208,6 +211,7 @@ class Trainer:
 
             # save model
             self.learner.save_model(model_save_dir)
+            self.learner.visualize_weight(visualize_path, self.current_t_index)
             
             # evaluate acc
             acc_table = []

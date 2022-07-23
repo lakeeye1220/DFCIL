@@ -5,7 +5,9 @@ DEFAULTGPU=0
 GPUID=3
 
 # benchmark settings
-DATE=balancing_mu1_
+BALANCING_LOSS_TYPE=l2
+# benchmark settings
+DATE=balancing_mu1_${BALANCING_LOSS_TYPE}
 SPLIT=5
 OUTDIR=outputs/${DATE}/DFCIL-twentytask/CIFAR100
 
@@ -44,7 +46,7 @@ python3 -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPU
     --gen_model_name CIFAR_GEN --gen_model_type generator \
     --beta 1 --power_iters $PI --deep_inv_params 1e-3 5e1 1e-3 1e3 1 \
     --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/abd\
-    --balancing
+    --balancing --middle --balancing_mu 1 --balancing_loss_type ${BALANCING_LOSS_TYPE}
 
 #########################
 #    BASELINES  OURS    #

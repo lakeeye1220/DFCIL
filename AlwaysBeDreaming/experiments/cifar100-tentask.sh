@@ -6,8 +6,9 @@ GPUID=0
 
 # benchmark settings
 #DATE=ICCV2021
-#DATE=ResNet34
-DATE=test
+BALANCING_LOSS_TYPE=l2
+# benchmark settings
+DATE=balancing_mu1e-1_${BALANCING_LOSS_TYPE}
 SPLIT=10
 OUTDIR=outputs/${DATE}/DFCIL-tentask/CIFAR100
 
@@ -47,4 +48,4 @@ CUDA_VISIBLE_DEVICES=$GPUID python -u run_dfcil.py --dataset CIFAR100 --train_au
     --gen_model_name CIFAR_GEN --gen_model_type generator \
     --beta 1 --power_iters $PI --deep_inv_params 1e-3 5e1 1e-3 1e3 1 \
     --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/abd \
-    --balancing
+    --balancing --middle --balancing_loss_type ${BALANCING_LOSS_TYPE}

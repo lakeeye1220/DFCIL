@@ -9,7 +9,8 @@ from .datafree_helper import Teacher
 from .default import NormalNN, weight_reset, accumulate_acc, loss_fn_kd
 import copy
 from torch.optim import Adam
-
+import matplotlib.pyplot as plt
+import os
 class SP(nn.Module):
     def __init__(self):
         super(SP,self).__init__()
@@ -46,6 +47,7 @@ class DeepInversionGenBN(NormalNN):
         # repeat call for generator network
         if self.gpu:
             self.cuda_gen()
+    
         
     ##########################################
     #           MODEL TRAINING               #
@@ -176,7 +178,6 @@ class DeepInversionGenBN(NormalNN):
                 losses = [AverageMeter() for i in range(num_meter)]
                 acc = AverageMeter()
                 accg = AverageMeter()
-
 
         self.model.eval()
         self.last_last_valid_out_dim = self.last_valid_out_dim
@@ -379,6 +380,10 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
         super(AlwaysBeDreamingBalancing, self).__init__(learner_config)
         self.kl_loss = nn.KLDivLoss(reduction='batchmean').cuda()
         self.md_criterion = SP().cuda()
+        if self.config['balancing_loss_type']=='l1':
+            self.norm_type=1
+        elif self.config['balancing_loss_type']=='l2':
+            self.norm_type=2
 
     def update_model(self, real_x,real_y,x_fake, y_fake, inputs, targets, target_scores = None, dw_force = None, kd_index = None):
         # class balancing
@@ -425,7 +430,6 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
 
         # KD
         if target_scores is not None:
-#
             # hard - linear
             kd_index = np.arange(2 * self.batch_size)
             #print("kd index : ",kd_index)
@@ -446,7 +450,7 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
         
         #Middle K.D
         #print("previous teacher : ",self.previous_teacher)
-        if self.previous_teacher is not None:
+        if self.previous_teacher is not None and self.config['middle']:
             logits_middle,out1_m,out2_m,out3_m = self.model.forward(inputs, middle=True)
             with torch.no_grad():
                 logits_prev_middle,out1_pm, out2_pm, out3_pm = self.previous_teacher.solver.forward(inputs,middle=True)
@@ -483,7 +487,7 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
                 if i==0:
                     oldest_task_weights=task_weights[i].detach()
                 else:
-                    loss_balancing+=torch.norm(task_weights[i].norm()-oldest_task_weights.norm(),1)
+                    loss_balancing+=torch.norm(task_weights[i].norm()-oldest_task_weights.norm(),self.norm_type)
             loss_balancing*=self.config['balancing_mu']
         else:
             loss_balancing=torch.zeros((1,),requires_grad=True).cuda()
