@@ -76,6 +76,7 @@ def create_args():
     parser.add_argument('--balancing',default=False,action='store_true',help='balancing')
     parser.add_argument('--balancing_loss_type',default='l1',type=str,help='balancing loss type')
     parser.add_argument('--abd_kd',default=False, action='store_true', help='use abd kd')
+    parser.add_argument('--dw_middle',default=False,action='store_true',help='dw middle distillation')
     return parser
 
 def get_args(argv):

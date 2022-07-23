@@ -463,6 +463,8 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
             with torch.no_grad():
                 logits_prev_middle,out1_pm, out2_pm, out3_pm = self.previous_teacher.solver.forward(inputs,middle=True)
             loss_middle = (self.md_criterion(out1_m,out1_pm)+self.md_criterion(out2_m,out2_pm)+self.md_criterion(out3_m,out3_pm))*self.middle_mu
+            if self.config['dw_middle']:
+                loss_middle*=dw_cls
             loss_middle = loss_middle.mean()
 
             #loss_middle = self.mu*(torch.norm(out1_m - out1_pm,2)+torch.norm(out2_m-out2_pm,2)+0.1*torch.norm(out3_m-out3_pm,2)).mean()
