@@ -12,8 +12,9 @@ from torch.optim import Adam
 import matplotlib.pyplot as plt
 import os
 class SP(nn.Module):
-    def __init__(self):
+    def __init__(self,reduction='mean'):
         super(SP,self).__init__()
+        self.reduction=reduction
 
     def forward(self,fm_s,fm_t):
         fm_s = fm_s.view(fm_s.size(0),-1)
@@ -23,7 +24,14 @@ class SP(nn.Module):
         fm_t = fm_t.view(fm_t.size(0),-1)
         G_t = torch.mm(fm_t,fm_t.t())
         norm_G_t = F.normalize(G_t,p=2,dim=1)
-        loss = F.mse_loss(norm_G_s,norm_G_t)
+        if self.reduction == 'mean':
+            loss = F.mse_loss(norm_G_s,norm_G_t)
+        elif self.reduction == 'sum':
+            loss = F.mse_loss(norm_G_s,norm_G_t,reduction='sum')
+        elif self.reduction=='none':
+            loss = F.mse_loss(norm_G_s,norm_G_t,reduction='none')
+        else:
+            raise NotImplementedError
         return loss
 
 class DeepInversionGenBN(NormalNN):
@@ -379,7 +387,7 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
     def __init__(self, learner_config):
         super(AlwaysBeDreamingBalancing, self).__init__(learner_config)
         self.kl_loss = nn.KLDivLoss(reduction='batchmean').cuda()
-        self.md_criterion = SP().cuda()
+        self.md_criterion = SP(reduction='none').cuda()
         if self.config['balancing_loss_type']=='l1':
             self.norm_type=1
         elif self.config['balancing_loss_type']=='l2':
@@ -455,6 +463,15 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
             with torch.no_grad():
                 logits_prev_middle,out1_pm, out2_pm, out3_pm = self.previous_teacher.solver.forward(inputs,middle=True)
             loss_middle = (self.md_criterion(out1_m,out1_pm)+self.md_criterion(out2_m,out2_pm)+self.md_criterion(out3_m,out3_pm))*self.middle_mu
+            if self.config['dw_middle']:
+                kd_index = np.arange(2 * self.batch_size)
+                #print("kd index : ",kd_index)
+                dw_KD = self.dw_k[-1 * torch.ones(len(kd_index),).long()]
+                loss_middle*=dw_KD
+                loss_middle = loss_middle.mean()
+            else:
+                loss_middle = loss_middle.mean()
+
             #loss_middle = self.mu*(torch.norm(out1_m - out1_pm,2)+torch.norm(out2_m-out2_pm,2)+0.1*torch.norm(out3_m-out3_pm,2)).mean()
             #print("layer 1 difference : ",torch.norm(out1_m-out1_pm,1), "l2 : ",torch.norm(out1_m-out1_pm,2))
             #print("layer 2 difference : ",torch.norm(out2_m-out2_pm,1),"l2 : ",torch.norm(out2_m-out2_pm,2))
