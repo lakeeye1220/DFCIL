@@ -77,6 +77,7 @@ def create_args():
     parser.add_argument('--balancing_loss_type',default='l1',type=str,help='balancing loss type')
     parser.add_argument('--abd_kd',default=False, action='store_true', help='use abd kd')
     parser.add_argument('--dw_middle',default=False,action='store_true',help='dw middle distillation')
+    parser.add_argument('--middle_index',default='real_fake',type=str,help='middle kd index set (real_fake, fake, real)')
     return parser
 
 def get_args(argv):

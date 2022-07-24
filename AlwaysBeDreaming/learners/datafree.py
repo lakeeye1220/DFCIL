@@ -459,9 +459,18 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
         #Middle K.D
         #print("previous teacher : ",self.previous_teacher)
         if self.previous_teacher is not None and self.config['middle']:
-            logits_middle,out1_m,out2_m,out3_m = self.model.forward(inputs, middle=True)
+            if self.config['middle_index']=='real_fake':
+                middle_index= np.arange(2*self.batch_size)
+            elif self.config['middle_index']=='fake':
+                middle_index= np.arange(self.batch_size)+self.batch_size
+            elif self.config['middle_index']=='real':
+                middle_index= np.arange(self.batch_size)
+            else:
+                raise ValueError("middle_index must be real, fake or real_fake")
+            
+            logits_middle,out1_m,out2_m,out3_m = self.model.forward(inputs[middle_index], middle=True)
             with torch.no_grad():
-                logits_prev_middle,out1_pm, out2_pm, out3_pm = self.previous_teacher.solver.forward(inputs,middle=True)
+                logits_prev_middle,out1_pm, out2_pm, out3_pm = self.previous_teacher.solver.forward(inputs[middle_index],middle=True)
             loss_middle = (self.md_criterion(out1_m,out1_pm)+self.md_criterion(out2_m,out2_pm)+self.md_criterion(out3_m,out3_pm))*self.middle_mu
             if self.config['dw_middle']:
                 loss_middle*=dw_cls
