@@ -78,6 +78,12 @@ def create_args():
     parser.add_argument('--abd_kd',default=False, action='store_true', help='use abd kd')
     parser.add_argument('--dw_middle',default=False,action='store_true',help='dw middle distillation')
     parser.add_argument('--middle_index',default='real_fake',type=str,help='middle kd index set (real_fake, fake, real)')
+    parser.add_argument('--cc',default=False,action='store_true',help='middle kd cc')
+    parser.add_argument('--cc_index',default='real_fake',type=str,help='middle kd cc index set (real_fake, fake, real)')
+    parser.add_argument('--cc_gamma',default=0.4,type=float,help='middle kd cc gamma')
+    parser.add_argument('--p_order',default=2,type=int,help='middle kd cc p_order')
+    parser.add_argument('--dw_cc',default=False,action='store_true',help='dw cc')
+    parser.add_argument('--cc_mu',default=1.0,type=float,help='cc mu')
     return parser
 
 def get_args(argv):

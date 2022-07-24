@@ -136,6 +136,12 @@ class Trainer:
                         'abd_kd':args.abd_kd,
                         'dw_middle':args.dw_middle,
                         'middle_index':args.middle_index,
+                        'cc':args.cc,
+                        'cc_mu':args.cc_mu,
+                        'cc_index':args.cc_index,
+                        'dw_cc':args.dw_cc,
+                        'cc_gamma':args.cc_gamma,
+                        'p_order':args.p_order,
                         }
         self.learner_type, self.learner_name = args.learner_type, args.learner_name
         self.learner = learners.__dict__[self.learner_type].__dict__[self.learner_name](self.learner_config)

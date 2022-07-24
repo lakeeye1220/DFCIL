@@ -11,6 +11,7 @@ import copy
 from torch.optim import Adam
 import matplotlib.pyplot as plt
 import os
+from learners.cc import CC
 class SP(nn.Module):
     def __init__(self,reduction='mean'):
         super(SP,self).__init__()
@@ -393,6 +394,8 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
         elif self.config['balancing_loss_type']=='l2':
             self.norm_type=2
 
+        self.kd_criterion=CC(self.config['cc_gamma'],self.config['p_order'],reduction='none').cuda()
+
     def update_model(self, real_x,real_y,x_fake, y_fake, inputs, targets, target_scores = None, dw_force = None, kd_index = None):
         # class balancing
         mappings = torch.ones(targets.size(), dtype=torch.float32)
@@ -482,6 +485,22 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
             #print("layer 3 differnce : ", torch.norm(out3_m-out3_pm,1), "l2 : ",torch.norm(out3_m-out3_pm,2))
         else:
             loss_middle=torch.zeros((1,),requires_grad=True).cuda()
+
+        if self.previous_teacher is not None and self.config['cc']:
+            if self.config['cc_index']=='real_fake':
+                cc_index= np.arange(2*self.batch_size)
+            elif self.config['cc_index']=='fake':
+                cc_index= np.arange(self.batch_size)+self.batch_size
+            elif self.config['cc_index']=='real':
+                cc_index= np.arange(self.batch_size)
+            else:
+                raise ValueError("cc_index must be real, fake or real_fake")
+            with torch.no_grad():
+                last_logits_pen=self.previous_teacher.generate_scores_pen(inputs[cc_index])
+            loss_middle=self.kd_criterion(logits_pen[cc_index], last_logits_pen)*self.mu
+            if self.config['dw_cc']:
+                loss_middle*=dw_cls
+            loss_middle=loss_middle.mean()*self.config['cc_mu']
         '''
         loss_hardKD = torch.zeros((1,),requires_grad=True).cuda()
         if x_fake is not None and self.previous_teacher:
