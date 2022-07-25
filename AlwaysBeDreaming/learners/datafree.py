@@ -546,6 +546,8 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
             # if self.config['dw_middle']:
             #     loss_middle*=(dw_cls[middle_index])#/dw_cls[middle_index].sum(keepdim=True))
             loss_middle=loss_middle.mean()*self.config['middle_mu']
+        else:
+            loss_middle=torch.zeros((1,), requires_grad=True).cuda()
 
         # balancing
         if self.previous_teacher is not None and self.config['balancing']:
