@@ -26,6 +26,7 @@ def create_args():
     parser.add_argument('--gpuid', nargs="+", type=int, default=[0],
                          help="The list of gpuid, ex:--gpuid 3 1. Negative value means cpu-only")
     parser.add_argument('--model_type', type=str, default='mlp', help="The type (mlp|lenet|vgg|resnet) of backbone network")
+    parser.add_argument('--log_dir', type=str, default=None, help="The directory of log file")
     parser.add_argument('--model_name', type=str, default='MLP', help="The name of actual model for the backbone")
     parser.add_argument('--gen_model_type', type=str, default='mlp', help="The type (mlp|lenet|vgg|resnet) of generator network")
     parser.add_argument('--gen_model_name', type=str, default='MLP', help="The name of actual model for the generator")
@@ -112,9 +113,10 @@ if __name__ == '__main__':
 
     # determinstic backend
     torch.backends.cudnn.deterministic=True
-    time_data = time.strftime(
-        '%m-%d_%H-%M-%S', time.localtime(time.time()))
-    args.log_dir = os.path.join('outputs',args.learner_name,time_data)
+    if args.log_dir is None:
+        time_data = time.strftime(
+            '%m-%d_%H-%M-%S', time.localtime(time.time()))
+        args.log_dir = os.path.join('outputs',args.learner_name,time_data)
 
     # duplicate output stream to output file
     if not os.path.exists(args.log_dir): os.makedirs(args.log_dir)
