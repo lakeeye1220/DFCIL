@@ -142,6 +142,9 @@ class Trainer:
                         'dw_cc':args.dw_cc,
                         'cc_gamma':args.cc_gamma,
                         'p_order':args.p_order,
+                        'ft':args.ft,
+                        'classification_type':args.classification_type,
+                        'classification_index':args.classification_index,
                         }
         self.learner_type, self.learner_name = args.learner_type, args.learner_name
         self.learner = learners.__dict__[self.learner_type].__dict__[self.learner_name](self.learner_config)

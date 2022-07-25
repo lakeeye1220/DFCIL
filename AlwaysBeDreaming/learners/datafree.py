@@ -426,13 +426,11 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
         class_idx = np.arange(self.batch_size)
         if self.inversion_replay:
             if self.config['classification_index']=='real':
-                cls_logits=logits[class_idx]
-            elif self.config['classification_indeix']=='fake':
+                class_idx=class_idx
+            elif self.config['classification_index']=='fake':
                 class_idx=class_idx+self.batch_size
-                cls_logits=logits[class_idx]
             else: # real_fake
                 class_idx=np.arange(2*self.batch_size)
-                cls_logits=logits[class_idx]
 
             # local classification
             if self.config['classification_type']=='local':
@@ -440,12 +438,13 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
             elif self.config['classification_type']=='global':
                 loss_class = self.criterion(logits,targets,dw_cls)
             # ft classification  
-            with torch.no_grad():             
-                feat_class = self.model.forward(x=inputs, pen=True).detach()
-            if len(self.config['gpuid']) > 1:
-                loss_class += self.criterion(self.model.module.last(feat_class), targets.long(), dw_cls)
-            else:
-                loss_class += self.criterion(self.model.last(feat_class), targets.long(), dw_cls)
+            if self.config['ft']:
+                with torch.no_grad():             
+                    feat_class = self.model.forward(x=inputs, pen=True).detach()
+                if len(self.config['gpuid']) > 1:
+                    loss_class += self.criterion(self.model.module.last(feat_class), targets.long(), dw_cls)
+                else:
+                    loss_class += self.criterion(self.model.last(feat_class), targets.long(), dw_cls)
             
         else:
             loss_class = self.criterion(logits[class_idx], targets[class_idx].long(), dw_cls[class_idx])

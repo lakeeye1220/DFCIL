@@ -84,6 +84,10 @@ def create_args():
     parser.add_argument('--p_order',default=2,type=int,help='middle kd cc p_order')
     parser.add_argument('--dw_cc',default=False,action='store_true',help='dw cc')
     parser.add_argument('--cc_mu',default=1.0,type=float,help='cc mu')
+    parser.add_argument('--ft',default=False,action='store_true',help='finetuning loss')
+    parser.add_argument('--classification_type',default='local',type=str,help='classification type (local, global)')
+    parser.add_argument('--classification_index',default='real',type=str,help='classification index (real, fake, real_fake)')
+
     return parser
 
 def get_args(argv):
