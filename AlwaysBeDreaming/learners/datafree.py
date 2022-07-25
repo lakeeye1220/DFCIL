@@ -425,9 +425,20 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
         # classification 
         class_idx = np.arange(self.batch_size)
         if self.inversion_replay:
-            # local classification
-            loss_class = self.criterion(logits[class_idx,self.last_valid_out_dim:self.valid_out_dim], (targets[class_idx]-self.last_valid_out_dim).long(), dw_cls[class_idx]) 
+            if self.config['classification_index']=='real':
+                cls_logits=logits[class_idx]
+            elif self.config['classification_indeix']=='fake':
+                class_idx=class_idx+self.batch_size
+                cls_logits=logits[class_idx]
+            else: # real_fake
+                class_idx=np.arange(2*self.batch_size)
+                cls_logits=logits[class_idx]
 
+            # local classification
+            if self.config['classification_type']=='local':
+                loss_class = self.criterion(logits[class_idx,self.last_valid_out_dim:self.valid_out_dim], (targets[class_idx]-self.last_valid_out_dim).long(), dw_cls[class_idx]) 
+            elif self.config['classification_type']=='global':
+                loss_class = self.criterion(logits,targets,dw_cls)
             # ft classification  
             with torch.no_grad():             
                 feat_class = self.model.forward(x=inputs, pen=True).detach()
