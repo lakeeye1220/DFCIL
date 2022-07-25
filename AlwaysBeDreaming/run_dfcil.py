@@ -10,7 +10,8 @@ import numpy as np
 import yaml
 import random
 from trainer import Trainer
-
+import time
+import pandas as pd
 def create_args():
     
     # This function prepares the variables shared across demo.py
@@ -24,8 +25,6 @@ def create_args():
     # standard Args
     parser.add_argument('--gpuid', nargs="+", type=int, default=[0],
                          help="The list of gpuid, ex:--gpuid 3 1. Negative value means cpu-only")
-    parser.add_argument('--log_dir', type=str, default="outputs/out",
-                         help="Save experiments results in dir for future plotting!")
     parser.add_argument('--model_type', type=str, default='mlp', help="The type (mlp|lenet|vgg|resnet) of backbone network")
     parser.add_argument('--model_name', type=str, default='MLP', help="The name of actual model for the backbone")
     parser.add_argument('--gen_model_type', type=str, default='mlp', help="The type (mlp|lenet|vgg|resnet) of generator network")
@@ -68,25 +67,24 @@ def create_args():
     parser.add_argument('--max_task', type=int, default=-1, help="number tasks to perform; if -1, then all tasks; for debug")
     parser.add_argument('--memory', type=int, default=0, help="size of memory for replay")
     parser.add_argument('--temp', type=float, default=2., dest='temp', help="temperature for distillation")
-    parser.add_argument('--mu', type=float, default=1.0, help="KD loss balancing weight")
-    parser.add_argument('--middle_mu', type=float, default=1.0, help="Middle KD loss balancing weight")
-    parser.add_argument('--balancing_mu', type=float, default=1.0, help="Balancing KD loss balancing weight")
     parser.add_argument('--beta', type=float, default=0.5, help="FT loss balancing weight")
-    parser.add_argument('--middle',default=False,action='store_true',help='middle distillation using real data')
+    parser.add_argument('--ft',default=False,action='store_true',help='finetuning loss')
+
+    parser.add_argument('--middle_mu', type=float, default=1.0, help="Middle KD loss balancing weight")
     parser.add_argument('--balancing',default=False,action='store_true',help='balancing')
+    parser.add_argument('--balancing_mu', type=float, default=1.0, help="Balancing KD loss balancing weight")
     parser.add_argument('--balancing_loss_type',default='l1',type=str,help='balancing loss type')
-    parser.add_argument('--abd_kd',default=False, action='store_true', help='use abd kd')
     parser.add_argument('--dw_middle',default=False,action='store_true',help='dw middle distillation')
     parser.add_argument('--middle_index',default='real_fake',type=str,help='middle kd index set (real_fake, fake, real)')
-    parser.add_argument('--cc',default=False,action='store_true',help='middle kd cc')
-    parser.add_argument('--cc_index',default='real_fake',type=str,help='middle kd cc index set (real_fake, fake, real)')
+    parser.add_argument('--middle_kd_type',default='sp',type=str,help='middle kd type',choices=['sp','cc',''])
+    parser.add_argument('--kd_type',default='abd',type=str,help='logits kd type',choices=['hkd','abd','hkd'])
+    parser.add_argument('--mu', type=float, default=1.0, help="KD loss balancing weight")
+
     parser.add_argument('--cc_gamma',default=0.4,type=float,help='middle kd cc gamma')
     parser.add_argument('--p_order',default=2,type=int,help='middle kd cc p_order')
-    parser.add_argument('--dw_cc',default=False,action='store_true',help='dw cc')
-    parser.add_argument('--cc_mu',default=1.0,type=float,help='cc mu')
-    parser.add_argument('--ft',default=False,action='store_true',help='finetuning loss')
-    parser.add_argument('--classification_type',default='local',type=str,help='classification type (local, global)')
-    parser.add_argument('--classification_index',default='real',type=str,help='classification index (real, fake, real_fake)')
+
+    parser.add_argument('--classification_type','-cls_type',default='local',type=str,help='classification type (local, global)')
+    parser.add_argument('--classification_index','-cls_idx',default='real',type=str,help='classification index (real, fake, real_fake)')
 
     return parser
 
@@ -113,6 +111,9 @@ if __name__ == '__main__':
 
     # determinstic backend
     torch.backends.cudnn.deterministic=True
+    time_data = time.strftime(
+        '%m-%d_%H-%M-%S', time.localtime(time.time()))
+    args.log_dir = os.path.join('outputs',args.learner_name,time_data)
 
     # duplicate output stream to output file
     if not os.path.exists(args.log_dir): os.makedirs(args.log_dir)
@@ -220,7 +221,24 @@ if __name__ == '__main__':
         print('===Summary of experiment repeats:',r+1,'/',args.repeat,'===')
         for mkey in metric_keys: 
             print(mkey, ' | mean:', avg_metrics[mkey]['global'][-1,:r+1].mean(), 'std:', avg_metrics[mkey]['global'][-1,:r+1].std())
-    
-    
+
+        df_dict=vars(args)
+        df_dict['acc']=avg_metrics['acc']['global'][-1:,:r+1].mean()
+        df_dict['time']=time_data
+
+        for key in df_dict.keys():
+            if isinstance(df_dict[key], torch.Tensor):
+                df_dict[key]=df_dict[key].view(-1).detach().cpu().tolist()
+            if type(df_dict[key])==list:
+                df_dict[key]=','.join(str(e) for e in df_dict[key])
+            df_dict[key]=[df_dict[key]]
+        df_cat=pd.DataFrame.from_dict(df_dict,dtype=object)
+        if os.path.exists('./learning_result.csv'):
+            df=pd.read_csv('./learning_result.csv',index_col=0,dtype=object)
+            
+            df=pd.merge(df,df_cat,how='outer')
+        else: df=df_cat
+        df.to_csv(os.path.join('outputs','learning_result.csv'))
+        ##############
 
 
