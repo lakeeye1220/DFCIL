@@ -179,7 +179,7 @@ if __name__ == '__main__':
         torch.cuda.manual_seed(seed)
 
         # set up a trainer
-        trainer = Trainer(args, seed, metric_keys, save_keys)
+        trainer = Trainer(args, seed, metric_keys, save_keys,time_data)
 
         # init total run metrics storage
         max_task = trainer.max_task

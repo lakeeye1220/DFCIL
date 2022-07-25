@@ -9,7 +9,7 @@ import learners
 
 class Trainer:
 
-    def __init__(self, args, seed, metric_keys, save_keys):
+    def __init__(self, args, seed, metric_keys, save_keys,time_data):
 
         # process inputs
         self.seed = seed
@@ -18,6 +18,7 @@ class Trainer:
         self.log_dir = args.log_dir
         self.batch_size = args.batch_size
         self.workers = args.workers
+        self.time_data=time_data
 
         # for generative models, pre-process data to be 0...1; otherwise, pre-process data to be zero mean, unit variance
         if args.learner_type == 'dgr':
@@ -184,7 +185,7 @@ class Trainer:
 
             # print name
             train_name = self.task_names[i]
-            print('======================', train_name, '=======================')
+            print('======================', train_name,self.time_data, '=======================')
 
             # load dataset for task
             task = self.tasks_logits[i]
