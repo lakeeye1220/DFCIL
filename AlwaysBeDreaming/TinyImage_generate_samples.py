@@ -1,7 +1,7 @@
 import torch 
 import torchvision
 from models.generator import Generator
-
+import numpy as np
 
 def denormalize(image_tensor, dataset):
     channel_num = 0
