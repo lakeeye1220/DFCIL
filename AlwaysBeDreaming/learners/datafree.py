@@ -42,7 +42,6 @@ class DeepInversionGenBN(NormalNN):
         self.inversion_replay = False
         self.previous_teacher = None
         self.dw = self.config['DW']
-        self.middle= self.config['middle']
         self.device = 'cuda' if self.gpu else 'cpu'
         self.power_iters = self.config['power_iters']
         self.deep_inv_params = self.config['deep_inv_params']
@@ -52,7 +51,6 @@ class DeepInversionGenBN(NormalNN):
         self.generator = self.create_generator()
         self.generator_optimizer = Adam(params=self.generator.parameters(), lr=self.deep_inv_params[0])
         self.beta = self.config['beta']
-        self.middle_mu = self.config['middle_mu']
         # repeat call for generator network
         if self.gpu:
             self.cuda_gen()
@@ -540,14 +538,14 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
             loss_middle = (self.md_criterion(out1_m,out1_pm)+self.md_criterion(out2_m,out2_pm)+self.md_criterion(out3_m,out3_pm))
             # if self.config['dw_middle']:
             #     loss_middle*=dw_cls[middle_index]
-            loss_middle = loss_middle.mean()*self.middle_mu
+            loss_middle = loss_middle.mean()*self.config['middle_mu']
         elif self.previous_teacher is not None and self.config['middle_kd_type']=='cc':
             with torch.no_grad():
                 last_logits_pen=self.previous_teacher.generate_scores_pen(inputs[middle_index])
             loss_middle=self.kd_criterion(logits_pen[middle_index], last_logits_pen)*self.mu
             # if self.config['dw_middle']:
             #     loss_middle*=(dw_cls[middle_index])#/dw_cls[middle_index].sum(keepdim=True))
-            loss_middle=loss_middle.mean()*self.middle_mu
+            loss_middle=loss_middle.mean()*self.config['middle_mu']
 
         # balancing
         if self.previous_teacher is not None and self.config['balancing']:
