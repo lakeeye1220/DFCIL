@@ -510,10 +510,10 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
             logits_KD = self.previous_linear(logits_pen[kd_index])[:,:self.last_valid_out_dim]
             logits_KD_past = self.previous_linear(self.previous_teacher.generate_scores_pen(inputs[kd_index]))[:,:self.last_valid_out_dim]
             loss_kd = self.mu * (self.kd_criterion(logits_KD, logits_KD_past).sum(dim=1) * dw_kd).mean() / (logits_KD.size(1))
-        elif target_scores is not None and self.config['kd_type']=='hkd':
+        elif target_scores is not None and self.config['kd_type']=='kd':
             with torch.no_grad():
                 logits_prevpen = self.previous_teacher.solver.forward(inputs,pen=True)
-            loss_kd=(F.cross_entropy(logits_pen,logits_prevpen.softmax(dim=1),reduction='none')*dw_kd).mean()/ task_step * self.mu
+            loss_kd=(F.cross_entropy(logits_pen/self.config['temp'],logits_prevpen.softmax(dim=1)/self.config['temp'],reduction='none')*dw_kd).mean()/ task_step * self.mu
         elif target_scores is not None and self.config['kd_type']=='hkd_yj':
             with torch.no_grad():
                 logits_prevpen = self.previous_teacher.solver.forward(inputs,pen=True)
