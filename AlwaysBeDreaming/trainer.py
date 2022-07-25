@@ -122,6 +122,7 @@ class Trainer:
                         'overwrite': args.overwrite == 1,
                         'beta': args.beta,
                         'kd_type': args.kd_type,
+                        'kd_index': args.kd_index,
                         'mu': args.mu,
                         'DW': args.DW,
                         'batch_size': args.batch_size,
