@@ -460,7 +460,7 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
 
         # forward pass
         # logits_pen = self.model.forward(x=inputs, pen=True)
-        logits_pen,out1_m,out2_m,out3_m = self.model.forward(inputs[middle_index], middle=True)
+        logits_pen,out1_m,out2_m,out3_m = self.model.forward(inputs, middle=True)
 
         if len(self.config['gpuid']) > 1:
             logits = self.model.module.last(logits_pen)
@@ -493,7 +493,7 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
             loss_class = self.criterion(logits[class_idx], targets[class_idx].long(), dw_cls[class_idx])
 
 
-        if target_scores is not None and self.config['kd_type']:
+        if self.previous_teacher is not None and self.config['kd_type']:
             # KD
             if self.config['kd_index']=='real_fake':
                 kd_index= np.arange(2*self.batch_size)
