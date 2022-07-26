@@ -543,7 +543,7 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
                 logits_prevpen = self.previous_teacher.solver.forward(inputs[kd_index],pen=True)
                 logits_prev=self.previous_linear(logits_prevpen)[:,:self.last_valid_out_dim].detach()
 
-                loss_kd=(F.mse_loss(logits[kd_index,:self.last_valid_out_dim],logits_prev,reduction='none').sum(dim=1)*dw_kd).mean()/ self.last_valid_out_dim * self.mu#
+                loss_kd=(F.mse_loss(logits[kd_index,:self.last_valid_out_dim],logits_prev,reduction='none').sum(dim=1)*dw_kd).mean() * self.mu#/self.last_valid_out_dim
             else:
                 raise ValueError("kd_type must be abd, kd or hkd_yj")
         else:
