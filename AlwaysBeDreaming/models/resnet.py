@@ -107,8 +107,8 @@ class ResNet(nn.Module):
         out1 = self.layer1(out)
         out2 = self.layer2(out1)
         out3 = self.layer3(out2)
-        out = F.avg_pool2d(out3, out3.size()[3])
-        out_pen = out.view(out.size(0), -1)
+        out4 = F.avg_pool2d(out3, out3.size()[3])
+        out_pen = out4.view(out4.size(0), -1)
         if pen:
             return out_pen
 
@@ -127,8 +127,8 @@ class ResNet(nn.Module):
 
 
             #return out, out1_m, out2_m, out3_m
-            out = self.last(out_pen)
-            return out, out_pen, out1,out2,out3
+            
+            return out_pen, out1,out2,out3
 
         else:
             out = self.last(out_pen)
