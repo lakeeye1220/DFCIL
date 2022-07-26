@@ -517,7 +517,7 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
             loss_middle=torch.zeros((1,), requires_grad=True).cuda()
 
         # KD
-        if self.previous_teacher is not None and self.config['kd_type']:
+        if self.previous_teacher and self.config['kd_type']:
             if self.config['kd_index']=='real_fake':
                 kd_index= np.arange(2*self.batch_size)
             elif self.config['kd_index']=='fake':
@@ -526,7 +526,9 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
                 kd_index= np.arange(self.batch_size)
             else:
                 raise ValueError("middle_index must be real, fake or real_fake")
-            dw_kd = self.dw_k[-1 * torch.ones(len(kd_index),).long()][kd_index]
+            dw_kd = self.dw_k[-1 * torch.ones(2*self.batch_size,).long()][kd_index]
+
+        if self.previous_teacher and self.config['kd_type']:
             if self.config['kd_type']=='abd':
                 # hard - linear
                 logits_KD = self.previous_linear(logits_pen[kd_index])[:,:self.last_valid_out_dim]
@@ -538,12 +540,10 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
                 loss_kd=(-F.log_softmax(logits[kd_index,:self.last_valid_out_dim]/self.config['temp'],dim=1)*logits_prev.softmax(dim=1)/self.config['temp'])
                 loss_kd=(loss_kd.sum(dim=1)*dw_kd).mean()/ task_step * self.mu
             elif self.config['kd_type']=='hkd_yj':
-                logits_oldpen = self.model.forward(inputs,pen=True)
-                logits_old = self.model.last(logits_oldpen)
                 logits_prevpen = self.previous_teacher.solver.forward(inputs[kd_index],pen=True)
                 logits_prev=self.previous_linear(logits_prevpen)[:,:self.last_valid_out_dim].detach()
 
-                loss_kd=(F.mse_loss(logits_old[kd_index,:self.last_valid_out_dim],logits_prev,reduction='none').sum(dim=1)*dw_kd).mean()/ task_step * self.mu#
+                loss_kd=(F.mse_loss(logits[kd_index,:self.last_valid_out_dim],logits_prev,reduction='none').sum(dim=1)*dw_kd).mean()/ task_step * self.mu#
             else:
                 raise ValueError("kd_type must be abd, kd or hkd_yj")
         else:
