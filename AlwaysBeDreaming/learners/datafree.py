@@ -58,18 +58,19 @@ class DeepInversionGenBN(NormalNN):
          weight = self.model.last.weight
          #weight = np.concatenate([self.model.last.WA_linears[i].weight.cpu().detach().numpy() for i in range(task_num)])
          #weight = np.concatenate([self.model.last.WA_linears[i].weight for i in range(task_num)])
-         print("weight shape  : ",weight.shape)
          
          for i in range(weight.shape[0]):
              class_norm.append(torch.norm(weight[i]).item())
              #class_norm.append(np.linalg.norm(weight[i]))
-             plt.figure()
-             #plt.plot(class_norm)
-             plt.plot(class_norm)
-             plt.xlabel('Class Index')
-             plt.ylabel('Weight Norm')
-             plt.xlim(0,self.last_valid_out_dim)
-             plt.savefig('./'+prefix+'{}task_class_norm.png'.format(task_num))
+         plt.figure()
+         classes = np.arange(weight.shape[0])
+         plt.scatter(classes,class_norm)
+         #plt.plot(class_norm)
+         #plt.plot(class_norm)
+         plt.xlabel('Class Index')
+         plt.ylabel('Weight Norm')
+         plt.xlim(0,weight.shape[0])
+         plt.savefig('./'+prefix+'{}task_class_norm.png'.format(task_num))
 
     def balanced_softmax_loss(self,labels,logits,reduction='mean'):
         #if num_seen is None:
@@ -110,8 +111,8 @@ class DeepInversionGenBN(NormalNN):
             # data weighting
             self.data_weighting(train_dataset)
             print("train_name : ",train_name)
-            if int(train_name)-1>=1:
-                self.visualize_weight(prefix='Balanced_softmax_after',task_num=int(train_name)-1)
+            #if int(train_name)-1>=1:
+            #    self.visualize_weight(prefix='HKD_fake_Balanced_softmax_after',task_num=int(train_name)-1)
                 #self.model.weight_align(int(train_name)-1)
                 #self.visualize_weight(prefix='oldNorm0_after', task_num=int(train_name)-1)
             # Evaluate the performance of current task
@@ -149,7 +150,7 @@ class DeepInversionGenBN(NormalNN):
                         x_replay=None
                         y_replay=None
 
-                    # if KD
+                   # # if KD
                     if self.inversion_replay:
                         y_hat = self.previous_teacher.generate_scores(x, allowed_predictions=np.arange(self.last_valid_out_dim))
                         _, y_hat_com = self.combine_data(((x, y_hat),(x_replay, y_replay_hat)))
@@ -387,15 +388,18 @@ class AlwaysBeDreaming(DeepInversionGenBN):
             loss_class = self.criterion(logits[class_idx,self.last_valid_out_dim:self.valid_out_dim], (targets[class_idx]-self.last_valid_out_dim).long(), dw_cls[class_idx]) 
             with torch.no_grad():
                 feat_class = self.model.forward(x=inputs, pen=True).detach()
+            '''
+            if len(self.config['gpuid']) > 1:
+                loss_class += self.criterion(self.model.module.last(feat_class), targets.long(), dw_cls)
+            else:
+                loss_class += self.criterion(self.model.last(feat_class), targets.long(), dw_cls)
+            '''
+            #WA
+            #self.model.weight_align(int(self.valid_out_dim/20.0)-1)
+            self.visualize_weight(prefix='BalancedSM_WA__HKD_realfake_100SP_realfake',task_num=int(self.valid_out_dim/20.0)-1)
             
-                '''
-                if len(self.config['gpuid']) > 1:
-                    loss_class += self.criterion(self.model.module.last(feat_class), targets.long(), dw_cls)
-                else:
-                    loss_class += self.criterion(self.model.last(feat_class), targets.long(), dw_cls)
-                '''
-                loss_class += self.balanced_softmax_loss(labels=targets,logits=self.model.last(feat_class)[:,:self.valid_out_dim],reduction='mean')
-                print("balanced softmax : ",loss_class)
+            loss_class += self.balanced_softmax_loss(labels=targets,logits=self.model.last(feat_class)[:,:self.valid_out_dim],reduction='mean')
+            #print("balanced softmax : ",loss_class)
         else:
             loss_class = self.criterion(logits[class_idx], targets[class_idx].long(), dw_cls[class_idx])
 
@@ -411,10 +415,10 @@ class AlwaysBeDreaming(DeepInversionGenBN):
         loss_hardkd = torch.zeros((1,),requires_grad=True).cuda()
 
         if self.previous_teacher:
-            logits_oldpen = self.model.forward(inputs,pen=True)
+            logits_oldpen = self.model.forward(x_fake,pen=True)
             logits_old = self.model.last(logits_oldpen)
 
-            logits_prevpen = self.previous_teacher.solver.forward(inputs,pen=True)
+            logits_prevpen = self.previous_teacher.solver.forward(x_fake,pen=True)
             logits_pre = self.previous_linear(logits_prevpen)
 
             loss_hardkd = self.mu * F.mse_loss(logits_old[:,:self.last_valid_out_dim],logits_pre[:,:self.last_valid_out_dim])
