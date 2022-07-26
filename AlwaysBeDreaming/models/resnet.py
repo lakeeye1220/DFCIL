@@ -127,6 +127,7 @@ class ResNet(nn.Module):
 
 
             #return out, out1_m, out2_m, out3_m
+            out = self.last(out_pen)
             return out, out_pen, out1,out2,out3
 
         else:
