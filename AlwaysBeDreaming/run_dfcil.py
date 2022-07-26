@@ -117,7 +117,7 @@ if __name__ == '__main__':
         time_data = time.strftime(
             '%m-%d_%H-%M-%S', time.localtime(time.time()))
         args.log_dir = os.path.join('outputs',args.learner_name,time_data)
-    else: time_data=args.out_dir
+    else: time_data=args.log_dir
 
     # duplicate output stream to output file
     if not os.path.exists(args.log_dir): os.makedirs(args.log_dir)
