@@ -84,6 +84,7 @@ def create_args():
 
     parser.add_argument('--cc_gamma',default=0.4,type=float,help='middle kd cc gamma')
     parser.add_argument('--p_order',default=2,type=int,help='middle kd cc p_order')
+    parser.add_argument('--ADI',default=False,action='store_true',help='ADI')
 
     parser.add_argument('--classification_type','-cls_type',default='local',type=str,help='classification type (local, global)')
     parser.add_argument('--classification_index','-cls_idx',default='real',type=str,help='classification index (real, fake, real_fake)')

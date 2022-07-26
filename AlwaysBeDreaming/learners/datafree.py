@@ -174,7 +174,7 @@ class DeepInversionGenBN(NormalNN):
 
                 # eval update
                 self.log('Epoch:{epoch:.0f}/{total:.0f}'.format(epoch=self.epoch+1,total=self.config['schedule'][-1]))
-                self.log(' * Loss {loss.avg:.3e} | CE Loss {lossb.avg:.3e} | KD Loss {lossc.avg:.3f}  | Middle loss {middle.avg:.3e} | Balancing loss {balancing.avg:.3e}'.format(loss=losses[0],lossb=losses[1],lossc=losses[2],middle=losses[3],balancing=losses[4]))
+                self.log(' * Loss {loss.avg:.3e} | CE Loss {lossb.avg:.3e} | KD Loss {lossc.avg:.3e}  | Middle loss {middle.avg:.3e} | Balancing loss {balancing.avg:.3e}'.format(loss=losses[0],lossb=losses[1],lossc=losses[2],middle=losses[3],balancing=losses[4]))
                 self.log(' * Train Acc {acc.avg:.3f} | Train Acc Gen {accg.avg:.3f}'.format(acc=acc,accg=accg))
 
                 # Evaluate the performance of current task
@@ -520,7 +520,7 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
                     logits_prevpen = self.previous_teacher.solver.forward(inputs[kd_index],pen=True)
                     logits_prev=self.previous_linear(logits_prevpen)[:,:self.last_valid_out_dim]
 
-                loss_kd=(F.mse_loss(logits[kd_index,:self.last_valid_out_dim],logits_prev,reduction='none')*dw_kd).mean()/ task_step * self.mu#
+                loss_kd=(F.mse_loss(logits[kd_index,:self.last_valid_out_dim],logits_prev,reduction='none').sum(dim=1)*dw_kd).mean()/ task_step * self.mu#
             else:
                 raise ValueError("kd_type must be abd, kd or hkd_yj")
         else:
