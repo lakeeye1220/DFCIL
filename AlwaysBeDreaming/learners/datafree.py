@@ -512,12 +512,13 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
             loss_kd = self.mu * (self.kd_criterion(logits_KD, logits_KD_past).sum(dim=1) * dw_kd).mean() / (logits_KD.size(1))
         elif target_scores is not None and self.config['kd_type']=='kd':
             with torch.no_grad():
-                logits_prevpen = self.previous_teacher.solver.forward(inputs,pen=True)[:,:self.last_valid_out_dim]
-            loss_kd=((-F.log_softmax(logits_pen[:,:self.last_valid_out_dim]/self.config['temp'],dim=1)*logits_prevpen.softmax(dim=1)/self.config['temp'])*dw_kd).sum(dim=1).mean()/ task_step * self.mu
+                logits_prevpen = self.previous_teacher.solver.forward(inputs[kd_index],pen=True)[kd_index,:self.last_valid_out_dim]
+            loss_kd=((-F.log_softmax(logits_pen[kd_index,:self.last_valid_out_dim]/self.config['temp'],dim=1)*logits_prevpen.softmax(dim=1)/self.config['temp'])
+            loss_kd=(loss_kd.sum(dim=1)*dw_kd[kd_index]).mean()/ task_step * self.mu
         elif target_scores is not None and self.config['kd_type']=='hkd_yj':
             with torch.no_grad():
-                logits_prevpen = self.previous_teacher.solver.forward(inputs,pen=True)[:,:self.last_valid_out_dim]
-            loss_kd=(F.mse_loss(logits_pen[:,:self.last_valid_out_dim],logits_prevpen,reduction='none')).mean()/ task_step * self.mu#*dw_kd
+                logits_prevpen = self.previous_teacher.solver.forward(inputs,pen=True)[kd_index,:self.last_valid_out_dim]
+            loss_kd=(F.mse_loss(logits_pen[kd_index,:self.last_valid_out_dim],logits_prevpen,reduction='none')).mean()/ task_step * self.mu#*dw_kd
         else:
             loss_kd = torch.zeros((1,), requires_grad=True).cuda()
         
