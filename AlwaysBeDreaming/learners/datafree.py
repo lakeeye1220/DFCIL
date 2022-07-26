@@ -25,14 +25,7 @@ class SP(nn.Module):
         fm_t = fm_t.view(fm_t.size(0),-1)
         G_t = torch.mm(fm_t,fm_t.t())
         norm_G_t = F.normalize(G_t,p=2,dim=1)
-        if self.reduction == 'mean':
-            loss = F.mse_loss(norm_G_s,norm_G_t)
-        elif self.reduction == 'sum':
-            loss = F.mse_loss(norm_G_s,norm_G_t,reduction='sum')
-        elif self.reduction=='none':
-            loss = F.mse_loss(norm_G_s,norm_G_t,reduction='none')
-        else:
-            raise NotImplementedError
+        loss = F.mse_loss(norm_G_s,norm_G_t,reduction=self.reduction)
         return loss
 
 class DeepInversionGenBN(NormalNN):
@@ -434,14 +427,14 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
 
     def __init__(self, learner_config):
         super(AlwaysBeDreamingBalancing, self).__init__(learner_config)
-        self.kl_loss = nn.KLDivLoss(reduction='batchmean').cuda()
-        self.md_criterion = SP(reduction='none').cuda()
+        self.kl_loss = nn.KLDivLoss(reduction='batchmean')
+        self.md_criterion = SP(reduction='mean')
         if self.config['balancing_loss_type']=='l1':
             self.norm_type=1
         elif self.config['balancing_loss_type']=='l2':
             self.norm_type=2
 
-        self.cc_criterion=CC(self.config['cc_gamma'],self.config['p_order'],reduction='none').cuda()
+        self.cc_criterion=CC(self.config['cc_gamma'],self.config['p_order'],reduction='none')
 
     def update_model(self, real_x,real_y,x_fake, y_fake, inputs, targets, target_scores = None, dw_force = None, kd_index = None):
         task_step=self.valid_out_dim-self.last_valid_out_dim
@@ -493,38 +486,6 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
             loss_class = self.criterion(logits[class_idx], targets[class_idx].long(), dw_cls[class_idx])
 
 
-        if self.previous_teacher is not None and self.config['kd_type']:
-            # KD
-            if self.config['kd_index']=='real_fake':
-                kd_index= np.arange(2*self.batch_size)
-            elif self.config['kd_index']=='fake':
-                kd_index= np.arange(self.batch_size)+self.batch_size
-            elif self.config['kd_index']=='real':
-                kd_index= np.arange(self.batch_size)
-            else:
-                raise ValueError("middle_index must be real, fake or real_fake")
-            dw_kd = self.dw_k[-1 * torch.ones(len(kd_index),).long()][kd_index]
-            if self.config['kd_type']=='abd':
-                # hard - linear
-                logits_KD = self.previous_linear(logits_pen[kd_index])[:,:self.last_valid_out_dim]
-                logits_KD_past = self.previous_linear(self.previous_teacher.generate_scores_pen(inputs[kd_index]))[:,:self.last_valid_out_dim]
-                loss_kd = self.mu * (self.kd_criterion(logits_KD, logits_KD_past).sum(dim=1) * dw_kd).mean() / (logits_KD.size(1))
-            elif self.config['kd_type']=='kd':
-                with torch.no_grad():
-                    logits_prevpen = self.previous_teacher.solver.forward(inputs[kd_index],pen=True)
-                    logits_prev=self.previous_linear(logits_prevpen)[:,:self.last_valid_out_dim]
-                loss_kd=(-F.log_softmax(logits[kd_index,:self.last_valid_out_dim]/self.config['temp'],dim=1)*logits_prev.softmax(dim=1)/self.config['temp'])
-                loss_kd=(loss_kd.sum(dim=1)*dw_kd).mean()/ task_step * self.mu
-            elif self.config['kd_type']=='hkd_yj':
-                with torch.no_grad():
-                    logits_prevpen = self.previous_teacher.solver.forward(inputs[kd_index],pen=True)
-                    logits_prev=self.previous_linear(logits_prevpen)[:,:self.last_valid_out_dim]
-
-                loss_kd=(F.mse_loss(logits[kd_index,:self.last_valid_out_dim],logits_prev,reduction='none').sum(dim=1)*dw_kd).mean()/ task_step * self.mu#
-            else:
-                raise ValueError("kd_type must be abd, kd or hkd_yj")
-        else:
-            loss_kd = torch.zeros((1,), requires_grad=True).cuda()
         
         #Middle K.D
         if self.previous_teacher and self.config['middle_kd_type']:
@@ -554,6 +515,39 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
                 raise ValueError("middle_kd_type must be sp or cc")
         else:
             loss_middle=torch.zeros((1,), requires_grad=True).cuda()
+
+        # KD
+        if self.previous_teacher is not None and self.config['kd_type']:
+            if self.config['kd_index']=='real_fake':
+                kd_index= np.arange(2*self.batch_size)
+            elif self.config['kd_index']=='fake':
+                kd_index= np.arange(self.batch_size)+self.batch_size
+            elif self.config['kd_index']=='real':
+                kd_index= np.arange(self.batch_size)
+            else:
+                raise ValueError("middle_index must be real, fake or real_fake")
+            dw_kd = self.dw_k[-1 * torch.ones(len(kd_index),).long()][kd_index]
+            if self.config['kd_type']=='abd':
+                # hard - linear
+                logits_KD = self.previous_linear(logits_pen[kd_index])[:,:self.last_valid_out_dim]
+                logits_KD_past = self.previous_linear(self.previous_teacher.generate_scores_pen(inputs[kd_index]))[:,:self.last_valid_out_dim]
+                loss_kd = self.mu * (self.kd_criterion(logits_KD, logits_KD_past).sum(dim=1) * dw_kd).mean() / (logits_KD.size(1))
+            elif self.config['kd_type']=='kd':
+                logits_prevpen = self.previous_teacher.solver.forward(inputs[kd_index],pen=True)
+                logits_prev=self.previous_linear(logits_prevpen)[:,:self.last_valid_out_dim].detach()
+                loss_kd=(-F.log_softmax(logits[kd_index,:self.last_valid_out_dim]/self.config['temp'],dim=1)*logits_prev.softmax(dim=1)/self.config['temp'])
+                loss_kd=(loss_kd.sum(dim=1)*dw_kd).mean()/ task_step * self.mu
+            elif self.config['kd_type']=='hkd_yj':
+                logits_oldpen = self.model.forward(inputs,pen=True)
+                logits_old = self.model.last(logits_oldpen)
+                logits_prevpen = self.previous_teacher.solver.forward(inputs[kd_index],pen=True)
+                logits_prev=self.previous_linear(logits_prevpen)[:,:self.last_valid_out_dim].detach()
+
+                loss_kd=(F.mse_loss(logits_old[kd_index,:self.last_valid_out_dim],logits_prev,reduction='none').sum(dim=1)*dw_kd).mean()/ task_step * self.mu#
+            else:
+                raise ValueError("kd_type must be abd, kd or hkd_yj")
+        else:
+            loss_kd = torch.zeros((1,), requires_grad=True).cuda()
 
         # balancing
         if self.previous_teacher is not None and self.config['balancing']:

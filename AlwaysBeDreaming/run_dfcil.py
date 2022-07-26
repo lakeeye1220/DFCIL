@@ -77,8 +77,8 @@ def create_args():
     parser.add_argument('--balancing_loss_type',default='l1',type=str,help='balancing loss type')
     parser.add_argument('--dw_middle',default=False,action='store_true',help='dw middle distillation')
     parser.add_argument('--middle_index',default='real_fake',type=str,help='middle kd index set (real_fake, fake, real)')
-    parser.add_argument('--middle_kd_type',default='sp',type=str,help='middle kd type',choices=['sp','cc',''])
-    parser.add_argument('--kd_type',default='abd',type=str,help='logits kd type',choices=['kd','abd','hkd_yj'])
+    parser.add_argument('--middle_kd_type',default=None,type=str,help='middle kd type',choices=['sp','cc'])
+    parser.add_argument('--kd_type',default=None,type=str,help='logits kd type',choices=['kd','abd','hkd_yj'])
     parser.add_argument('--kd_index',default='real_fake',type=str,help='classification index (real, fake, real_fake)')
     parser.add_argument('--mu', type=float, default=1.0, help="KD loss balancing weight")
 
