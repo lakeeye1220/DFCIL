@@ -459,8 +459,7 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
         dw_cls = mappings[targets.long()]
 
         # forward pass
-        # logits_pen = self.model.forward(x=inputs, pen=True)
-        logits_pen,out1_m,out2_m,out3_m = self.model.forward(inputs, middle=True)
+        logits_pen = self.model.forward(x=inputs, pen=True)
 
         if len(self.config['gpuid']) > 1:
             logits = self.model.module.last(logits_pen)
@@ -497,7 +496,7 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
         #     dw_kd=dw_cls[kd_index]
         # else:
 
-        if target_scores:
+        if target_scores is not None:
             if self.config['kd_index']=='real_fake':
                 kd_index= np.arange(2*self.batch_size)
             elif self.config['kd_index']=='fake':
@@ -537,17 +536,17 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
                 middle_index= np.arange(self.batch_size)
             else:
                 raise ValueError("middle_index must be real, fake or real_fake")
-            middle_inputs=inputs[middle_index].detach().clone()
             if self.config['middle_kd_type']=='sp':
+                logits_pen,out1_m,out2_m,out3_m = self.model.forward(inputs, middle=True)
                 with torch.no_grad():
-                    logits_prev_middle,out1_pm, out2_pm, out3_pm = self.previous_teacher.solver.forward(middle_inputs,middle=True)
-                loss_middle = (self.md_criterion(out1_m[middle_index],out1_pm)+self.md_criterion(out2_m[middle_index],out2_pm)+self.md_criterion(out3_m[middle_index],out3_pm))
+                    logits_prev_middle,out1_pm, out2_pm, out3_pm = self.previous_teacher.solver.forward(inputs,middle=True)
+                loss_middle = (self.md_criterion(out1_m[middle_index],out1_pm[middle_index])+self.md_criterion(out2_m[middle_index],out2_pm[middle_index])+self.md_criterion(out3_m[middle_index],out3_pm[middle_index]))
                 # if self.config['dw_middle']:
                 #     loss_middle*=dw_cls[middle_index]
                 loss_middle = loss_middle.mean()*self.config['middle_mu']
             elif self.config['middle_kd_type']=='cc':
                 with torch.no_grad():
-                    last_logits_pen=self.previous_teacher.generate_scores_pen(middle_inputs)
+                    last_logits_pen=self.previous_teacher.generate_scores_pen(inputs)[middle_index]
                 loss_middle=self.cc_criterion(logits_pen[middle_index], last_logits_pen)
                 # if self.config['dw_middle']:
                 #     loss_middle*=(dw_cls[middle_index])#/dw_cls[middle_index].sum(keepdim=True))
