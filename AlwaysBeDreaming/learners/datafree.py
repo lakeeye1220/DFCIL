@@ -9,6 +9,8 @@ from .datafree_helper import Teacher
 from .default import NormalNN, weight_reset, accumulate_acc, loss_fn_kd
 import copy
 from torch.optim import Adam
+import matplotlib.pyplot as plt
+import os
 
 class SP(nn.Module):
     def __init__(self):
@@ -18,7 +20,7 @@ class SP(nn.Module):
         fm_s = fm_s.view(fm_s.size(0),-1)
         G_s = torch.mm(fm_s,fm_s.t())
         norm_G_s =F.normalize(G_s,p=2,dim=1)
-
+        
         fm_t = fm_t.view(fm_t.size(0),-1)
         G_t = torch.mm(fm_t,fm_t.t())
         norm_G_t = F.normalize(G_t,p=2,dim=1)
@@ -32,7 +34,6 @@ class DeepInversionGenBN(NormalNN):
         self.inversion_replay = False
         self.previous_teacher = None
         self.dw = self.config['DW']
-        self.middle= self.config['middle']
         self.device = 'cuda' if self.gpu else 'cpu'
         self.power_iters = self.config['power_iters']
         self.deep_inv_params = self.config['deep_inv_params']
@@ -50,9 +51,45 @@ class DeepInversionGenBN(NormalNN):
     ##########################################
     #           MODEL TRAINING               #
     ##########################################
+    def visualize_weight(self,prefix,task_num):
+         class_norm=[]
+         #print(self.model.last.WA_linears[:task_num])
+         #weight=self.model.last.WA_linears[task_num].weight
+         weight = self.model.last.weight
+         #weight = np.concatenate([self.model.last.WA_linears[i].weight.cpu().detach().numpy() for i in range(task_num)])
+         #weight = np.concatenate([self.model.last.WA_linears[i].weight for i in range(task_num)])
+         print("weight shape  : ",weight.shape)
+         
+         for i in range(weight.shape[0]):
+             class_norm.append(torch.norm(weight[i]).item())
+             #class_norm.append(np.linalg.norm(weight[i]))
+             plt.figure()
+             #plt.plot(class_norm)
+             plt.plot(class_norm)
+             plt.xlabel('Class Index')
+             plt.ylabel('Weight Norm')
+             plt.xlim(0,self.last_valid_out_dim)
+             plt.savefig('./'+prefix+'{}task_class_norm.png'.format(task_num))
 
-    def learn_batch(self, train_loader, train_dataset, model_save_dir, val_loader=None):
-        
+    def balanced_softmax_loss(self,labels,logits,reduction='mean'):
+        #if num_seen is None:
+        #labels = [int(dataset[i][1]) for i in range(len(dataset))]
+        #labels = np.asarray(labels, dtype=np.int64)
+        #print("labels shape : ",labels)
+        np_sample_per_class = np.asarray([len(labels[labels==k]) for k in range(self.valid_out_dim)], dtype=np.float32)
+        sample_per_class = torch.from_numpy(np_sample_per_class)
+        spc = sample_per_class.type_as(logits)
+        #print("sample per class : ",spc)
+
+        spc = spc.unsqueeze(0).expand(logits.shape[0],-1)
+        #print("spc : ", spc)
+        #print("spc shape  : ",spc.shape)
+        logits = logits + spc.log()
+        loss = F.cross_entropy(input=logits, target=labels,reduction=reduction)
+        return loss
+
+    def learn_batch(self, train_loader, train_dataset, model_save_dir, train_name, val_loader=None):
+      #  
         self.pre_steps()
 
         # try to load model
@@ -72,7 +109,11 @@ class DeepInversionGenBN(NormalNN):
 
             # data weighting
             self.data_weighting(train_dataset)
-
+            print("train_name : ",train_name)
+            if int(train_name)-1>=1:
+                self.visualize_weight(prefix='Balanced_softmax_after',task_num=int(train_name)-1)
+                #self.model.weight_align(int(train_name)-1)
+                #self.visualize_weight(prefix='oldNorm0_after', task_num=int(train_name)-1)
             # Evaluate the performance of current task
             self.log('Epoch:{epoch:.0f}/{total:.0f}'.format(epoch=0,total=self.config['schedule'][-1]))
             if val_loader is not None:
@@ -105,20 +146,10 @@ class DeepInversionGenBN(NormalNN):
                     if self.inversion_replay:
                         x_replay, y_replay, y_replay_hat = self.sample(self.previous_teacher, len(x), self.device)
                     else:
-                        x_replay = None
-                        y_replay = None
-                    #if middle KD
-                    #if self.middle and self.previous_teacher.solver is not None:
-                        #print("previous teacher : ",self.previous_teacher)
-                        #logits_middle,out1_m,out2_m,out3_m = self.model.forward(x, middle=True)
-                        #logits_prev_middle,out1_pm, out2_pm, out3_pm = self.previous_teacher.solver.forward(x,middle=True)
-                        #print("out1_m shape : ", out1_m.shape)
-                        #print("out1_mp shape ",out1_pm.shape)
+                        x_replay=None
+                        y_replay=None
 
-                        #print("out1_m ",out1_m)
-                        #print("out1_mp : ",out1_pm)
-
-
+                    # if KD
                     if self.inversion_replay:
                         y_hat = self.previous_teacher.generate_scores(x, allowed_predictions=np.arange(self.last_valid_out_dim))
                         _, y_hat_com = self.combine_data(((x, y_hat),(x_replay, y_replay_hat)))
@@ -140,12 +171,9 @@ class DeepInversionGenBN(NormalNN):
                     # model update
                     if self.inversion_replay:
 
-                    #loss, loss_class, loss_kd, loss_middle, output= self.update_model(x, y,x_replay,y_replay, x_com, y_com, y_hat_com, dw_force = dw_cls, kd_index = np.arange(len(x), len(x_com)))
-                        loss,loss_class,loss_kd,loss_middle,output = self.update_model(x,y,x_replay,y_replay,x_com,y_com,y_hat_com, dw_force=dw_cls, kd_index = np.arange(len(x), len(x_com)))
-
-                        #loss,loss_class,loss_hardKD,loss_middle,output = self.update_model(x,y,x_replay,y_replay,x_com,y_com,y_hat_com, dw_force=dw_cls, kd_index = np.arange(len(x), len(x_com)))
+                        loss, loss_class, loss_hkd,loss_middle, output= self.update_model(x,y,x_replay,y_replay,x_com, y_com, y_hat_com, dw_force = dw_cls, kd_index = np.arange(len(x), len(x_com)))
                     else:
-                        loss, loss_class, loss_kd, loss_middle, output= self.update_model(x, y,None, None, x_com, y_com, y_hat_com, dw_force = dw_cls, kd_index = np.arange(len(x), len(x_com)))
+                        loss, loss_class, loss_hkd,loss_middle, output= self.update_model(x,y,None,None,x_com, y_com, y_hat_com, dw_force = dw_cls, kd_index = np.arange(len(x), len(x_com)))
 
                     # measure elapsed time
                     batch_time.update(batch_timer.toc()) 
@@ -156,15 +184,13 @@ class DeepInversionGenBN(NormalNN):
                     if self.inversion_replay: accumulate_acc(output[self.batch_size:], y_com[self.batch_size:], task, accg, topk=(self.top_k,))
                     losses[0].update(loss,  y_com.size(0)) 
                     losses[1].update(loss_class,  y_com.size(0))
-                    losses[2].update(loss_kd,  y_com.size(0))
-                    #losses[2].update(loss_hardKD, y_com.size(0))
-                    #losses[3].update(loss_middle,y_com.size(0))
-                    losses[3].update(loss_middle,1)
+                    losses[2].update(loss_hkd,  y_com.size(0))
+                    losses[3].update(loss_middle,1.0)
                     batch_timer.tic()
 
                 # eval update
                 self.log('Epoch:{epoch:.0f}/{total:.0f}'.format(epoch=self.epoch+1,total=self.config['schedule'][-1]))
-                self.log(' * Loss {loss.avg:.3f} | CE Loss {lossb.avg:.3f} | hard KD Loss {lossc.avg:.3f}  | Middle loss {middle.avg:.3f}'.format(loss=losses[0],lossb=losses[1],lossc=losses[2],middle=losses[3]))
+                self.log(' * Loss {loss.avg:.3f} | CE Loss {lossb.avg:.3f} | HKD Loss {lossc.avg:.3f} | middle distillation {middle.avg:.5f}'.format(loss=losses[0],lossb=losses[1],lossc=losses[2],middle=losses[3]))
                 self.log(' * Train Acc {acc.avg:.3f} | Train Acc Gen {accg.avg:.3f}'.format(acc=acc,accg=accg))
 
                 # Evaluate the performance of current task
@@ -201,9 +227,10 @@ class DeepInversionGenBN(NormalNN):
         except:
             return None
 
-    def update_model(self, real_x,real_y,x_fake,y_fake,inputs, targets, target_scores = None, dw_force = None, kd_index = None):
+    def update_model(self, inputs, targets, target_scores = None, dw_force = None, kd_index = None):
 
         loss_kd = torch.zeros((1,), requires_grad=True).cuda()
+        loss_middle = torch.zeros((1,),requires_grad=True).cuda()
 
         if dw_force is not None:
             dw_cls = dw_force
@@ -222,7 +249,7 @@ class DeepInversionGenBN(NormalNN):
         # KD old
         if target_scores is not None:
             loss_kd = self.mu * loss_fn_kd(logits[class_idx], target_scores[class_idx], dw_cls[class_idx], np.arange(self.last_valid_out_dim).tolist(), self.DTemp)
-            print("self.mu : ",self.mu)
+
         # KD new
         if target_scores is not None:
             target_scores = F.softmax(target_scores[:, :self.last_valid_out_dim] / self.DTemp, dim=1)
@@ -230,35 +257,13 @@ class DeepInversionGenBN(NormalNN):
             target_scores.append(torch.zeros((len(targets),self.valid_out_dim-self.last_valid_out_dim), requires_grad=True).cuda())
             target_scores = torch.cat(target_scores, dim=1)
             loss_kd += self.mu * loss_fn_kd(logits[kd_index], target_scores[kd_index], dw_cls[kd_index], np.arange(self.valid_out_dim).tolist(), self.DTemp, soft_t = True)
-        
-        loss_middle =torch.zeros((1,),requires_grad=True).cuda()
-        if self.previous_teacher is not None:
-            logits_middle,out1_m,out2_m,out3_m = self.model.forward(real_x, middle=True)
-            logits_prev_middle,out1_pm, out2_pm, out3_pm = self.previous_teacher.solver.forward(real_x,middle=True)
-            #print("layer 1 difference : ",torch.norm(out1_m,out1_pm,1))
-            #print("layer 2 difference : ",torch.norm(out2_m, out2_pm,1))
-            #print("layer 3 differnce : ", torch.norm(out3_m,out3_pm,1))
-            loss_middle = self.mu*(torch.norm(out1_m - out1_pm,2)+torch.norm(out2_m-out2_pm,2)+torch.norm(out3_m-out3_pm,2)).mean()
-        print("General middle layer distllation loss: ",loss_middle.detach())
-        '''
-        loss_hardKD = torch.zeros((1,),requires_grad=True).cuda()
-        if x_fake is not None and self.previous_teacher:
-            logits_old = self.model.forward(x_fake)
-            logits_prev_old = self.previous_teacher.solver.forward(x_fake)
-            loss_hardKD = torch.norm(logits_old[:self.last_valid_out_dim]-logits_prev_old,1).sum()*self.mu 
-        print("General loss_hardKD : ",loss_hardKD)
-        '''
 
-
-        #total_loss = loss_class + loss_kd + loss_middle
-
-        #total_loss = loss_class + loss_kd+loss_middle
-        total_loss = loss_class + loss_kd + loss_middle
-        self.optimizer.zero_gra:d()
+        total_loss = loss_class + loss_kd +loss_hardkd
+        self.optimizer.zero_grad()
         total_loss.backward()
         self.optimizer.step()
-        #return total_loss.detach(), loss_class.detach(), loss_kd.detach(),loss_middle.detach(),logits
-        return total_loss.detach(),loss_class.detach(),loss_kd.detach(),loss_middle.detach(),logits
+        return total_loss.detach(), loss_class.detach(), loss_kd.detach(), loss_middle.detach(),logits
+
     ##########################################
     #             MODEL UTILS                #
     ##########################################
@@ -322,17 +327,14 @@ class DeepInversionLWF(DeepInversionGenBN):
         super(DeepInversionLWF, self).__init__(learner_config)
         self.kl_loss = nn.KLDivLoss(reduction='batchmean').cuda()
 
-    def update_model(self, real_x,real_y, x_fake, y_fake, inputs, targets, target_scores = None, dw_force = None, kd_index = None):
-        print("Welcome to DI_LWF")        
+    def update_model(self, inputs, targets, target_scores = None, dw_force = None, kd_index = None):
+        
         loss_kd = torch.zeros((1,), requires_grad=True).cuda()
-
+        loss_middle = torch.zeros((1,),requires_grad=True).cuda()
         if dw_force is not None:
             dw_cls = dw_force
         elif self.dw:
             dw_cls = self.dw_k[targets.long()]
-            #print("self.dw_K : ",dw_k)
-            #print("length of self.dw_k  :",len(self.dw_K))
-            #print("dw_cls : ",dw_cls)
         else:
             dw_cls = self.dw_k[-1 * torch.ones(targets.size()).long()]
 
@@ -346,31 +348,12 @@ class DeepInversionLWF(DeepInversionGenBN):
         # KD
         if target_scores is not None:
             loss_kd = self.mu * loss_fn_kd(logits, target_scores, dw_cls, np.arange(self.last_valid_out_dim).tolist(), self.DTemp)
-        
-        loss_middle = torch.zeros((1,),requires_grad=True).cuda()
-        if self.previous_teacher is not None:
-            logits_middle,out1_m,out2_m,out3_m = self.model.forward(real_x, middle=True)
-            logits_prev_middle,out1_pm, out2_pm, out3_pm = self.previous_teacher.solver.forward(real_x,middle=True)
-            loss_middle = self.mu*(torch.norm(out1_m - out1_pm,2)+torch.norm(out2_m-out2_pm,2)+torch.norm(out3_m-out3_pm,2)).mean()
 
-            print("DI layer 1 difference : ",torch.norm(out1_m-out1_pm,1), "l2 : ",torch.norm(out1_m-out1_pm,2))
-            print("DI layer 2 difference : ",torch.norm(out2_m-out2_pm,1),"l2 : ",torch.norm(out2_m-out2_pm,2))
-            print("DI layer 3 differnce : ", torch.norm(out3_m-out3_pm,1), "l2 : ",torch.norm(out3_m-out3_pm,2))
-        '''
-        loss_hardKD = torch.zeros((1,),requires_grad=True).cuda()
-        if x_fake is not None and self.previous_teacher:
-            logits_old = self.model.forward(x_fake)
-            logits_prev_old = self.previous_teacher.solver.forward(x_fake)
-            loss_hardKD = torch.norm(logits_old[:self.last_valid_out_dim]-logits_prev_old,1).sum()*self.mu
-        print("DI_LWF ", loss_hardKD)
-        '''
         total_loss = loss_class + loss_kd+loss_middle
-        #total_loss = loss_class + loss_hardKD + loss_middle
         self.optimizer.zero_grad()
         total_loss.backward()
         self.optimizer.step()
-        #return total_loss.detach(), loss_class.detach(), loss_kd.detach(),loss_middle.detach(), logits
-        return total_loss.detach(), loss_class.detach(), loss_kd.detach(), loss_middle.detach(), logits
+        return total_loss.detach(), loss_class.detach(), loss_kd.detach(),loss_middle.detach(), logits
 
 class AlwaysBeDreaming(DeepInversionGenBN):
 
@@ -378,27 +361,19 @@ class AlwaysBeDreaming(DeepInversionGenBN):
         super(AlwaysBeDreaming, self).__init__(learner_config)
         self.kl_loss = nn.KLDivLoss(reduction='batchmean').cuda()
 
-    def update_model(self, real_x,real_y,x_fake, y_fake, inputs, targets, target_scores = None, dw_force = None, kd_index = None):
+    def update_model(self, x_real,y_real,x_fake,y_fake,inputs, targets, target_scores = None, dw_force = None, kd_index = None):
+        
         # class balancing
         mappings = torch.ones(targets.size(), dtype=torch.float32)
         if self.gpu:
             mappings = mappings.cuda()
-        #print("ABD self.last_valid_out_dim shape : ",self.last_valid_out_dim) #5
-        #print("ABD self.valid_out_dim", self.valid_out_dim) #10
-
         rnt = 1.0 * self.last_valid_out_dim / self.valid_out_dim
-        #print("rnt  :",rnt)
         mappings[:self.last_valid_out_dim] = rnt
         mappings[self.last_valid_out_dim:] = 1-rnt
         dw_cls = mappings[targets.long()]
 
-
-        #mapping is one batch 
-        #previous observed data(images):inversion data, current data(images):real data(large value of dw_cls)
-
         # forward pass
         logits_pen = self.model.forward(x=inputs, pen=True)
-
         if len(self.config['gpuid']) > 1:
             logits = self.model.module.last(logits_pen)
         else:
@@ -407,71 +382,62 @@ class AlwaysBeDreaming(DeepInversionGenBN):
         # classification 
         class_idx = np.arange(self.batch_size)
         if self.inversion_replay:
+
             # local classification
             loss_class = self.criterion(logits[class_idx,self.last_valid_out_dim:self.valid_out_dim], (targets[class_idx]-self.last_valid_out_dim).long(), dw_cls[class_idx]) 
-
-            # ft classification  
-            with torch.no_grad():             
+            with torch.no_grad():
                 feat_class = self.model.forward(x=inputs, pen=True).detach()
-            if len(self.config['gpuid']) > 1:
-                loss_class += self.criterion(self.model.module.last(feat_class), targets.long(), dw_cls)
-            else:
-                loss_class += self.criterion(self.model.last(feat_class), targets.long(), dw_cls)
             
+                '''
+                if len(self.config['gpuid']) > 1:
+                    loss_class += self.criterion(self.model.module.last(feat_class), targets.long(), dw_cls)
+                else:
+                    loss_class += self.criterion(self.model.last(feat_class), targets.long(), dw_cls)
+                '''
+                loss_class += self.balanced_softmax_loss(labels=targets,logits=self.model.last(feat_class)[:,:self.valid_out_dim],reduction='mean')
+                print("balanced softmax : ",loss_class)
         else:
             loss_class = self.criterion(logits[class_idx], targets[class_idx].long(), dw_cls[class_idx])
 
+            # ft classifications
+        loss_middle = torch.zeros((1,),requires_grad=True).cuda()
+        md_criterion= SP()
+
+        if self.previous_teacher is not None:
+            logits_middle,out1_m,out2_m,out3_m = self.model.forward(inputs,middle=True)
+            logits_prev_middle,out1_pm,out2_pm,out3_pm = self.previous_teacher.solver.forward(inputs,middle=True)
+            loss_middle = (md_criterion(out1_m,out1_pm.detach())+md_criterion(out2_m,out2_pm.detach())+md_criterion(out3_m,out3_pm.detach()))/3.0
+
+        loss_hardkd = torch.zeros((1,),requires_grad=True).cuda()
+
+        if self.previous_teacher:
+            logits_oldpen = self.model.forward(inputs,pen=True)
+            logits_old = self.model.last(logits_oldpen)
+
+            logits_prevpen = self.previous_teacher.solver.forward(inputs,pen=True)
+            logits_pre = self.previous_linear(logits_prevpen)
+
+            loss_hardkd = self.mu * F.mse_loss(logits_old[:,:self.last_valid_out_dim],logits_pre[:,:self.last_valid_out_dim])
+
         # KD
+        '''
         if target_scores is not None:
-#
+
             # hard - linear
             kd_index = np.arange(2 * self.batch_size)
-            #print("kd index : ",kd_index)
             dw_KD = self.dw_k[-1 * torch.ones(len(kd_index),).long()]
-            #print("self.dw_k: ", self.dw_k)
-            #print("dw_KD : ",dw_KD)
-            
-            #print("logits_pen[kd_index]",logits_pen[kd_index].shape)
-            #print("linear layer : ",self.previous_linear(logits_pen[kd_index])[:,:self.last_valid_out_dim].shape)
-
             logits_KD = self.previous_linear(logits_pen[kd_index])[:,:self.last_valid_out_dim]
             logits_KD_past = self.previous_linear(self.previous_teacher.generate_scores_pen(inputs[kd_index]))[:,:self.last_valid_out_dim]
             loss_kd = self.mu * (self.kd_criterion(logits_KD, logits_KD_past).sum(dim=1) * dw_KD).mean() / (logits_KD.size(1))
-            #print("logits_KD : ",logits_KD.size(1))
-            #loss_kd = (self.
         else:
             loss_kd = torch.zeros((1,), requires_grad=True).cuda()
+        '''
         
-        #Middle K.D
-        #print("previous teacher : ",self.previous_teacher)
-        loss_middle=torch.zeros((1,),requires_grad=True).cuda()
-        md_criterion = SP().cuda()
-        if self.previous_teacher is not None:
-            logits_middle,out1_m,out2_m,out3_m = self.model.forward(inputs, middle=True)
-            logits_prev_middle,out1_pm, out2_pm, out3_pm = self.previous_teacher.solver.forward(inputs,middle=True)
-            loss_middle = (md_criterion(out1_m,out1_pm.detach())+md_criterion(out2_m,out2_pm.detach())+md_criterion(out3_m,out3_pm.detach()))/3.0
-            #loss_middle = self.mu*(torch.norm(out1_m - out1_pm,2)+torch.norm(out2_m-out2_pm,2)+0.1*torch.norm(out3_m-out3_pm,2)).mean()
-            #print("layer 1 difference : ",torch.norm(out1_m-out1_pm,1), "l2 : ",torch.norm(out1_m-out1_pm,2))
-            #print("layer 2 difference : ",torch.norm(out2_m-out2_pm,1),"l2 : ",torch.norm(out2_m-out2_pm,2))
-            #print("layer 3 differnce : ", torch.norm(out3_m-out3_pm,1), "l2 : ",torch.norm(out3_m-out3_pm,2))
-        '''
-        loss_hardKD = torch.zeros((1,),requires_grad=True).cuda()
-        if x_fake is not None and self.previous_teacher:
-            logits_old = self.model.forward(x_fake)
-            logits_prev_old = self.previous_teacher.solver.forward(x_fake)
-            #print("logits old : ",logits_old.shape)
-            #print("dimension : ",logits_old[:,:self.last_valid_out_dim].shape)
-            #print("previous logits : ",logits_prev_old.shape)
-            loss_hardKD = torch.norm(logits_old[:,:self.last_valid_out_dim]-logits_prev_old[:,:self.last_valid_out_dim],1).sum()/(len(x_fake)*10) #task_size
-        #print("ABD hard KD : ",loss_hardKD.detach())
-        '''
-        total_loss = loss_class + loss_kd + loss_middle
-        #total_loss = loss_class + loss_midfdle + 
+        total_loss = loss_class + 100*loss_middle+loss_hardkd
         self.optimizer.zero_grad()
         total_loss.backward()
 
         # step
         self.optimizer.step()
 
-        #return total_loss.detach(), loss_class.detach(), loss_kd.detach(), loss_middle.detach(),logits
-        return total_loss.detach(), loss_class.detach(), loss_kd.detach(), loss_middle.detach(), logits
+        return total_loss.detach(), loss_class.detach(), loss_hardkd.detach(), loss_middle.detach(),logits
