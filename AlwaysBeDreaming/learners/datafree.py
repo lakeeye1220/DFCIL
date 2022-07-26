@@ -459,7 +459,8 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
         dw_cls = mappings[targets.long()]
 
         # forward pass
-        logits_pen = self.model.forward(x=inputs, pen=True)
+        # logits_pen = self.model.forward(x=inputs, pen=True)
+        logits_pen,out1_m,out2_m,out3_m = self.model.forward(inputs[middle_index], middle=True)
 
         if len(self.config['gpuid']) > 1:
             logits = self.model.module.last(logits_pen)
@@ -480,7 +481,7 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
             if self.config['classification_type']=='local':
                 loss_class = self.criterion(logits[class_idx,self.last_valid_out_dim:self.valid_out_dim], (targets[class_idx]-self.last_valid_out_dim).long(), dw_cls[class_idx]) 
             elif self.config['classification_type']=='global':
-                loss_class = self.criterion(logits,targets,dw_cls)
+                loss_class = self.criterion(logits[class_idx],targets[class_idx],dw_cls[class_idx])
             # ft classification  
             if self.config['ft']:
                 if len(self.config['gpuid']) > 1:
@@ -491,62 +492,66 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
         else:
             loss_class = self.criterion(logits[class_idx], targets[class_idx].long(), dw_cls[class_idx])
 
-        # KD
-        if self.config['kd_index']=='real_fake':
-            kd_index= np.arange(2*self.batch_size)
-        elif self.config['kd_index']=='fake':
-            kd_index= np.arange(self.batch_size)+self.batch_size
-        elif self.config['kd_index']=='real':
-            kd_index= np.arange(self.batch_size)
-        else:
-            raise ValueError("middle_index must be real, fake or real_fake")
-        dw_kd = self.dw_k[-1 * torch.ones(len(kd_index),).long()]
-        # if self.config['dw_kd']:
-        #     dw_kd=dw_cls[kd_index]
-        # else:
 
-        if target_scores is not None and self.config['kd_type']=='abd':
-            # hard - linear
-            logits_KD = self.previous_linear(logits_pen[kd_index])[:,:self.last_valid_out_dim]
-            logits_KD_past = self.previous_linear(self.previous_teacher.generate_scores_pen(inputs[kd_index]))[:,:self.last_valid_out_dim]
-            loss_kd = self.mu * (self.kd_criterion(logits_KD, logits_KD_past).sum(dim=1) * dw_kd).mean() / (logits_KD.size(1))
-        elif target_scores is not None and self.config['kd_type']=='kd':
-            with torch.no_grad():
-                logits_prev = self.previous_teacher.solver.forward(inputs[kd_index])[:,:self.last_valid_out_dim]
-            loss_kd=(-F.log_softmax(logits[kd_index,:self.last_valid_out_dim]/self.config['temp'],dim=1)*logits_prev.softmax(dim=1)/self.config['temp'])
-            loss_kd=(loss_kd.sum(dim=1)*dw_kd[kd_index]).mean()/ task_step * self.mu
-        elif target_scores is not None and self.config['kd_type']=='hkd_yj':
-            with torch.no_grad():
-                logits_prev = self.previous_teacher.solver.forward(inputs[kd_index])[:,:self.last_valid_out_dim]
-            loss_kd=(F.mse_loss(logits[kd_index,:self.last_valid_out_dim],logits_prev,reduction='none')).mean()/ task_step * self.mu#*dw_kd
+        if target_scores is not None and self.config['kd_type']:
+            # KD
+            if self.config['kd_index']=='real_fake':
+                kd_index= np.arange(2*self.batch_size)
+            elif self.config['kd_index']=='fake':
+                kd_index= np.arange(self.batch_size)+self.batch_size
+            elif self.config['kd_index']=='real':
+                kd_index= np.arange(self.batch_size)
+            else:
+                raise ValueError("middle_index must be real, fake or real_fake")
+            dw_kd = self.dw_k[-1 * torch.ones(len(kd_index),).long()][kd_index]
+            if self.config['kd_type']=='abd':
+                # hard - linear
+                logits_KD = self.previous_linear(logits_pen[kd_index])[:,:self.last_valid_out_dim]
+                logits_KD_past = self.previous_linear(self.previous_teacher.generate_scores_pen(inputs[kd_index]))[:,:self.last_valid_out_dim]
+                loss_kd = self.mu * (self.kd_criterion(logits_KD, logits_KD_past).sum(dim=1) * dw_kd).mean() / (logits_KD.size(1))
+            elif self.config['kd_type']=='kd':
+                with torch.no_grad():
+                    logits_prevpen = self.previous_teacher.solver.forward(inputs[kd_index],pen=True)
+                    logits_prev=self.previous_linear(logits_prevpen)[:,:self.last_valid_out_dim]
+                loss_kd=(-F.log_softmax(logits[kd_index,:self.last_valid_out_dim]/self.config['temp'],dim=1)*logits_prev.softmax(dim=1)/self.config['temp'])
+                loss_kd=(loss_kd.sum(dim=1)*dw_kd).mean()/ task_step * self.mu
+            elif self.config['kd_type']=='hkd_yj':
+                with torch.no_grad():
+                    logits_prevpen = self.previous_teacher.solver.forward(inputs[kd_index],pen=True)
+                    logits_prev=self.previous_linear(logits_prevpen)[:,:self.last_valid_out_dim]
+
+                loss_kd=(F.mse_loss(logits[kd_index,:self.last_valid_out_dim],logits_prev,reduction='none')*dw_kd).mean()/ task_step * self.mu#
+            else:
+                raise ValueError("kd_type must be abd, kd or hkd_yj")
         else:
             loss_kd = torch.zeros((1,), requires_grad=True).cuda()
         
         #Middle K.D
-        if self.config['middle_index']=='real_fake':
-            middle_index= np.arange(2*self.batch_size)
-        elif self.config['middle_index']=='fake':
-            middle_index= np.arange(self.batch_size)+self.batch_size
-        elif self.config['middle_index']=='real':
-            middle_index= np.arange(self.batch_size)
-        else:
-            raise ValueError("middle_index must be real, fake or real_fake")
-        #print("previous teacher : ",self.previous_teacher)
-        if self.previous_teacher is not None and self.config['middle_kd_type']=='sp':
-            logits_middle,out1_m,out2_m,out3_m = self.model.forward(inputs[middle_index], middle=True)
-            with torch.no_grad():
-                logits_prev_middle,out1_pm, out2_pm, out3_pm = self.previous_teacher.solver.forward(inputs[middle_index],middle=True)
-            loss_middle = (self.md_criterion(out1_m,out1_pm)+self.md_criterion(out2_m,out2_pm)+self.md_criterion(out3_m,out3_pm))
-            # if self.config['dw_middle']:
-            #     loss_middle*=dw_cls[middle_index]
-            loss_middle = loss_middle.mean()*self.config['middle_mu']
-        elif self.previous_teacher is not None and self.config['middle_kd_type']=='cc':
-            with torch.no_grad():
-                last_logits_pen=self.previous_teacher.generate_scores_pen(inputs[middle_index])
-            loss_middle=self.cc_criterion(logits_pen[middle_index], last_logits_pen)
-            # if self.config['dw_middle']:
-            #     loss_middle*=(dw_cls[middle_index])#/dw_cls[middle_index].sum(keepdim=True))
-            loss_middle=loss_middle.mean()*self.config['middle_mu']
+        if self.previous_teacher and self.config['middle_kd_type']:
+            if self.config['middle_index']=='real_fake':
+                middle_index= np.arange(2*self.batch_size)
+            elif self.config['middle_index']=='fake':
+                middle_index= np.arange(self.batch_size)+self.batch_size
+            elif self.config['middle_index']=='real':
+                middle_index= np.arange(self.batch_size)
+            else:
+                raise ValueError("middle_index must be real, fake or real_fake")
+            if self.config['middle_kd_type']=='sp':
+                with torch.no_grad():
+                    logits_prev_middle,out1_pm, out2_pm, out3_pm = self.previous_teacher.solver.forward(inputs[middle_index],middle=True)
+                loss_middle = (self.md_criterion(out1_m[middle_index],out1_pm)+self.md_criterion(out2_m[middle_index],out2_pm)+self.md_criterion(out3_m[middle_index],out3_pm))
+                # if self.config['dw_middle']:
+                #     loss_middle*=dw_cls[middle_index]
+                loss_middle = loss_middle.mean()*self.config['middle_mu']
+            elif self.config['middle_kd_type']=='cc':
+                with torch.no_grad():
+                    last_logits_pen=self.previous_teacher.generate_scores_pen(inputs[middle_index])
+                loss_middle=self.cc_criterion(logits_pen[middle_index], last_logits_pen)
+                # if self.config['dw_middle']:
+                #     loss_middle*=(dw_cls[middle_index])#/dw_cls[middle_index].sum(keepdim=True))
+                loss_middle=loss_middle.mean()*self.config['middle_mu']
+            else:
+                raise ValueError("middle_kd_type must be sp or cc")
         else:
             loss_middle=torch.zeros((1,), requires_grad=True).cuda()
 
