@@ -460,7 +460,7 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
 
         # forward pass
         # logits_pen = self.model.forward(x=inputs, pen=True)
-        logits_pen,out1_m,out2_m,out3_m = self.model.forward(inputs, middle=True)
+        logits, logits_pen,out1_m,out2_m,out3_m = self.model.forward(inputs, middle=True)
 
         if len(self.config['gpuid']) > 1:
             logits = self.model.module.last(logits_pen)
