@@ -533,19 +533,23 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
                 # hard - linear
                 logits_KD = self.previous_linear(logits_pen[kd_index])[:,:self.last_valid_out_dim]
                 logits_KD_past = self.previous_linear(self.previous_teacher.generate_scores_pen(inputs[kd_index]))[:,:self.last_valid_out_dim]
-                loss_kd = self.mu * (self.kd_criterion(logits_KD, logits_KD_past).sum(dim=1) * dw_kd).mean() / (logits_KD.size(1))
+                loss_kd = self.mu * (self.kd_criterion(logits_KD, logits_KD_past).sum(dim=1)) / (logits_KD.size(1))
             elif self.config['kd_type']=='kd':
                 logits_prevpen = self.previous_teacher.solver.forward(inputs[kd_index],pen=True)
                 logits_prev=self.previous_linear(logits_prevpen)[:,:self.last_valid_out_dim].detach()
                 loss_kd=(-F.log_softmax(logits[kd_index,:self.last_valid_out_dim]/self.config['temp'],dim=1)*logits_prev.softmax(dim=1)/self.config['temp'])
-                loss_kd=(loss_kd.sum(dim=1)*dw_kd).mean()/ task_step * self.mu
+                loss_kd=(loss_kd.sum(dim=1))/ task_step * self.mu
             elif self.config['kd_type']=='hkd_yj':
                 logits_prevpen = self.previous_teacher.solver.forward(inputs[kd_index],pen=True)
                 logits_prev=self.previous_linear(logits_prevpen)[:,:self.last_valid_out_dim].detach()
 
-                loss_kd=(F.mse_loss(logits[kd_index,:self.last_valid_out_dim],logits_prev,reduction='none').sum(dim=1)*dw_kd).mean() * self.mu#/self.last_valid_out_dim
+                loss_kd=(F.mse_loss(logits[kd_index,:self.last_valid_out_dim],logits_prev,reduction='none').sum(dim=1)) * self.mu#/self.last_valid_out_dim
             else:
                 raise ValueError("kd_type must be abd, kd or hkd_yj")
+            if self.config['dw_kd']:
+                loss_kd=(loss_kd*dw_kd).mean()
+            else:
+                loss_kd=loss_kd.mean()
         else:
             loss_kd = torch.zeros((1,), requires_grad=True).cuda()
 
@@ -563,11 +567,14 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
             for i in range(len(task_weights)):
                 if i==0:
                     oldest_task_weights=task_weights[i].detach().clone()
+                    
                 else:
                     if self.config['balancing_loss_type']=='l1':
-                        loss_balancing+=F.l1_loss(task_weights[i].norm(),oldest_task_weights.norm())/self.last_valid_out_dim
+                        loss_balancing+=F.l1_loss(task_weights[i].norm(),oldest_task_weights.norm())/ task_step
                     elif self.config['balancing_loss_type']=='l2':
-                        loss_balancing+=F.mse_loss(task_weights[i].norm(),oldest_task_weights.norm())/self.last_valid_out_dim
+                        loss_balancing+=F.mse_loss(task_weights[i].norm(),oldest_task_weights.norm())/ task_step
+                    else:
+                        raise ValueError("balancing_loss_type must be l1 or l2")
             loss_balancing*=self.config['balancing_mu']
         else:
             loss_balancing=torch.zeros((1,),requires_grad=True).cuda()

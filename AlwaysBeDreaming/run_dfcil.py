@@ -69,15 +69,22 @@ def create_args():
     parser.add_argument('--memory', type=int, default=0, help="size of memory for replay")
     parser.add_argument('--temp', type=float, default=2., dest='temp', help="temperature for distillation")
     parser.add_argument('--beta', type=float, default=0.5, help="FT loss balancing weight")
+
+
+    ###################################### KD #####################
     parser.add_argument('--ft',default=False,action='store_true',help='finetuning loss')
 
     parser.add_argument('--middle_mu', type=float, default=1.0, help="Middle KD loss balancing weight")
+    parser.add_argument('--middle_kd_type',default=None,type=str,help='middle kd type',choices=['sp','cc'])
+    parser.add_argument('--dw_middle',default=False,action='store_true',help='dw middle distillation')
+    parser.add_argument('--middle_index',default='real_fake',type=str,help='middle kd index set (real_fake, fake, real)')
+
     parser.add_argument('--balancing',default=False,action='store_true',help='balancing')
     parser.add_argument('--balancing_mu', type=float, default=1.0, help="Balancing KD loss balancing weight")
     parser.add_argument('--balancing_loss_type',default='l1',type=str,help='balancing loss type')
-    parser.add_argument('--dw_middle',default=False,action='store_true',help='dw middle distillation')
-    parser.add_argument('--middle_index',default='real_fake',type=str,help='middle kd index set (real_fake, fake, real)')
-    parser.add_argument('--middle_kd_type',default=None,type=str,help='middle kd type',choices=['sp','cc'])
+    
+
+    parser.add_argument('--dw_kd',default=False,action='store_true',help='dw logits distillation')
     parser.add_argument('--kd_type',default=None,type=str,help='logits kd type',choices=['kd','abd','hkd_yj'])
     parser.add_argument('--kd_index',default='real_fake',type=str,help='classification index (real, fake, real_fake)')
     parser.add_argument('--mu', type=float, default=1.0, help="KD loss balancing weight")
@@ -198,6 +205,20 @@ if __name__ == '__main__':
         # evaluate model
         avg_metrics = trainer.evaluate(avg_metrics)    
 
+        for key in df_dict.keys():
+            if isinstance(df_dict[key], torch.Tensor):
+                df_dict[key]=df_dict[key].view(-1).detach().cpu().tolist()
+            if type(df_dict[key])==list:
+                df_dict[key]=','.join(str(e) for e in df_dict[key])
+            df_dict[key]=[df_dict[key]]
+        df_cat=pd.DataFrame.from_dict(df_dict,dtype=object)
+        if os.path.exists('./learning_result.csv'):
+            df=pd.read_csv('./learning_result.csv',index_col=0,dtype=object)
+            
+            df=pd.merge(df,df_cat,how='outer')
+        else: df=df_cat
+        df.to_csv(os.path.join('outputs','learning_result.csv'))
+
         # save results
         for mkey in metric_keys: 
             m_dir = args.log_dir+'/results-'+mkey+'/'
@@ -231,19 +252,6 @@ if __name__ == '__main__':
         df_dict['acc']=avg_metrics['acc']['global'][-1:,:r+1].mean()
         df_dict['time']=time_data
 
-        for key in df_dict.keys():
-            if isinstance(df_dict[key], torch.Tensor):
-                df_dict[key]=df_dict[key].view(-1).detach().cpu().tolist()
-            if type(df_dict[key])==list:
-                df_dict[key]=','.join(str(e) for e in df_dict[key])
-            df_dict[key]=[df_dict[key]]
-        df_cat=pd.DataFrame.from_dict(df_dict,dtype=object)
-        if os.path.exists('./learning_result.csv'):
-            df=pd.read_csv('./learning_result.csv',index_col=0,dtype=object)
-            
-            df=pd.merge(df,df_cat,how='outer')
-        else: df=df_cat
-        df.to_csv(os.path.join('outputs','learning_result.csv'))
         ##############
 
 
