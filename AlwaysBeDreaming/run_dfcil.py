@@ -238,12 +238,13 @@ if __name__ == '__main__':
                 df_dict[key]=','.join(str(e) for e in df_dict[key])
             df_dict[key]=[df_dict[key]]
         df_cat=pd.DataFrame.from_dict(df_dict,dtype=object)
-        if os.path.exists('./learning_result.csv'):
-            df=pd.read_csv('./learning_result.csv',index_col=0,dtype=object)
+        save_path=os.path.join('outputs','learning_result.csv')
+        if os.path.exists(save_path):
+            df=pd.read_csv(save_path,index_col=0,dtype=object)
             
             df=pd.merge(df,df_cat,how='outer')
         else: df=df_cat
-        df.to_csv(os.path.join('outputs','learning_result.csv'))
+        df.to_csv(save_path)
         ##############
 
 
