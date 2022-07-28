@@ -32,7 +32,7 @@ def create_args():
     parser.add_argument('--gen_model_name', type=str, default='MLP', help="The name of actual model for the generator")
     parser.add_argument('--learner_type', type=str, default='default', help="The type (filename) of learner")
     parser.add_argument('--learner_name', type=str, default='NormalNN', help="The class name of learner")
-    parser.add_argument('--dataroot', type=str, default='../../data/dataset/cifar100', help="The root folder of dataset or downloaded data")
+    parser.add_argument('--dataroot', type=str, default=dataset_path, help="The root folder of dataset or downloaded data")
     parser.add_argument('--dataset', type=str, default='MNIST', help="CIFAR10|MNIST")
     parser.add_argument('--load_model_dir', type=str, default=None, help="try loading from external model directory")
     parser.add_argument('--workers', type=int, default=8, help="#Thread for dataloader")
@@ -256,3 +256,4 @@ if __name__ == '__main__':
         df.to_csv(save_path)
         ##############
         print("Record in ", time_data)
+
