@@ -85,7 +85,7 @@ class NormalNN(nn.Module):
         plt.ylabel('Weight Norm')
         plt.xlim(0,weight.shape[0])
         plt.savefig(os.path.join(filename,'{}task_class_norm.png'.format(task_num)))
-
+        np.savetxt(os.path.join(filename,'{}task_class_norm.csv'.format(task_num)), class_norm, delimiter=",", fmt='%.2f')
     ##########################################
     #           MODEL TRAINING               #
     ##########################################

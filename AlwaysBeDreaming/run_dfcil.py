@@ -95,7 +95,7 @@ def create_args():
 
     parser.add_argument('--classification_type','-cls_type',default='local',type=str,help='classification type (local, global)')
     parser.add_argument('--classification_index','-cls_idx',default='real',type=str,help='classification index (real, fake, real_fake)')
-    parser.add_argument('--dw_classification','-cls_idx',default=False,type=bool,help='classification data weighting')
+    parser.add_argument('--dw_classification','-dw_cls',default=False,type=bool,help='classification data weighting')
 
     return parser
 
