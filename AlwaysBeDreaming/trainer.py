@@ -144,6 +144,7 @@ class Trainer:
                         'ft':args.ft,
                         'classification_type':args.classification_type,
                         'classification_index':args.classification_index,
+                        'dw_classification':args.dw_classification,
                         'ADI':args.ADI,
                         }
         self.learner_type, self.learner_name = args.learner_type, args.learner_name
