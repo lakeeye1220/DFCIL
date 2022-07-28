@@ -205,19 +205,6 @@ if __name__ == '__main__':
         # evaluate model
         avg_metrics = trainer.evaluate(avg_metrics)    
 
-        for key in df_dict.keys():
-            if isinstance(df_dict[key], torch.Tensor):
-                df_dict[key]=df_dict[key].view(-1).detach().cpu().tolist()
-            if type(df_dict[key])==list:
-                df_dict[key]=','.join(str(e) for e in df_dict[key])
-            df_dict[key]=[df_dict[key]]
-        df_cat=pd.DataFrame.from_dict(df_dict,dtype=object)
-        if os.path.exists('./learning_result.csv'):
-            df=pd.read_csv('./learning_result.csv',index_col=0,dtype=object)
-            
-            df=pd.merge(df,df_cat,how='outer')
-        else: df=df_cat
-        df.to_csv(os.path.join('outputs','learning_result.csv'))
 
         # save results
         for mkey in metric_keys: 

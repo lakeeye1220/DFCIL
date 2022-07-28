@@ -540,10 +540,11 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
                 loss_kd=(-F.log_softmax(logits[kd_index,:self.last_valid_out_dim]/self.config['temp'],dim=1)*logits_prev.softmax(dim=1)/self.config['temp'])
                 loss_kd=(loss_kd.sum(dim=1))/ task_step * self.mu
             elif self.config['kd_type']=='hkd_yj':
-                logits_prevpen = self.previous_teacher.solver.forward(inputs[kd_index],pen=True)
-                logits_prev=self.previous_linear(logits_prevpen)[:,:self.last_valid_out_dim].detach()
+                with torch.no_grad():
+                    logits_prevpen = self.previous_teacher.solver.forward(inputs[kd_index],pen=True)
+                    logits_prev=self.previous_linear(logits_prevpen)[:,:self.last_valid_out_dim].detach()
 
-                loss_kd=(F.mse_loss(logits[kd_index,:self.last_valid_out_dim],logits_prev,reduction='none').sum(dim=1)) * self.mu#/self.last_valid_out_dim
+                loss_kd=(F.mse_loss(logits[kd_index,:self.last_valid_out_dim],logits_prev,reduction='none').sum(dim=1)) * self.mu / task_step #/self.last_valid_out_dim
             else:
                 raise ValueError("kd_type must be abd, kd or hkd_yj")
             if self.config['dw_kd']:
