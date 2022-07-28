@@ -255,4 +255,4 @@ if __name__ == '__main__':
         else: df=df_cat
         df.to_csv(save_path)
         ##############
-        print("Record in ", time-data)
+        print("Record in ", time_data)
