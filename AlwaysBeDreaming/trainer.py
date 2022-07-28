@@ -143,6 +143,7 @@ class Trainer:
                         'p_order':args.p_order,
                         'ft':args.ft,
                         'classification_type':args.classification_type,
+                        'dw_classification':args.dw_classification,
                         'classification_index':args.classification_index,
                         'dw_classification':args.dw_classification,
                         'ADI':args.ADI,
