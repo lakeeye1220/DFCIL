@@ -239,6 +239,20 @@ if __name__ == '__main__':
         df_dict['acc']=avg_metrics['acc']['global'][-1:,:r+1].mean()
         df_dict['time']=time_data
 
+        for key in df_dict.keys():
+            if isinstance(df_dict[key], torch.Tensor):
+                df_dict[key]=df_dict[key].view(-1).detach().cpu().tolist()
+            if type(df_dict[key])==list:
+                df_dict[key]=','.join(str(e) for e in df_dict[key])
+            df_dict[key]=[df_dict[key]]
+        df_cat=pd.DataFrame.from_dict(df_dict,dtype=object)
+        save_path=os.path.join('outputs','learning_result.csv')
+        if os.path.exists(save_path):
+            df=pd.read_csv(save_path,index_col=0,dtype=object)
+            
+            df=pd.merge(df,df_cat,how='outer')
+        else: df=df_cat
+        df.to_csv(save_path)
         ##############
 
         for key in df_dict.keys():
