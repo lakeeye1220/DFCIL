@@ -85,7 +85,7 @@ class NormalNN(nn.Module):
         plt.ylabel('Weight Norm')
         plt.xlim(0,weight.shape[0])
         plt.savefig(os.path.join(filename,'{}task_class_norm.png'.format(task_num)))
-
+        np.savetxt(os.path.join(filename,'{}task_class_norm.csv'.format(task_num)), class_norm, delimiter=",", fmt='%.2f')
     ##########################################
     #           MODEL TRAINING               #
     ##########################################
@@ -185,9 +185,10 @@ class NormalNN(nn.Module):
             return None
 
     def criterion(self, logits, targets, data_weights):
-        loss_supervised = (self.criterion_fn(logits, targets.long()) * data_weights).mean()
-        #return loss_supervised 
-        #loss_supervised = self.criterion_fn(logits,targets.long()).mean()
+        if self.config['dw_classification']:
+            loss_supervised = (self.criterion_fn(logits, targets.long()) * data_weights).mean()
+        else:
+            loss_supervised = self.criterion_fn(logits,targets.long()).mean()
         return loss_supervised
 
     def update_model(self, real_x,real_y,inputs, targets, target_scores = None, dw_force = None, kd_index = None):
