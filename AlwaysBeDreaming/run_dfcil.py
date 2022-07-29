@@ -90,6 +90,9 @@ def create_args():
     parser.add_argument('--balancing_mu', type=float, default=1.0, help="Balancing KD loss balancing weight")
     parser.add_argument('--balancing_loss_type',default='l1',type=str,help='balancing loss type')
     
+    parser.add_argument('--weight_regularization','-wr',default=False,action='store_true',help='weight_regularization')
+    parser.add_argument('--wr_mu', type=float, default=1.0, help="weight_regularization KD loss weight_regularization weight")
+    
 
     parser.add_argument('--dw_kd',default=False,action='store_true',help='dw logits distillation')
     parser.add_argument('--kd_type',default=None,type=str,help='logits kd type',choices=['kd','abd','hkd_yj'])

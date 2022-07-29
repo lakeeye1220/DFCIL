@@ -133,9 +133,11 @@ class Trainer:
                         'top_k': self.top_k,
                         'middle_kd_type':args.middle_kd_type,
                         'middle_mu':args.middle_mu,
-                        'balancing_mu':args.balancing_mu,
-                        'balancing':args.balancing,
-                        'balancing_loss_type':args.balancing_loss_type,
+                        'balancing_mu':args.balancing_mu, # temp
+                        'balancing':args.balancing, # temp
+                        'balancing_loss_type':args.balancing_loss_type, # temp
+                        'weight_regularization':args.weight_regularization, # temp
+                        'wr_mu':args.wr_mu, # temp
                         'dw_middle':args.dw_middle,
                         'dw_kd':args.dw_kd,
                         'middle_index':args.middle_index,
