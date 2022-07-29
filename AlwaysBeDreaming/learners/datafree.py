@@ -484,9 +484,9 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
             # local classification
             if self.config['classification_bs']:
                 if self.config['classification_type']=='local':
-                    loss_class=balanced_softmax_loss(logits[class_idx,self.last_valid_out_dim:self.valid_out_dim], targets[class_idx]-self.last_valid_out_dim, dw_cls[class_idx])
+                    loss_class=balanced_softmax_loss(logits[class_idx,self.last_valid_out_dim:self.valid_out_dim], targets[class_idx]-self.last_valid_out_dim )
                 elif self.config['classification_type']=='global':
-                    loss_class=balanced_softmax_loss(logits[class_idx], targets[class_idx], dw_cls[class_idx])
+                    loss_class=balanced_softmax_loss(logits[class_idx], targets[class_idx] )
                 else:
                     raise ValueError('classification_type must be local or global')
             else:
@@ -505,7 +505,10 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
                         loss_class += self.criterion(self.model.last(logits_pen.detach()), targets.long(), dw_cls)
             
         else:
-            loss_class = self.criterion(logits[class_idx], targets[class_idx].long(), dw_cls[class_idx])
+            if self.config['classification_bs']:
+                loss_class=balanced_softmax_loss(logits[class_idx], targets[class_idx] )
+            else:
+                loss_class = self.criterion(logits[class_idx], targets[class_idx].long(), dw_cls[class_idx])
 
 
         
