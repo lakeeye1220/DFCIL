@@ -72,7 +72,14 @@ def create_args():
 
 
     ###################################### KD #####################
+    
+    parser.add_argument('--classification_type','-cls_type',default='local',type=str,help='classification type (local, global)')
+    parser.add_argument('--classification_index','-cls_idx',default='real',type=str,help='classification index (real, fake, real_fake)')
+    parser.add_argument('--dw_classification','-dw_cls',default=False,action='store_true',help='classification data weighting')
+
+    parser.add_argument('--classification_bs','-cls_bs',default=False,action='store_true',help='Balanced softmax for classification ce loss')
     parser.add_argument('--ft',default=False,action='store_true',help='finetuning loss')
+    parser.add_argument('--ft_bs',default=False,action='store_true',help='Balanced softmax for classification finetuning')
 
     parser.add_argument('--middle_mu', type=float, default=1.0, help="Middle KD loss balancing weight")
     parser.add_argument('--middle_kd_type',default=None,type=str,help='middle kd type',choices=['sp','cc'])
@@ -91,11 +98,7 @@ def create_args():
 
     parser.add_argument('--cc_gamma',default=0.4,type=float,help='middle kd cc gamma')
     parser.add_argument('--p_order',default=2,type=int,help='middle kd cc p_order')
-    parser.add_argument('--ADI',default=False,action='store_true',help='ADI')
-
-    parser.add_argument('--classification_type','-cls_type',default='local',type=str,help='classification type (local, global)')
-    parser.add_argument('--classification_index','-cls_idx',default='real',type=str,help='classification index (real, fake, real_fake)')
-    parser.add_argument('--dw_classification','-dw_cls',default=False,action='store_true',help='classification data weighting')
+    parser.add_argument('--ADI',default=False,action='store_true',help='ADI')    
 
     return parser
 
