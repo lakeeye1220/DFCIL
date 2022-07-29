@@ -12,6 +12,17 @@ from torch.optim import Adam
 import matplotlib.pyplot as plt
 import os
 from learners.cc import CC
+
+def balanced_softmax_loss(labels, logits, reduction='mean'):
+    #print("bsl label : ",labels)
+    np_sample_per_class = np.asarray([len(labels[labels==k]) for k in range(int(logits.shape[1]))], dtype=np.float32)
+    sample_per_class = torch.from_numpy(np_sample_per_class)
+    spc = sample_per_class.type_as(logits)
+    spc = spc.unsqueeze(0).expand(logits.shape[0],-1)
+    logits = logits + spc.log()
+    loss = F.cross_entropy(input=logits, target=labels,reduction=reduction)
+    return loss
+
 class SP(nn.Module):
     def __init__(self,reduction='mean'):
         super(SP,self).__init__()
@@ -471,16 +482,27 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
                 class_idx=np.arange(2*self.batch_size)
 
             # local classification
-            if self.config['classification_type']=='local':
-                loss_class = self.criterion(logits[class_idx,self.last_valid_out_dim:self.valid_out_dim], (targets[class_idx]-self.last_valid_out_dim).long(), dw_cls[class_idx]) 
-            elif self.config['classification_type']=='global':
-                loss_class = self.criterion(logits[class_idx],targets[class_idx],dw_cls[class_idx])
+            if self.config['lcl_bs']:
+                if self.config['classification_type']=='local':
+                    loss_class=balanced_softmax_loss(logits[class_idx,self.last_valid_out_dim:self.valid_out_dim], targets[class_idx]-self.last_valid_out_dim, dw_cls[class_idx])
+                elif self.config['classification_type']=='global':
+                    loss_class=balanced_softmax_loss(logits[class_idx], targets[class_idx], dw_cls[class_idx])
+                else:
+                    raise ValueError('classification_type must be local or global')
+            else:
+                if self.config['classification_type']=='local':
+                    loss_class = self.criterion(logits[class_idx,self.last_valid_out_dim:self.valid_out_dim], (targets[class_idx]-self.last_valid_out_dim).long(), dw_cls[class_idx]) 
+                elif self.config['classification_type']=='global':
+                    loss_class = self.criterion(logits[class_idx],targets[class_idx],dw_cls[class_idx])
             # ft classification  
             if self.config['ft']:
-                if len(self.config['gpuid']) > 1:
-                    loss_class += self.criterion(self.model.module.last(logits_pen.detach()), targets.long(), dw_cls)
+                if self.config['ft_bs']:
+                    loss_class+=balanced_softmax_loss(logits,targets)
                 else:
-                    loss_class += self.criterion(self.model.last(logits_pen.detach()), targets.long(), dw_cls)
+                    if len(self.config['gpuid']) > 1:
+                        loss_class += self.criterion(self.model.module.last(logits_pen.detach()), targets.long(), dw_cls)
+                    else:
+                        loss_class += self.criterion(self.model.last(logits_pen.detach()), targets.long(), dw_cls)
             
         else:
             loss_class = self.criterion(logits[class_idx], targets[class_idx].long(), dw_cls[class_idx])
@@ -588,5 +610,4 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
         # step
         self.optimizer.step()
 
-        #return total_loss.detach(), loss_class.detach(), loss_kd.detach(), loss_middle.detach(),logits
         return total_loss.detach(), loss_class.detach(), loss_kd.detach(), loss_middle.detach(), loss_balancing.detach(), logits
