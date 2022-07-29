@@ -482,7 +482,7 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
                 class_idx=np.arange(2*self.batch_size)
 
             # local classification
-            if self.config['lcl_bs']:
+            if self.config['classification_bs']:
                 if self.config['classification_type']=='local':
                     loss_class=balanced_softmax_loss(logits[class_idx,self.last_valid_out_dim:self.valid_out_dim], targets[class_idx]-self.last_valid_out_dim, dw_cls[class_idx])
                 elif self.config['classification_type']=='global':
