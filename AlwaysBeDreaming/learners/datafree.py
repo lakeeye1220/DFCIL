@@ -11,20 +11,21 @@ import copy
 from torch.optim import Adam
 import matplotlib.pyplot as plt
 import os
-
+from learners.cc import CC
 class SP(nn.Module):
-    def __init__(self):
+    def __init__(self,reduction='mean'):
         super(SP,self).__init__()
+        self.reduction=reduction
 
     def forward(self,fm_s,fm_t):
         fm_s = fm_s.view(fm_s.size(0),-1)
         G_s = torch.mm(fm_s,fm_s.t())
         norm_G_s =F.normalize(G_s,p=2,dim=1)
-        
+
         fm_t = fm_t.view(fm_t.size(0),-1)
         G_t = torch.mm(fm_t,fm_t.t())
         norm_G_t = F.normalize(G_t,p=2,dim=1)
-        loss = F.mse_loss(norm_G_s,norm_G_t)
+        loss = F.mse_loss(norm_G_s,norm_G_t,reduction=self.reduction)
         return loss
 
 class DeepInversionGenBN(NormalNN):
@@ -43,54 +44,37 @@ class DeepInversionGenBN(NormalNN):
         self.generator = self.create_generator()
         self.generator_optimizer = Adam(params=self.generator.parameters(), lr=self.deep_inv_params[0])
         self.beta = self.config['beta']
-
         # repeat call for generator network
         if self.gpu:
             self.cuda_gen()
+    
         
     ##########################################
     #           MODEL TRAINING               #
     ##########################################
-    def visualize_weight(self,prefix,task_num):
-         class_norm=[]
-         #print(self.model.last.WA_linears[:task_num])
-         #weight=self.model.last.WA_linears[task_num].weight
-         weight = self.model.last.weight
-         #weight = np.concatenate([self.model.last.WA_linears[i].weight.cpu().detach().numpy() for i in range(task_num)])
-         #weight = np.concatenate([self.model.last.WA_linears[i].weight for i in range(task_num)])
-         
-         for i in range(weight.shape[0]):
-             class_norm.append(torch.norm(weight[i]).item())
-             #class_norm.append(np.linalg.norm(weight[i]))
-         plt.figure()
-         classes = np.arange(weight.shape[0])
-         plt.scatter(classes,class_norm)
-         #plt.plot(class_norm)
-         #plt.plot(class_norm)
-         plt.xlabel('Class Index')
-         plt.ylabel('Weight Norm')
-         plt.xlim(0,weight.shape[0])
-         plt.savefig('./'+prefix+'{}task_class_norm.png'.format(task_num))
-
     def balanced_softmax_loss(self,labels,logits,reduction='mean'):
-        #if num_seen is None:
-        #labels = [int(dataset[i][1]) for i in range(len(dataset))]
-        #labels = np.asarray(labels, dtype=np.int64)
-        #print("labels shape : ",labels)
-        np_sample_per_class = np.asarray([len(labels[labels==k]) for k in range(self.valid_out_dim)], dtype=np.float32)
+        #print("bsl label : ",labels)
+        np_sample_per_class = np.asarray([len(labels[labels==k]) for k in range(int(logits.shape[1]))], dtype=np.float32)
         sample_per_class = torch.from_numpy(np_sample_per_class)
         spc = sample_per_class.type_as(logits)
-        #print("sample per class : ",spc)
-
         spc = spc.unsqueeze(0).expand(logits.shape[0],-1)
-        #print("spc : ", spc)
-        #print("spc shape  : ",spc.shape)
         logits = logits + spc.log()
         loss = F.cross_entropy(input=logits, target=labels,reduction=reduction)
         return loss
 
-    def learn_batch(self, train_loader, train_dataset, model_save_dir, train_name, val_loader=None):
-      #  
+                                                                                                                            
+    def lcl_balanced_softmax_loss(self,labels,logits,reduction='mean'):
+        #print("lsl label : ",labels)
+        np_sample_per_class = np.asarray([len(labels[labels==k]) for k in range(self.last_valid_out_dim,self.valid_out_dim)], dtype=np.float32)
+        sample_per_class = torch.from_numpy(np_sample_per_class)
+        spc = sample_per_class.type_as(logits)
+        spc = spc.unsqueeze(0).expand(logits.shape[0],-1)
+        logits = logits + spc.log()
+        loss = F.cross_entropy(input=logits, target=labels,reduction=reduction)
+        return loss
+
+    def learn_batch(self, train_loader, train_dataset, model_save_dir, val_loader=None):
+        
         self.pre_steps()
 
         # try to load model
@@ -110,17 +94,13 @@ class DeepInversionGenBN(NormalNN):
 
             # data weighting
             self.data_weighting(train_dataset)
-            print("train_name : ",train_name)
-            #if int(train_name)-1>=1:
-            #    self.visualize_weight(prefix='HKD_fake_Balanced_softmax_after',task_num=int(train_name)-1)
-                #self.model.weight_align(int(train_name)-1)
-                #self.visualize_weight(prefix='oldNorm0_after', task_num=int(train_name)-1)
+
             # Evaluate the performance of current task
             self.log('Epoch:{epoch:.0f}/{total:.0f}'.format(epoch=0,total=self.config['schedule'][-1]))
             if val_loader is not None:
                 self.validation(val_loader)
-
-            losses = [AverageMeter() for i in range(4)]
+            num_meter=5
+            losses = [AverageMeter() for i in range(num_meter)]
             acc = AverageMeter()
             accg = AverageMeter()
             batch_time = AverageMeter()
@@ -147,10 +127,20 @@ class DeepInversionGenBN(NormalNN):
                     if self.inversion_replay:
                         x_replay, y_replay, y_replay_hat = self.sample(self.previous_teacher, len(x), self.device)
                     else:
-                        x_replay=None
-                        y_replay=None
+                        x_replay = None
+                        y_replay = None
+                    #if middle KD
+                    #if self.middle and self.previous_teacher.solver is not None:
+                        #print("previous teacher : ",self.previous_teacher)
+                        #logits_middle,out1_m,out2_m,out3_m = self.model.forward(x, middle=True)
+                        #logits_prev_middle,out1_pm, out2_pm, out3_pm = self.previous_teacher.solver.forward(x,middle=True)
+                        #print("out1_m shape : ", out1_m.shape)
+                        #print("out1_mp shape ",out1_pm.shape)
 
-                   # # if KD
+                        #print("out1_m ",out1_m)
+                        #print("out1_mp : ",out1_pm)
+
+
                     if self.inversion_replay:
                         y_hat = self.previous_teacher.generate_scores(x, allowed_predictions=np.arange(self.last_valid_out_dim))
                         _, y_hat_com = self.combine_data(((x, y_hat),(x_replay, y_replay_hat)))
@@ -172,9 +162,12 @@ class DeepInversionGenBN(NormalNN):
                     # model update
                     if self.inversion_replay:
 
-                        loss, loss_class, loss_hkd,loss_middle, output= self.update_model(x,y,x_replay,y_replay,x_com, y_com, y_hat_com, dw_force = dw_cls, kd_index = np.arange(len(x), len(x_com)))
+                    #loss, loss_class, loss_kd, loss_middle, output= self.update_model(x, y,x_replay,y_replay, x_com, y_com, y_hat_com, dw_force = dw_cls, kd_index = np.arange(len(x), len(x_com)))
+                        loss,loss_class,loss_kd,loss_middle,loss_balancing,output = self.update_model(x,y,x_replay,y_replay,x_com,y_com,y_hat_com, dw_force=dw_cls, kd_index = np.arange(len(x), len(x_com)))
+
+                        #loss,loss_class,loss_hardKD,loss_middle,loss_balancing,output = self.update_model(x,y,x_replay,y_replay,x_com,y_com,y_hat_com, dw_force=dw_cls, kd_index = np.arange(len(x), len(x_com)))
                     else:
-                        loss, loss_class, loss_hkd,loss_middle, output= self.update_model(x,y,None,None,x_com, y_com, y_hat_com, dw_force = dw_cls, kd_index = np.arange(len(x), len(x_com)))
+                        loss, loss_class, loss_kd, loss_middle,loss_balancing, output= self.update_model(x, y,None, None, x_com, y_com, y_hat_com, dw_force = dw_cls, kd_index = np.arange(len(x), len(x_com)))
 
                     # measure elapsed time
                     batch_time.update(batch_timer.toc()) 
@@ -185,13 +178,16 @@ class DeepInversionGenBN(NormalNN):
                     if self.inversion_replay: accumulate_acc(output[self.batch_size:], y_com[self.batch_size:], task, accg, topk=(self.top_k,))
                     losses[0].update(loss,  y_com.size(0)) 
                     losses[1].update(loss_class,  y_com.size(0))
-                    losses[2].update(loss_hkd,  y_com.size(0))
-                    losses[3].update(loss_middle,1.0)
+                    losses[2].update(loss_kd,  y_com.size(0))
+                    #losses[2].update(loss_hardKD, y_com.size(0))
+                    #losses[3].update(loss_middle,y_com.size(0))
+                    losses[3].update(loss_middle,1)
+                    losses[4].update(loss_balancing,1)
                     batch_timer.tic()
 
                 # eval update
                 self.log('Epoch:{epoch:.0f}/{total:.0f}'.format(epoch=self.epoch+1,total=self.config['schedule'][-1]))
-                self.log(' * Loss {loss.avg:.3f} | CE Loss {lossb.avg:.3f} | HKD Loss {lossc.avg:.3f} | middle distillation {middle.avg:.5f}'.format(loss=losses[0],lossb=losses[1],lossc=losses[2],middle=losses[3]))
+                self.log(' * Loss {loss.avg:.3e} | CE Loss {lossb.avg:.3e} | KD Loss {lossc.avg:.3e}  | Middle loss {middle.avg:.3e} | Balancing loss {balancing.avg:.3e}'.format(loss=losses[0],lossb=losses[1],lossc=losses[2],middle=losses[3],balancing=losses[4]))
                 self.log(' * Train Acc {acc.avg:.3f} | Train Acc Gen {accg.avg:.3f}'.format(acc=acc,accg=accg))
 
                 # Evaluate the performance of current task
@@ -199,10 +195,9 @@ class DeepInversionGenBN(NormalNN):
                     self.validation(val_loader)
 
                 # reset
-                losses = [AverageMeter() for i in range(4)]
+                losses = [AverageMeter() for i in range(num_meter)]
                 acc = AverageMeter()
                 accg = AverageMeter()
-
 
         self.model.eval()
         self.last_last_valid_out_dim = self.last_valid_out_dim
@@ -231,7 +226,6 @@ class DeepInversionGenBN(NormalNN):
     def update_model(self, inputs, targets, target_scores = None, dw_force = None, kd_index = None):
 
         loss_kd = torch.zeros((1,), requires_grad=True).cuda()
-        loss_middle = torch.zeros((1,),requires_grad=True).cuda()
 
         if dw_force is not None:
             dw_cls = dw_force
@@ -259,12 +253,15 @@ class DeepInversionGenBN(NormalNN):
             target_scores = torch.cat(target_scores, dim=1)
             loss_kd += self.mu * loss_fn_kd(logits[kd_index], target_scores[kd_index], dw_cls[kd_index], np.arange(self.valid_out_dim).tolist(), self.DTemp, soft_t = True)
 
-        total_loss = loss_class + loss_kd +loss_hardkd
+        total_loss = loss_class + loss_kd
         self.optimizer.zero_grad()
         total_loss.backward()
         self.optimizer.step()
-        return total_loss.detach(), loss_class.detach(), loss_kd.detach(), loss_middle.detach(),logits
+        
+        loss_middle=torch.zeros((1,), requires_grad=True).cuda()
+        loss_balancing=torch.zeros((1,), requires_grad=True).cuda()
 
+        return total_loss.detach(), loss_class.detach(), loss_kd.detach(), loss_middle.detach(), loss_balancing.detach(), logits
     ##########################################
     #             MODEL UTILS                #
     ##########################################
@@ -328,10 +325,10 @@ class DeepInversionLWF(DeepInversionGenBN):
         super(DeepInversionLWF, self).__init__(learner_config)
         self.kl_loss = nn.KLDivLoss(reduction='batchmean').cuda()
 
-    def update_model(self, inputs, targets, target_scores = None, dw_force = None, kd_index = None):
+    def update_model(self, real_x,real_y,x_fake, y_fake, inputs, targets, target_scores = None, dw_force = None, kd_index = None):
         
         loss_kd = torch.zeros((1,), requires_grad=True).cuda()
-        loss_middle = torch.zeros((1,),requires_grad=True).cuda()
+
         if dw_force is not None:
             dw_cls = dw_force
         elif self.dw:
@@ -350,11 +347,14 @@ class DeepInversionLWF(DeepInversionGenBN):
         if target_scores is not None:
             loss_kd = self.mu * loss_fn_kd(logits, target_scores, dw_cls, np.arange(self.last_valid_out_dim).tolist(), self.DTemp)
 
-        total_loss = loss_class + loss_kd+loss_middle
+        total_loss = loss_class + loss_kd
         self.optimizer.zero_grad()
         total_loss.backward()
         self.optimizer.step()
-        return total_loss.detach(), loss_class.detach(), loss_kd.detach(),loss_middle.detach(), logits
+        loss_middle=torch.zeros((1,), requires_grad=True).cuda()
+        loss_balancing=torch.zeros((1,), requires_grad=True).cuda()
+
+        return total_loss.detach(), loss_class.detach(), loss_kd.detach(), loss_middle.detach(), loss_balancing.detach(), logits
 
 class AlwaysBeDreaming(DeepInversionGenBN):
 
@@ -362,7 +362,7 @@ class AlwaysBeDreaming(DeepInversionGenBN):
         super(AlwaysBeDreaming, self).__init__(learner_config)
         self.kl_loss = nn.KLDivLoss(reduction='batchmean').cuda()
 
-    def update_model(self, x_real,y_real,x_fake,y_fake,inputs, targets, target_scores = None, dw_force = None, kd_index = None):
+    def update_model(self, real_x,real_y,x_fake, y_fake, inputs, targets, target_scores = None, dw_force = None, kd_index = None):
         
         # class balancing
         mappings = torch.ones(targets.size(), dtype=torch.float32)
@@ -385,8 +385,11 @@ class AlwaysBeDreaming(DeepInversionGenBN):
         if self.inversion_replay:
 
             # local classification
-            loss_class = self.criterion(logits[class_idx,self.last_valid_out_dim:self.valid_out_dim], (targets[class_idx]-self.last_valid_out_dim).long(), dw_cls[class_idx]) 
-            with torch.no_grad():
+            #loss_class = self.criterion(logits[class_idx,self.last_valid_out_dim:self.valid_out_dim], (targets[class_idx]-self.last_valid_out_dim).long(), dw_cls[class_idx]) 
+            loss_class = self.balanced_softmax_loss(labels=(targets[class_idx]-self.last_valid_out_dim).long(), logits=logits[class_idx,self.last_valid_out_dim:self.valid_out_dim],reduction='mean')
+            print(targets[class_idx]-self.last_valid_out_dim)
+            # ft classification  
+            with torch.no_grad():             
                 feat_class = self.model.forward(x=inputs, pen=True).detach()
             '''
             if len(self.config['gpuid']) > 1:
@@ -394,35 +397,11 @@ class AlwaysBeDreaming(DeepInversionGenBN):
             else:
                 loss_class += self.criterion(self.model.last(feat_class), targets.long(), dw_cls)
             '''
-            #WA
-            #self.model.weight_align(int(self.valid_out_dim/20.0)-1)
-            self.visualize_weight(prefix='BalancedSM_WA__HKD_realfake_100SP_realfake',task_num=int(self.valid_out_dim/20.0)-1)
-            
             loss_class += self.balanced_softmax_loss(labels=targets,logits=self.model.last(feat_class)[:,:self.valid_out_dim],reduction='mean')
-            #print("balanced softmax : ",loss_class)
-        else:
-            loss_class = self.criterion(logits[class_idx], targets[class_idx].long(), dw_cls[class_idx])
-
-            # ft classifications
-        loss_middle = torch.zeros((1,),requires_grad=True).cuda()
-        md_criterion= SP()
-
-        if self.previous_teacher is not None:
-            logits_middle,out1_m,out2_m,out3_m = self.model.forward(inputs,middle=True)
-            logits_prev_middle,out1_pm,out2_pm,out3_pm = self.previous_teacher.solver.forward(inputs,middle=True)
-            loss_middle = (md_criterion(out1_m,out1_pm.detach())+md_criterion(out2_m,out2_pm.detach())+md_criterion(out3_m,out3_pm.detach()))/3.0
-
-        loss_hardkd = torch.zeros((1,),requires_grad=True).cuda()
-
-        if self.previous_teacher:
-            logits_oldpen = self.model.forward(x_fake,pen=True)
-            logits_old = self.model.last(logits_oldpen)
-
-            logits_prevpen = self.previous_teacher.solver.forward(x_fake,pen=True)
-            logits_pre = self.previous_linear(logits_prevpen)
-
-            loss_hardkd = self.mu * F.mse_loss(logits_old[:,:self.last_valid_out_dim],logits_pre[:,:self.last_valid_out_dim])
-
+        else: # start 
+            #loss_class = self.criterion(logits[class_idx], targets[class_idx].long(), dw_cls[class_idx])
+            # loss_class = self.criterion(logits[class_idx,self.last_valid_out_dim:self.valid_out_dim], targets[class_idx].long(), dw_cls[class_idx]) # 211 no split logits
+            loss_class = self.lcl_balanced_softmax_loss(labels=targets[class_idx].long(), logits=logits[class_idx,self.last_valid_out_dim:self.valid_out_dim],reduction='mean')
         # KD
         '''
         if target_scores is not None:
@@ -436,12 +415,211 @@ class AlwaysBeDreaming(DeepInversionGenBN):
         else:
             loss_kd = torch.zeros((1,), requires_grad=True).cuda()
         '''
-        
-        total_loss = loss_class + 100*loss_middle+loss_hardkd
+        loss_middle=torch.zeros((1,), requires_grad=True).cuda()
+        md_criterion= SP()
+
+        if self.previous_teacher is not None:
+            logits_middle,out1_m,out2_m,out3_m = self.model.forward(inputs,middle=True)
+            logits_prev_middle,out1_pm,out2_pm,out3_pm = self.previous_teacher.solver.forward(inputs,middle=True)
+            loss_middle = (md_criterion(out1_m,out1_pm.detach())+md_criterion(out2_m,out2_pm.detach())+md_criterion(out3_m,out3_pm.detach()))/3.0
+
+        loss_hardkd = torch.zeros((1,),requires_grad=True).cuda()
+
+        if self.previous_teacher:
+            logits_oldpen = self.model.forward(inputs,pen=True)
+            logits_old = self.model.last(logits_oldpen)
+            logits_prevpen = self.previous_teacher.solver.forward(inputs,pen=True)
+            logits_pre = self.previous_linear(logits_prevpen)
+
+            loss_hardkd = self.mu * F.mse_loss(logits_old[:,:self.last_valid_out_dim],logits_pre[:,:self.last_valid_out_dim])
+            
+        if self.previous_teacher is not None and self.config['balancing']:
+            task_step=self.valid_out_dim-self.last_valid_out_dim
+            task_weights=[]
+            loss_balancing=torch.zeros((1,),requires_grad=True).cuda()
+            if len(self.config['gpuid']) > 1:
+                for i in range(self.valid_out_dim//task_step):
+                    task_weights.append(self.model.module.last.weight[i*task_step:(i+1)*task_step,:])
+            else:
+                for i in range(self.valid_out_dim//task_step):
+                    task_weights.append(self.model.last.weight[i*task_step:(i+1)*task_step,:])
+
+            for i in range(len(task_weights)):
+                if i==0:
+                    oldest_task_weights=task_weights[i].detach().clone()
+                else:
+                    if self.config['balancing_loss_type']=='l1':
+                        loss_balancing+=F.l1_loss(task_weights[i].norm(),oldest_task_weights.norm())/task_step
+                    elif self.config['balancing_loss_type']=='l2':
+                        #print("hellp")
+                        loss_balancing+=F.mse_loss(task_weights[i].norm(),oldest_task_weights.norm())/task_step
+            loss_balancing*=self.config['balancing_mu']
+        else:
+            loss_balancing=torch.zeros((1,),requires_grad=True).cuda()
+        total_loss = loss_class + loss_hardkd + 100.0*loss_middle + loss_balancing
         self.optimizer.zero_grad()
         total_loss.backward()
 
         # step
         self.optimizer.step()
 
-        return total_loss.detach(), loss_class.detach(), loss_hardkd.detach(), loss_middle.detach(),logits
+        return total_loss.detach(), loss_class.detach(), loss_hardkd.detach(), loss_middle.detach(), loss_balancing.detach(), logits
+
+class AlwaysBeDreamingBalancing(DeepInversionGenBN):
+
+    def __init__(self, learner_config):
+        super(AlwaysBeDreamingBalancing, self).__init__(learner_config)
+        self.kl_loss = nn.KLDivLoss(reduction='batchmean')
+        self.md_criterion = SP(reduction='mean')
+        if self.config['balancing_loss_type']=='l1':
+            self.norm_type=1
+        elif self.config['balancing_loss_type']=='l2':
+            self.norm_type=2
+
+        self.cc_criterion=CC(self.config['cc_gamma'],self.config['p_order'],reduction='none')
+
+    def update_model(self, real_x,real_y,x_fake, y_fake, inputs, targets, target_scores = None, dw_force = None, kd_index = None):
+        task_step=self.valid_out_dim-self.last_valid_out_dim
+        # class balancing
+        mappings = torch.ones(targets.size(), dtype=torch.float32)
+        if self.gpu:
+            mappings = mappings.cuda()
+        #print("ABD self.last_valid_out_dim shape : ",self.last_valid_out_dim) #5
+        #print("ABD self.valid_out_dim", self.valid_out_dim) #10
+
+        rnt = 1.0 * self.last_valid_out_dim / self.valid_out_dim
+        #print("rnt  :",rnt)
+        mappings[:self.last_valid_out_dim] = rnt
+        mappings[self.last_valid_out_dim:] = 1-rnt
+        dw_cls = mappings[targets.long()]
+
+        # forward pass
+        # logits_pen = self.model.forward(x=inputs, pen=True)
+        logits_pen,out1_m,out2_m,out3_m = self.model.forward(inputs, middle=True)
+
+        if len(self.config['gpuid']) > 1:
+            logits = self.model.module.last(logits_pen)
+        else:
+            logits = self.model.last(logits_pen)
+        
+        # classification 
+        class_idx = np.arange(self.batch_size)
+        if self.inversion_replay:
+            if self.config['classification_index']=='real':
+                class_idx=class_idx
+            elif self.config['classification_index']=='fake':
+                class_idx=class_idx+self.batch_size
+            else: # real_fake
+                class_idx=np.arange(2*self.batch_size)
+
+            # local classification
+            if self.config['classification_type']=='local':
+                loss_class = self.criterion(logits[class_idx,self.last_valid_out_dim:self.valid_out_dim], (targets[class_idx]-self.last_valid_out_dim).long(), dw_cls[class_idx]) 
+            elif self.config['classification_type']=='global':
+                loss_class = self.criterion(logits[class_idx],targets[class_idx],dw_cls[class_idx])
+            # ft classification  
+            if self.config['ft']:
+                if len(self.config['gpuid']) > 1:
+                    loss_class += self.criterion(self.model.module.last(logits_pen.detach()), targets.long(), dw_cls)
+                else:
+                    loss_class += self.criterion(self.model.last(logits_pen.detach()), targets.long(), dw_cls)
+            
+        else:
+            loss_class = self.criterion(logits[class_idx], targets[class_idx].long(), dw_cls[class_idx])
+
+
+        
+        #Middle K.D
+        if self.previous_teacher and self.config['middle_kd_type']:
+            if self.config['middle_index']=='real_fake':
+                middle_index= np.arange(2*self.batch_size)
+            elif self.config['middle_index']=='fake':
+                middle_index= np.arange(self.batch_size)+self.batch_size
+            elif self.config['middle_index']=='real':
+                middle_index= np.arange(self.batch_size)
+            else:
+                raise ValueError("middle_index must be real, fake or real_fake")
+            if self.config['middle_kd_type']=='sp':
+                with torch.no_grad():
+                    logits_prev_middle,out1_pm, out2_pm, out3_pm = self.previous_teacher.solver.forward(inputs[middle_index],middle=True)
+                loss_middle = (self.md_criterion(out1_m[middle_index],out1_pm)+self.md_criterion(out2_m[middle_index],out2_pm)+self.md_criterion(out3_m[middle_index],out3_pm))
+                # if self.config['dw_middle']:
+                #     loss_middle*=dw_cls[middle_index]
+                loss_middle = loss_middle.mean()*self.config['middle_mu']
+            elif self.config['middle_kd_type']=='cc':
+                with torch.no_grad():
+                    last_logits_pen=self.previous_teacher.generate_scores_pen(inputs[middle_index])
+                loss_middle=self.cc_criterion(logits_pen[middle_index], last_logits_pen)
+                # if self.config['dw_middle']:
+                #     loss_middle*=(dw_cls[middle_index])#/dw_cls[middle_index].sum(keepdim=True))
+                loss_middle=loss_middle.mean()*self.config['middle_mu']
+            else:
+                raise ValueError("middle_kd_type must be sp or cc")
+        else:
+            loss_middle=torch.zeros((1,), requires_grad=True).cuda()
+
+        # KD
+        if self.previous_teacher and self.config['kd_type']:
+            if self.config['kd_index']=='real_fake':
+                kd_index= np.arange(2*self.batch_size)
+            elif self.config['kd_index']=='fake':
+                kd_index= np.arange(self.batch_size)+self.batch_size
+            elif self.config['kd_index']=='real':
+                kd_index= np.arange(self.batch_size)
+            else:
+                raise ValueError("middle_index must be real, fake or real_fake")
+            dw_kd = self.dw_k[-1 * torch.ones(2*self.batch_size,).long()][kd_index]
+
+        if self.previous_teacher and self.config['kd_type']:
+            if self.config['kd_type']=='abd':
+                # hard - linear
+                logits_KD = self.previous_linear(logits_pen[kd_index])[:,:self.last_valid_out_dim]
+                logits_KD_past = self.previous_linear(self.previous_teacher.generate_scores_pen(inputs[kd_index]))[:,:self.last_valid_out_dim]
+                loss_kd = self.mu * (self.kd_criterion(logits_KD, logits_KD_past).sum(dim=1) * dw_kd).mean() / (logits_KD.size(1))
+            elif self.config['kd_type']=='kd':
+                logits_prevpen = self.previous_teacher.solver.forward(inputs[kd_index],pen=True)
+                logits_prev=self.previous_linear(logits_prevpen)[:,:self.last_valid_out_dim].detach()
+                loss_kd=(-F.log_softmax(logits[kd_index,:self.last_valid_out_dim]/self.config['temp'],dim=1)*logits_prev.softmax(dim=1)/self.config['temp'])
+                loss_kd=(loss_kd.sum(dim=1)*dw_kd).mean()/ task_step * self.mu
+            elif self.config['kd_type']=='hkd_yj':
+                logits_prevpen = self.previous_teacher.solver.forward(inputs[kd_index],pen=True)
+                logits_prev=self.previous_linear(logits_prevpen)[:,:self.last_valid_out_dim].detach()
+
+                loss_kd=(F.mse_loss(logits[kd_index,:self.last_valid_out_dim],logits_prev,reduction='none').sum(dim=1)*dw_kd).mean() * self.mu#/self.last_valid_out_dim
+            else:
+                raise ValueError("kd_type must be abd, kd or hkd_yj")
+        else:
+            loss_kd = torch.zeros((1,), requires_grad=True).cuda()
+
+        # balancing
+        if self.previous_teacher is not None and self.config['balancing']:
+            task_weights=[]
+            loss_balancing=torch.zeros((1,),requires_grad=True).cuda()
+            if len(self.config['gpuid']) > 1:
+                for i in range(self.valid_out_dim//task_step):
+                    task_weights.append(self.model.module.last.weight[i*task_step:(i+1)*task_step,:])
+            else:
+                for i in range(self.valid_out_dim//task_step):
+                    task_weights.append(self.model.last.weight[i*task_step:(i+1)*task_step,:])
+
+            for i in range(len(task_weights)):
+                if i==0:
+                    oldest_task_weights=task_weights[i].detach().clone()
+                else:
+                    if self.config['balancing_loss_type']=='l1':
+                        loss_balancing+=F.l1_loss(task_weights[i].norm(),oldest_task_weights.norm())/self.last_valid_out_dim
+                    elif self.config['balancing_loss_type']=='l2':
+                        loss_balancing+=F.mse_loss(task_weights[i].norm(),oldest_task_weights.norm())/self.last_valid_out_dim
+            loss_balancing*=self.config['balancing_mu']
+        else:
+            loss_balancing=torch.zeros((1,),requires_grad=True).cuda()
+        total_loss = loss_class + loss_kd + loss_middle + loss_balancing
+        #total_loss = loss_class + loss_midfdle + 
+        self.optimizer.zero_grad()
+        total_loss.backward()
+
+        # step
+        self.optimizer.step()
+
+        #return total_loss.detach(), loss_class.detach(), loss_kd.detach(), loss_middle.detach(),logits
+        return total_loss.detach(), loss_class.detach(), loss_kd.detach(), loss_middle.detach(), loss_balancing.detach(), logits
