@@ -73,8 +73,11 @@ class NormalNN(nn.Module):
         class_norm=[]
         if len(self.config['gpuid'])>1:
             weight=self.model.module.last.weight
+            bias=self.model.module.last.bias.unsqueeze(-1)
         else:
             weight=self.model.last.weight
+            bias=self.model.last.bias.unsqueeze(-1)
+        weight=torch.cat((weight,bias),dim=1)
         for i in range(self.valid_out_dim):
             class_norm.append(torch.norm(weight[i]).item())
 
