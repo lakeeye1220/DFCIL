@@ -593,7 +593,7 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
             else:
                 for i in range(self.valid_out_dim//task_step):
                     task_weights.append(
-                        torch.cat ((self.model.last.weight[i*task_step:(i+1)*task_step,:],self.model.last.bias[i*task_step:(i+1)*task_step].unsqueeze(-1)),dim=1))
+                        torch.cat ((self.model.last.weight[i*task_step:(i+1)*task_step,:], self.model.last.bias[i*task_step:(i+1)*task_step].unsqueeze(-1)),dim=1))
             for i in range(len(task_weights)):
                 if i==0:
                     oldest_task_weights=task_weights[i].detach().clone()
