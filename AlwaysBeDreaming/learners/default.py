@@ -101,6 +101,7 @@ class NormalNN(nn.Module):
         plt.xlim(0,weight.shape[0])
         plt.savefig(os.path.join(file_path,'{}task_class_norm.pdf'.format(task_num)),bbox_inches='tight')
         np.savetxt(os.path.join(file_path,'{}task_class_norm.csv'.format(task_num)), class_norm, delimiter=",", fmt='%.2f')
+        plt.close()
     ##########################################
     #           MODEL TRAINING               #
     ##########################################
