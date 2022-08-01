@@ -78,7 +78,7 @@ class NormalNN(nn.Module):
         np.save(os.path.join(file_path,'{}task_confusion_matrix.npy'.format(task_num)), cm1)
         plt.pcolor(cm1)
         plt.colorbar()
-        plt.savefig(os.path.join(file_path,'{}task_confusion_mat.png'.format(task_num)))
+        plt.savefig(os.path.join(file_path,'{}task_confusion_mat.pdf'.format(task_num)),bbox_inches='tight')
         plt.close()
 
     def visualize_weight(self,file_path,task_num):
@@ -99,7 +99,7 @@ class NormalNN(nn.Module):
         plt.xlabel('Class Index')
         plt.ylabel('Weight Norm')
         plt.xlim(0,weight.shape[0])
-        plt.savefig(os.path.join(file_path,'{}task_class_norm.png'.format(task_num)))
+        plt.savefig(os.path.join(file_path,'{}task_class_norm.pdf'.format(task_num)),bbox_inches='tight')
         np.savetxt(os.path.join(file_path,'{}task_class_norm.csv'.format(task_num)), class_norm, delimiter=",", fmt='%.2f')
     ##########################################
     #           MODEL TRAINING               #
@@ -265,8 +265,8 @@ class NormalNN(nn.Module):
                     acc = accumulate_acc(output, target-task_in[0], task, acc, topk=(self.top_k,))
 
             if confusion_mat:
-                y_true.append(target.cpu().numpy())
-                y_pred.append(output.argmax(dim=1).cpu().numpy())
+                y_true.append(target.cpu())
+                y_pred.append(output.argmax(dim=1).cpu())
 
         model.train(orig_mode)
 

@@ -638,7 +638,7 @@ class iTinyIMNET(iDataset):
                             self.targets.append(self.names2index[label])
         else:
             val_dir = path.join(root, 'tiny-imagenet/val_no_split')
-            with open(path.join(val_dir, 'val_annotations.txt'), 'r') as f:
+            with open(path.join(path.join(root,'tiny-imagenet','val'), 'val_annotations.txt'), 'r') as f:
                 infos = f.read().strip().split('\n')
                 infos = [info.strip().split('\t')[:2] for info in infos]
                 self.data = [path.join(val_dir, 'images', info[0])for info in infos]

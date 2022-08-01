@@ -178,6 +178,8 @@ class Trainer:
         if not os.path.exists(temp_dir): os.makedirs(temp_dir)
         visualize_path= os.path.join(self.log_dir,'visualize_weight')
         if not os.path.exists(visualize_path): os.makedirs(visualize_path)
+        visualize_cm_path=os.path.join(self.log_dir,'visualize_confusion_matrix')
+        if not os.path.exists(visualize_cm_path): os.makedirs(visualize_cm_path)
 
         # for each task
         for i in range(self.max_task):
@@ -230,7 +232,7 @@ class Trainer:
             # save model
             self.learner.save_model(model_save_dir)
             self.learner.visualize_weight(visualize_path, self.current_t_index)
-            self.learner.visualize_confusion_matrix(test_loader,os.path.join(self.log_dir,'visualize_confusion_matrix'), self.current_t_index)
+            self.learner.visualize_confusion_matrix(test_loader,visualize_cm_path, self.current_t_index)
             
             # evaluate acc
             acc_table = []
