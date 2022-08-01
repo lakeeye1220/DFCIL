@@ -8,6 +8,7 @@ import copy
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+import tensorflow as tf
 class NormalNN(nn.Module):
     """
     consider citing the benchmarking environment this was built on top of
@@ -68,8 +69,19 @@ class NormalNN(nn.Module):
 
         # initialize optimizer
         self.init_optimizer()
+    
+    def visualize_confusion_matrix(self, val_loader,file_path,task_num):
+        cm=self.validation(val_loader,confusion_mat=True)
+        if cm.shape[0]<self.config['num_classes']:
+            cm1 = np.pad(cm, ((0,self.config['num_classes']-cm.shape[0]),(0,self.config['num_classes']-cm.shape[1])), 'constant', constant_values=0)
+        
+        np.save(os.path.join(file_path,'{}task_confusion_matrix.npy'.format(task_num)), cm1)
+        plt.pcolor(cm1)
+        plt.colorbar()
+        plt.savefig(os.path.join(file_path,'{}task_confusion_mat.png'.format(task_num)))
+        plt.close()
 
-    def visualize_weight(self,filename,task_num):
+    def visualize_weight(self,file_path,task_num):
         class_norm=[]
         if len(self.config['gpuid'])>1:
             weight=self.model.module.last.weight
@@ -87,8 +99,8 @@ class NormalNN(nn.Module):
         plt.xlabel('Class Index')
         plt.ylabel('Weight Norm')
         plt.xlim(0,weight.shape[0])
-        plt.savefig(os.path.join(filename,'{}task_class_norm.png'.format(task_num)))
-        np.savetxt(os.path.join(filename,'{}task_class_norm.csv'.format(task_num)), class_norm, delimiter=",", fmt='%.2f')
+        plt.savefig(os.path.join(file_path,'{}task_class_norm.png'.format(task_num)))
+        np.savetxt(os.path.join(file_path,'{}task_class_norm.csv'.format(task_num)), class_norm, delimiter=",", fmt='%.2f')
     ##########################################
     #           MODEL TRAINING               #
     ##########################################
@@ -215,7 +227,7 @@ class NormalNN(nn.Module):
         self.optimizer.step()
         return total_loss.detach(), logits
 
-    def validation(self, dataloader, model=None, task_in = None,  verbal = True):
+    def validation(self, dataloader, model=None, task_in = None,  verbal = True,confusion_mat=False):
 
         if model is None:
             model = self.model
@@ -224,6 +236,9 @@ class NormalNN(nn.Module):
         batch_timer = Timer()
         acc = AverageMeter()
         batch_timer.tic()
+
+        y_true=[]
+        y_pred=[]
 
         orig_mode = model.training
         model.eval()
@@ -248,8 +263,19 @@ class NormalNN(nn.Module):
                 if len(target) > 1:
                     output = model.forward(input)[:, task_in]
                     acc = accumulate_acc(output, target-task_in[0], task, acc, topk=(self.top_k,))
-            
+
+            if confusion_mat:
+                y_true.append(target.cpu().numpy())
+                y_pred.append(output.argmax(dim=1).cpu().numpy())
+
         model.train(orig_mode)
+
+        if confusion_mat:
+            y_true=torch.cat(y_true, dim=0)
+            y_pred=torch.cat(y_pred, dim=0)
+            cm = tf.math.confusion_matrix(y_true, y_pred)
+            return cm
+
 
         if verbal:
             self.log(' * Val Acc {acc.avg:.3f}, Total time {time:.2f}'
