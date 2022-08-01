@@ -74,6 +74,8 @@ class NormalNN(nn.Module):
         cm=self.validation(val_loader,confusion_mat=True)
         if cm.shape[0]<self.config['num_classes']:
             cm1 = np.pad(cm, ((0,self.config['num_classes']-cm.shape[0]),(0,self.config['num_classes']-cm.shape[1])), 'constant', constant_values=0)
+        else:
+            cm1=cm
         
         np.save(os.path.join(file_path,'{}task_confusion_matrix.npy'.format(task_num)), cm1)
         plt.matshow(cm1)
