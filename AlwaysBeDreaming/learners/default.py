@@ -76,8 +76,8 @@ class NormalNN(nn.Module):
             cm1 = np.pad(cm, ((0,self.config['num_classes']-cm.shape[0]),(0,self.config['num_classes']-cm.shape[1])), 'constant', constant_values=0)
         
         np.save(os.path.join(file_path,'{}task_confusion_matrix.npy'.format(task_num)), cm1)
-        plt.pcolor(cm1)
-        plt.colorbar()
+        plt.matshow(cm1)
+        #plt.colorbar()
         plt.savefig(os.path.join(file_path,'{}task_confusion_mat.pdf'.format(task_num)),bbox_inches='tight')
         plt.close()
 
