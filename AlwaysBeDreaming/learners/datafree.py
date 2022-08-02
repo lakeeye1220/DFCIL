@@ -440,10 +440,10 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
         super(AlwaysBeDreamingBalancing, self).__init__(learner_config)
         self.kl_loss = nn.KLDivLoss(reduction='batchmean')
         self.md_criterion = SP(reduction='mean')
-        if self.config['balancing_loss_type']=='l1':
-            self.norm_type=1
-        elif self.config['balancing_loss_type']=='l2':
-            self.norm_type=2
+        #if self.config['balancing_loss_type']=='l1':
+        #    self.norm_type=1
+        #elif self.config['balancing_loss_type']=='l2':
+        #    self.norm_type=2
 
         self.cc_criterion=CC(self.config['cc_gamma'],self.config['p_order'],reduction='none')
 
@@ -579,10 +579,9 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
                 loss_kd=loss_kd.mean()
         else:
             loss_kd = torch.zeros((1,), requires_grad=True).cuda()
-
+        loss_balancing=torch.zeros((1,),requires_grad=True).cuda()
         if self.previous_teacher is not None and self.config['balancing']:
             #new balancing
-            loss_balancing=torch.zeros((1,),requires_grad=True).cuda()
             if len(self.config['gpuid']) > 1:
                 last_weights=self.previous_linear.weight[:self.last_valid_out_dim,:].detach()
                 last_bias=self.previous_linear.bias[:self.last_valid_out_dim].detach().unsqueeze(-1)
@@ -595,12 +594,8 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
                 cur_bias=self.model.last.bias[self.last_valid_out_dim:].unsqueeze(-1)
             last_params=torch.cat([last_weights,last_bias],dim=1)
             cur_params=torch.cat([cur_weights,cur_bias],dim=1)
-            
             loss_balancing+=F.mse_loss(last_params.norm(dim=1).mean(),cur_params.norm(dim=1).mean())
-            loss_balancing*=self.config['wr_mu']
             loss_balancing*=self.config['balancing_mu']
-        else:
-            loss_balancing=torch.zeros((1,),requires_grad=True).cuda()
         # # balancing
         # if self.previous_teacher is not None and self.config['balancing']:
         #     task_weights=[]
@@ -647,8 +642,6 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
             
             loss_balancing+=F.mse_loss(last_params.norm(dim=1).mean(),cur_params.norm(dim=1).mean())
             loss_balancing*=self.config['wr_mu']
-        else:
-            loss_balancing=torch.zeros((1,),requires_grad=True).cuda()
 
         total_loss = loss_class + loss_kd + loss_middle + loss_balancing
         #total_loss = loss_class + loss_midfdle + 
