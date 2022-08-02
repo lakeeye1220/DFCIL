@@ -135,7 +135,6 @@ class Trainer:
                         'middle_mu':args.middle_mu,
                         'balancing_mu':args.balancing_mu, # temp
                         'balancing':args.balancing, # temp
-                        'balancing_loss_type':args.balancing_loss_type, # temp
                         'weight_regularization':args.weight_regularization, # temp
                         'wr_mu':args.wr_mu, # temp
                         'dw_middle':args.dw_middle,

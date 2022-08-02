@@ -440,10 +440,6 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
         super(AlwaysBeDreamingBalancing, self).__init__(learner_config)
         self.kl_loss = nn.KLDivLoss(reduction='batchmean')
         self.md_criterion = SP(reduction='mean')
-        if self.config['balancing_loss_type']=='l1':
-            self.norm_type=1
-        elif self.config['balancing_loss_type']=='l2':
-            self.norm_type=2
 
         self.cc_criterion=CC(self.config['cc_gamma'],self.config['p_order'],reduction='none')
 
@@ -526,15 +522,15 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
                 with torch.no_grad():
                     logits_prev_middle,out1_pm, out2_pm, out3_pm = self.previous_teacher.solver.forward(inputs[middle_index],middle=True)
                 loss_middle = (self.md_criterion(out1_m[middle_index],out1_pm)+self.md_criterion(out2_m[middle_index],out2_pm)+self.md_criterion(out3_m[middle_index],out3_pm))
-                # if self.config['dw_middle']:
-                #     loss_middle*=dw_cls[middle_index]
+                if self.config['dw_middle']:
+                    loss_middle*=dw_cls[middle_index]
                 loss_middle = loss_middle.mean()*self.config['middle_mu']
             elif self.config['middle_kd_type']=='cc':
                 with torch.no_grad():
                     last_logits_pen=self.previous_teacher.generate_scores_pen(inputs[middle_index])
                 loss_middle=self.cc_criterion(logits_pen[middle_index], last_logits_pen)
-                # if self.config['dw_middle']:
-                #     loss_middle*=(dw_cls[middle_index])#/dw_cls[middle_index].sum(keepdim=True))
+                if self.config['dw_middle']:
+                    loss_middle*=(dw_cls[middle_index])#/dw_cls[middle_index].sum(keepdim=True))
                 loss_middle=loss_middle.mean()*self.config['middle_mu']
             else:
                 raise ValueError("middle_kd_type must be sp or cc")
