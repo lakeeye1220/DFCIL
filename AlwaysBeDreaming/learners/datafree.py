@@ -580,33 +580,54 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
         else:
             loss_kd = torch.zeros((1,), requires_grad=True).cuda()
 
-        # balancing
         if self.previous_teacher is not None and self.config['balancing']:
-            task_weights=[]
+            #new balancing
             loss_balancing=torch.zeros((1,),requires_grad=True).cuda()
             if len(self.config['gpuid']) > 1:
-                for i in range(self.valid_out_dim//task_step):
-                    task_weights.append(
-                        torch.cat((
-                        self.model.module.last.weight[i*task_step:(i+1)*task_step,:],
-                        self.model.module.last.bias[i*task_step:(i+1)*task_step].unsqueeze(-1)),dim=1))
+                last_weights=self.previous_linear.weight[:self.last_valid_out_dim,:].detach()
+                last_bias=self.previous_linear.bias[:self.last_valid_out_dim].detach().unsqueeze(-1)
+                cur_weights=self.model.module.last.weight[self.last_valid_out_dim:,:]
+                cur_bias=self.model.module.last.bias[self.last_valid_out_dim:].unsqueeze(-1)
             else:
-                for i in range(self.valid_out_dim//task_step):
-                    task_weights.append(
-                        torch.cat ((self.model.last.weight[i*task_step:(i+1)*task_step,:], self.model.last.bias[i*task_step:(i+1)*task_step].unsqueeze(-1)),dim=1))
-            for i in range(len(task_weights)):
-                if i==0:
-                    oldest_task_weights=task_weights[i].detach().clone()
-                else:
-                    if self.config['balancing_loss_type']=='l1':
-                        loss_balancing+=F.l1_loss(task_weights[i].norm(),oldest_task_weights.norm())/ task_step
-                    elif self.config['balancing_loss_type']=='l2':
-                        loss_balancing+=F.mse_loss(task_weights[i].norm(),oldest_task_weights.norm())/ task_step
-                    else:
-                        raise ValueError("balancing_loss_type must be l1 or l2")
+                last_weights=self.previous_linear.weight[:self.last_valid_out_dim,:].detach()
+                last_bias=self.previous_linear.bias[:self.last_valid_out_dim].detach().unsqueeze(-1)
+                cur_weights=self.model.last.weight[self.last_valid_out_dim:,:]
+                cur_bias=self.model.last.bias[self.last_valid_out_dim:].unsqueeze(-1)
+            last_params=torch.cat([last_weights,last_bias],dim=1)
+            cur_params=torch.cat([cur_weights,cur_bias],dim=1)
+            
+            loss_balancing+=F.mse_loss(last_params.norm(dim=1).mean(),cur_params.norm(dim=1).mean())
+            loss_balancing*=self.config['wr_mu']
             loss_balancing*=self.config['balancing_mu']
         else:
             loss_balancing=torch.zeros((1,),requires_grad=True).cuda()
+        # # balancing
+        # if self.previous_teacher is not None and self.config['balancing']:
+        #     task_weights=[]
+        #     loss_balancing=torch.zeros((1,),requires_grad=True).cuda()
+        #     if len(self.config['gpuid']) > 1:
+        #         for i in range(self.valid_out_dim//task_step):
+        #             task_weights.append(
+        #                 torch.cat((
+        #                 self.model.module.last.weight[i*task_step:(i+1)*task_step,:],
+        #                 self.model.module.last.bias[i*task_step:(i+1)*task_step].unsqueeze(-1)),dim=1))
+        #     else:
+        #         for i in range(self.valid_out_dim//task_step):
+        #             task_weights.append(
+        #                 torch.cat ((self.model.last.weight[i*task_step:(i+1)*task_step,:], self.model.last.bias[i*task_step:(i+1)*task_step].unsqueeze(-1)),dim=1))
+        #     for i in range(len(task_weights)):
+        #         if i==0:
+        #             oldest_task_weights=task_weights[i].detach().clone()
+        #         else:
+        #             if self.config['balancing_loss_type']=='l1':
+        #                 loss_balancing+=F.l1_loss(task_weights[i].norm(),oldest_task_weights.norm())/ task_step
+        #             elif self.config['balancing_loss_type']=='l2':
+        #                 loss_balancing+=F.mse_loss(task_weights[i].norm(),oldest_task_weights.norm())/ task_step
+        #             else:
+        #                 raise ValueError("balancing_loss_type must be l1 or l2")
+        #     loss_balancing*=self.config['balancing_mu']
+        # else:
+        #     loss_balancing=torch.zeros((1,),requires_grad=True).cuda()
 
         # weight regularization
         if self.previous_teacher is not None and self.config['weight_regularization']:
