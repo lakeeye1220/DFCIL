@@ -635,7 +635,7 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
             last_params=torch.cat([last_weights,last_bias],dim=1)
             cur_params=torch.cat([cur_weights,cur_bias],dim=1)
             
-            loss_balancing+=F.mse_loss(last_params.norm(dim=1).mean(),cur_params.norm(dim=1).mean())
+            loss_balancing+=F.mse_loss(last_params.norm(dim=1).mean().view(-1),cur_params.norm(dim=1).mean())
             loss_balancing*=self.config['wr_mu']
 
         total_loss = loss_class + loss_kd + loss_middle + loss_balancing
