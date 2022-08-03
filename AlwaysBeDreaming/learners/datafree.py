@@ -439,7 +439,7 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
     def __init__(self, learner_config):
         super(AlwaysBeDreamingBalancing, self).__init__(learner_config)
         self.kl_loss = nn.KLDivLoss(reduction='batchmean')
-        self.md_criterion = SP(reduction='mean')
+        self.md_criterion = SP(reduction='none')
         self.cc_criterion=CC(self.config['cc_gamma'],self.config['p_order'],reduction='none')
 
     def update_model(self, real_x,real_y,x_fake, y_fake, inputs, targets, target_scores = None, dw_force = None, kd_index = None):
@@ -578,18 +578,18 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
         if self.previous_teacher is not None and self.config['balancing']:
             #new balancing
             if len(self.config['gpuid']) > 1:
-                last_weights=self.previous_linear.weight[:self.last_valid_out_dim,:].detach()
-                last_bias=self.previous_linear.bias[:self.last_valid_out_dim].detach().unsqueeze(-1)
-                cur_weights=self.model.module.last.weight[self.last_valid_out_dim:,:]
-                cur_bias=self.model.module.last.bias[self.last_valid_out_dim:].unsqueeze(-1)
+                last_weights=self.model.module.last.weight[:self.valid_out_dim,:].detach()
+                last_bias=self.model.module.last.bias[:self.valid_out_dim].detach().unsqueeze(-1)
+                cur_weights=self.model.module.last.weight[:self.valid_out_dim,:] #[self.last_valid_out_dim:,:]
+                cur_bias=self.model.module.last.bias[:self.valid_out_dim].unsqueeze(-1) #[self.last_valid_out_dim:].unsqueeze(-1)
             else:
-                last_weights=self.previous_linear.weight[:self.last_valid_out_dim,:].detach()
-                last_bias=self.previous_linear.bias[:self.last_valid_out_dim].detach().unsqueeze(-1)
-                cur_weights=self.model.last.weight[self.last_valid_out_dim:,:]
-                cur_bias=self.model.last.bias[self.last_valid_out_dim:].unsqueeze(-1)
+                last_weights=self.model.last.weight[:self.valid_out_dim,:].detach()
+                last_bias=self.model.last.bias[:self.valid_out_dim].detach().unsqueeze(-1)
+                cur_weights=self.model.last.weight[:self.valid_out_dim,:]
+                cur_bias=self.model.last.bias[:self.valid_out_dim].unsqueeze(-1) #[self.last_valid_out_dim:].unsqueeze(-1)
             last_params=torch.cat([last_weights,last_bias],dim=1)
             cur_params=torch.cat([cur_weights,cur_bias],dim=1)
-            loss_balancing+=F.mse_loss(last_params.norm(dim=1).mean(),cur_params.norm(dim=1).mean())
+            loss_balancing+=F.mse_loss(last_params.norm(dim=1).mean(),cur_params.norm(dim=1))
             loss_balancing*=self.config['balancing_mu']
         # # balancing
         # if self.previous_teacher is not None and self.config['balancing']:
