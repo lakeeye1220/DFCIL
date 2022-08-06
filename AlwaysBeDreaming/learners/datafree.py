@@ -120,17 +120,6 @@ class DeepInversionGenBN(NormalNN):
                     else:
                         x_replay = None
                         y_replay = None
-                    #if middle KD
-                    #if self.middle and self.previous_teacher.solver is not None:
-                        #print("previous teacher : ",self.previous_teacher)
-                        #logits_middle,out1_m,out2_m,out3_m = self.model.forward(x, middle=True)
-                        #logits_prev_middle,out1_pm, out2_pm, out3_pm = self.previous_teacher.solver.forward(x,middle=True)
-                        #print("out1_m shape : ", out1_m.shape)
-                        #print("out1_mp shape ",out1_pm.shape)
-
-                        #print("out1_m ",out1_m)
-                        #print("out1_mp : ",out1_pm)
-
 
                     if self.inversion_replay:
                         y_hat = self.previous_teacher.generate_scores(x, allowed_predictions=np.arange(self.last_valid_out_dim))
@@ -151,14 +140,8 @@ class DeepInversionGenBN(NormalNN):
                         dw_cls = None
 
                     # model update
-                    if self.inversion_replay:
+                    loss,loss_class,loss_kd,loss_middle,loss_balancing,output = self.update_model(x_com,y_com,y_hat_com, dw_force=dw_cls, kd_index = np.arange(len(x), len(x_com)))
 
-                    #loss, loss_class, loss_kd, loss_middle, output= self.update_model(x, y,x_replay,y_replay, x_com, y_com, y_hat_com, dw_force = dw_cls, kd_index = np.arange(len(x), len(x_com)))
-                        loss,loss_class,loss_kd,loss_middle,loss_balancing,output = self.update_model(x,y,x_replay,y_replay,x_com,y_com,y_hat_com, dw_force=dw_cls, kd_index = np.arange(len(x), len(x_com)))
-
-                        #loss,loss_class,loss_hardKD,loss_middle,loss_balancing,output = self.update_model(x,y,x_replay,y_replay,x_com,y_com,y_hat_com, dw_force=dw_cls, kd_index = np.arange(len(x), len(x_com)))
-                    else:
-                        loss, loss_class, loss_kd, loss_middle,loss_balancing, output= self.update_model(x, y,None, None, x_com, y_com, y_hat_com, dw_force = dw_cls, kd_index = np.arange(len(x), len(x_com)))
 
                     # measure elapsed time
                     batch_time.update(batch_timer.toc()) 
@@ -172,8 +155,8 @@ class DeepInversionGenBN(NormalNN):
                     losses[2].update(loss_kd,  y_com.size(0))
                     #losses[2].update(loss_hardKD, y_com.size(0))
                     #losses[3].update(loss_middle,y_com.size(0))
-                    losses[3].update(loss_middle,1)
-                    losses[4].update(loss_balancing,1)
+                    losses[3].update(loss_middle,y_com.size(0))
+                    losses[4].update(loss_balancing,y_com.size(0))
                     batch_timer.tic()
 
                 # eval update
@@ -316,7 +299,7 @@ class DeepInversionLWF(DeepInversionGenBN):
         super(DeepInversionLWF, self).__init__(learner_config)
         self.kl_loss = nn.KLDivLoss(reduction='batchmean').cuda()
 
-    def update_model(self, real_x,real_y,x_fake, y_fake, inputs, targets, target_scores = None, dw_force = None, kd_index = None):
+    def update_model(self, inputs, targets, target_scores = None, dw_force = None, kd_index = None):
         
         loss_kd = torch.zeros((1,), requires_grad=True).cuda()
 
@@ -353,7 +336,7 @@ class AlwaysBeDreaming(DeepInversionGenBN):
         super(AlwaysBeDreaming, self).__init__(learner_config)
         self.kl_loss = nn.KLDivLoss(reduction='batchmean').cuda()
 
-    def update_model(self, real_x,real_y,x_fake, y_fake, inputs, targets, target_scores = None, dw_force = None, kd_index = None):
+    def update_model(self, inputs, targets, target_scores = None, dw_force = None, kd_index = None):
         
         # class balancing
         mappings = torch.ones(targets.size(), dtype=torch.float32)
@@ -442,7 +425,7 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
         self.md_criterion = SP(reduction='none')
         self.cc_criterion=CC(self.config['cc_gamma'],self.config['p_order'],reduction='none')
 
-    def update_model(self, real_x,real_y,x_fake, y_fake, inputs, targets, target_scores = None, dw_force = None, kd_index = None):
+    def update_model(self, inputs, targets, target_scores = None, dw_force = None, kd_index = None):
         task_step=self.valid_out_dim-self.last_valid_out_dim
         # class balancing
         mappings = torch.ones(targets.size(), dtype=torch.float32)
