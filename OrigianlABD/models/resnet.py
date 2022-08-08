@@ -27,9 +27,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.init as init
 
-#__all__ = ['ResNet','resnet32']
-__all__ = ['ResNet','resnet32','ResNet18','ResNet34','ResNet50','ResNet101','ResNet152']
-
+__all__ = ['ResNet','resnet32']
 
 def _weights_init(m):
     #print(classname)
@@ -78,6 +76,82 @@ class BasicBlock(nn.Module):
 class ResNet(nn.Module):
     def __init__(self, block, num_blocks, num_classes=10):
         super(ResNet, self).__init__()
+        self.in_planes = 16
+
+        self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(16)
+        self.layer1 = self._make_layer(block, 16, num_blocks[0], stride=1)
+        self.layer2 = self._make_layer(block, 32, num_blocks[1], stride=2)
+        self.layer3 = self._make_layer(block, 64, num_blocks[2], stride=2)
+        self.last = nn.Linear(64, num_classes)
+
+        self.apply(_weights_init)
+
+    def _make_layer(self, block, planes, num_blocks, stride):
+        strides = [stride] + [1]*(num_blocks-1)
+        layers = []
+        for stride in strides:
+            layers.append(block(self.in_planes, planes, stride))
+            self.in_planes = planes * block.expansion
+
+        return nn.Sequential(*layers)
+
+    def forward(self, x, pen=False):
+        out = F.relu(self.bn1(self.conv1(x)))
+        out = self.layer1(out)
+        out = self.layer2(out)
+        out = self.layer3(out)
+        out = F.avg_pool2d(out, out.size()[3])
+        out = out.view(out.size(0), -1)
+        if pen:
+            return out
+        else:
+            out = self.last(out)
+            return out
+
+class ResNet(nn.Module):
+    def __init__(self, block, num_blocks, num_classes=10):
+        super(ResNet, self).__init__()
+        self.in_planes = 16
+
+        self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(16)
+        self.layer1 = self._make_layer(block, 16, num_blocks[0], stride=1)
+        self.layer2 = self._make_layer(block, 32, num_blocks[1], stride=2)
+        self.layer3 = self._make_layer(block, 64, num_blocks[2], stride=2)
+        self.last = nn.Linear(64, num_classes)
+
+        self.apply(_weights_init)
+
+    def _make_layer(self, block, planes, num_blocks, stride):
+        strides = [stride] + [1]*(num_blocks-1)
+        layers = []
+        for stride in strides:
+            layers.append(block(self.in_planes, planes, stride))
+            self.in_planes = planes * block.expansion
+
+        return nn.Sequential(*layers)
+
+    def forward(self, x, middle=False, pen=False):
+        out = F.relu(self.bn1(self.conv1(x)))
+        out1 = self.layer1(out)
+        out2 = self.layer2(out1)
+        out3 = self.layer3(out2)
+        out4 = F.avg_pool2d(out3, out3.size()[3])
+        out_pen = out4.view(out4.size(0), -1)
+        if pen:
+            return out_pen
+
+        if middle:
+            return out_pen, out1,out2,out3
+
+        else:
+            out = self.last(out_pen)
+            return out
+
+class ResNet(nn.Module):
+    def __init__(self, block, num_blocks, num_classes=10):
+        super(ResNet, self).__init__()
         self.len_blocks=len (num_blocks)
         if self.len_blocks==3:
             self.in_planes = 16
@@ -90,10 +164,6 @@ class ResNet(nn.Module):
             self.last = nn.Linear(64, num_classes)
 
             self.apply(_weights_init)
-
-            self.middle1= nn.Linear(16,16) 
-            self.middle2= nn.Linear(32,32)
-            self.middle3= nn.Linear(64,64)
         else: # len(num_blocks) 4
             
             self.in_planes = 64
@@ -128,21 +198,6 @@ class ResNet(nn.Module):
                 return out_pen
 
             if middle:
-                #out1 = F.adaptive_avg_pool2d(out1,(1,1))
-                #out1 = out1.view(out1.size(0),-1)
-                #out1_m = self.middle1(out1)
-
-                #out2 = F.adaptive_avg_pool2d(out2,(1,1))
-                #out2 = out2.view(out2.size(0),-1)
-                #out2_m = self.middle2(out2)
-
-                #out3 = F.adaptive_avg_pool2d(out3,(1,1))
-                #out3 = out3.view(out3.size(0),-1)
-                #out3_m = self.middle3(out3)
-
-
-                #return out, out1_m, out2_m, out3_m
-                
                 return out_pen, [out1,out2,out3]
 
             else:
@@ -158,73 +213,11 @@ class ResNet(nn.Module):
             out_pen = out5.view(out5.size(0), -1)
             if pen:
                 return out_pen
-
             if middle:
-                
-                return out_pen, [out1,out2,out3, out4]
-
+                return out_pen, [out1,out2,out3,out4]
             else:
                 out = self.last(out_pen)
                 return out
-
-
-class ResNet_ori(nn.Module):
-    def __init__(self, block, num_blocks, num_classes=10,p=0.0):
-        super(ResNet_ori, self).__init__()
-        self.in_planes = 64
-        self.p=p
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(64)
-        self.layer1 = self._make_layer(block, 64, num_blocks[0], stride=1)
-        self.layer2 = self._make_layer(block, 128, num_blocks[1], stride=2)
-        self.layer3 = self._make_layer(block, 256, num_blocks[2], stride=2)
-        self.layer4 = self._make_layer(block, 512, num_blocks[3], stride=2)
-        self.avgpool = nn.AdaptiveAvgPool2d((1,1))
-        self.last = nn.Linear(512*block.expansion, num_classes)
-    
-    def _make_layer(self, block, planes, num_blocks, stride):
-        strides = [stride] + [1]*(num_blocks-1)
-        layers = []
-        for stride in strides:
-            layers.append(block(self.in_planes, planes, stride))
-            self.in_planes = planes * block.expansion
-        return nn.Sequential(*layers)
-
-    def forward(self, x, pen=False):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        out0 = F.relu(x)
-        out = self.layer1(out0)
-        out1 = self.layer2(out)
-        out2 = self.layer3(out1)
-        out3 = self.layer4(out2)
-        out4 = self.avgpool(out3)
-        feature = out4.view(out4.size(0), -1)
-        #img = self.last(feature)
-        '''
-        if out_feature == False:
-            #return img, out3, out2, out1, out, out0
-            return img
-        else:
-            return img, feature, out3, out2, out1, out, out0
-        '''
-        if pen:
-            return feature
-        else:
-            img=self.last(feature)
-            return img
-
-        
-def ResNet18(out_dim):
-    return ResNet_ori(BasicBlock, [2,2,2,2], num_classes=out_dim)
-    
-    
-def ResNet34(out_dim):
-    return ResNet_ori(BasicBlock, [3,4,6,3], num_classes=out_dim)
-    
-def ResNet50(out_dim):
-    return ResNet_ori(Bottleneck, [3,4,6,3], num_classes=out_dim)
-
 
 def resnet32(out_dim):
     return ResNet(BasicBlock, [5, 5, 5], num_classes=out_dim)

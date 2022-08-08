@@ -6,9 +6,8 @@ import models
 from utils.metric import accuracy, AverageMeter, Timer
 import copy
 import numpy as np
-import matplotlib.pyplot as plt
 import os
-import tensorflow as tf
+import matplotlib.pyplot as plt
 class NormalNN(nn.Module):
     """
     consider citing the benchmarking environment this was built on top of
@@ -69,7 +68,11 @@ class NormalNN(nn.Module):
 
         # initialize optimizer
         self.init_optimizer()
-    
+
+    ##########################################
+    #           MODEL TRAINING               #
+    ##########################################
+
     def visualize_confusion_matrix(self, val_loader,file_path,task_num):
         cm=self.validation(val_loader,confusion_mat=True)
         if cm.shape[0]<self.config['num_classes']:
@@ -105,9 +108,6 @@ class NormalNN(nn.Module):
         plt.savefig(os.path.join(file_path,'{}task_class_norm.pdf'.format(task_num)),bbox_inches='tight')
         np.savetxt(os.path.join(file_path,'{}task_class_norm.csv'.format(task_num)), class_norm, delimiter=",", fmt='%.2f')
         plt.close()
-    ##########################################
-    #           MODEL TRAINING               #
-    ##########################################
 
     def learn_batch(self, train_loader, train_dataset, model_save_dir, val_loader=None):
         
@@ -140,6 +140,7 @@ class NormalNN(nn.Module):
             batch_timer = Timer()
             for epoch in range(self.config['schedule'][-1]):
                 self.epoch=epoch
+
                 if epoch > 0: self.scheduler.step()
                 for param_group in self.optimizer.param_groups:
                     self.log('LR:', param_group['lr'])
@@ -203,11 +204,8 @@ class NormalNN(nn.Module):
             return None
 
     def criterion(self, logits, targets, data_weights):
-        if self.config['dw_classification']:
-            loss_supervised = (self.criterion_fn(logits, targets.long()) * data_weights).mean()
-        else:
-            loss_supervised = self.criterion_fn(logits,targets.long()).mean()
-        return loss_supervised
+        loss_supervised = (self.criterion_fn(logits, targets.long()) * data_weights).mean()
+        return loss_supervised 
 
     def update_model(self, inputs, targets, target_scores = None, dw_force = None, kd_index = None):
         
@@ -230,7 +228,7 @@ class NormalNN(nn.Module):
         self.optimizer.step()
         return total_loss.detach(), logits
 
-    def validation(self, dataloader, model=None, task_in = None,  verbal = True,confusion_mat=False):
+    def validation(self, dataloader, model=None, task_in = None,  verbal = True):
 
         if model is None:
             model = self.model
@@ -239,9 +237,6 @@ class NormalNN(nn.Module):
         batch_timer = Timer()
         acc = AverageMeter()
         batch_timer.tic()
-
-        y_true=[]
-        y_pred=[]
 
         orig_mode = model.training
         model.eval()
@@ -266,19 +261,8 @@ class NormalNN(nn.Module):
                 if len(target) > 1:
                     output = model.forward(input)[:, task_in]
                     acc = accumulate_acc(output, target-task_in[0], task, acc, topk=(self.top_k,))
-
-            if confusion_mat:
-                y_true.append(target.cpu())
-                y_pred.append(output.argmax(dim=1).cpu())
-
+            
         model.train(orig_mode)
-
-        if confusion_mat:
-            y_true=torch.cat(y_true, dim=0)
-            y_pred=torch.cat(y_pred, dim=0)
-            cm = tf.math.confusion_matrix(y_true, y_pred)
-            return cm
-
 
         if verbal:
             self.log(' * Val Acc {acc.avg:.3f}, Total time {time:.2f}'
