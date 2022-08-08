@@ -217,6 +217,7 @@ class Trainer:
             self.train_dataset.append_coreset(only=False)
 
             # load dataloader
+            print(len(self.train_dataset))
             train_loader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, drop_last=True, num_workers=int(self.workers))
 
             # learn

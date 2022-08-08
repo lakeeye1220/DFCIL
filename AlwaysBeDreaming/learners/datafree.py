@@ -510,7 +510,7 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
                 else: # len pm 4
                     out1_pm,out2_pm,out3_pm,out4_pm=pm
                     out1_m,out2_m,out3_m,out4_m=m
-                    loss_middle = (self.md_criterion(out1_m[middle_index],out1_pm)+self.md_criterion(out2_m[middle_index],out2_pm)+self.md_criterion(out3_m[middle_index],out3_pm),self.md_criterion(out4_m[middle_index],out4_pm))/4.
+                    loss_middle = (self.md_criterion(out1_m[middle_index],out1_pm)+self.md_criterion(out2_m[middle_index],out2_pm)+self.md_criterion(out3_m[middle_index],out3_pm)+self.md_criterion(out4_m[middle_index],out4_pm))/4.
                 
                 if self.config['dw_middle']:
                     loss_middle*=dw_cls[middle_index]
@@ -580,7 +580,7 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
                 cur_bias=self.model.last.bias[:self.valid_out_dim].unsqueeze(-1) #[self.last_valid_out_dim:].unsqueeze(-1)
             last_params=torch.cat([last_weights,last_bias],dim=1)
             cur_params=torch.cat([cur_weights,cur_bias],dim=1)
-            loss_balancing+=F.mse_loss(last_params.norm(dim=1).mean(),cur_params.norm(dim=1))
+            loss_balancing+=F.mse_loss(last_params.norm(dim=1,keepdim=True).mean(),cur_params.norm(dim=1))
             loss_balancing*=self.config['balancing_mu']
         # # balancing
         # if self.previous_teacher is not None and self.config['balancing']:
