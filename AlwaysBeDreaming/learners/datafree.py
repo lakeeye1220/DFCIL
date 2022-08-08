@@ -442,7 +442,7 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
 
         # forward pass
         # logits_pen = self.model.forward(x=inputs, pen=True)
-        logits_pen,out1_m,out2_m,out3_m = self.model.forward(inputs, middle=True)
+        logits_pen,m = self.model.forward(inputs, middle=True)
 
         if len(self.config['gpuid']) > 1:
             logits = self.model.module.last(logits_pen)
@@ -502,8 +502,16 @@ class AlwaysBeDreamingBalancing(DeepInversionGenBN):
                 raise ValueError("middle_index must be real, fake or real_fake")
             if self.config['middle_kd_type']=='sp':
                 with torch.no_grad():
-                    logits_prev_middle,out1_pm, out2_pm, out3_pm = self.previous_teacher.solver.forward(inputs[middle_index],middle=True)
-                loss_middle = (self.md_criterion(out1_m[middle_index],out1_pm)+self.md_criterion(out2_m[middle_index],out2_pm)+self.md_criterion(out3_m[middle_index],out3_pm))
+                    logits_prev_middle,pm = self.previous_teacher.solver.forward(inputs[middle_index],middle=True)
+                if len(pm)==3:
+                    out1_pm,out2_pm,out3_pm=pm
+                    out1_m,out2_m,out3_m=m
+                    loss_middle = (self.md_criterion(out1_m[middle_index],out1_pm)+self.md_criterion(out2_m[middle_index],out2_pm)+self.md_criterion(out3_m[middle_index],out3_pm))/3.
+                else: # len pm 4
+                    out1_pm,out2_pm,out3_pm,out4_pm=pm
+                    out1_m,out2_m,out3_m,out4_m=m
+                    loss_middle = (self.md_criterion(out1_m[middle_index],out1_pm)+self.md_criterion(out2_m[middle_index],out2_pm)+self.md_criterion(out3_m[middle_index],out3_pm),self.md_criterion(out4_m[middle_index],out4_pm))/4.
+                
                 if self.config['dw_middle']:
                     loss_middle*=dw_cls[middle_index]
                 loss_middle = loss_middle.mean()*self.config['middle_mu']

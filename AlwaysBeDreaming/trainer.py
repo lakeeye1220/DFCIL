@@ -90,6 +90,7 @@ class Trainer:
         # datasets and dataloaders
         train_transform = dataloaders.utils.get_transform(dataset=args.dataset, phase='train', aug=args.train_aug, dgr=self.dgr)
         test_transform  = dataloaders.utils.get_transform(dataset=args.dataset, phase='test', aug=args.train_aug, dgr=self.dgr)
+        
         self.train_dataset = Dataset(args.dataroot, train=True, tasks=self.tasks,
                             download_flag=True, transform=train_transform, 
                             seed=self.seed, validation=args.validation)
