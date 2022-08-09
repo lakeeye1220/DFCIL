@@ -128,7 +128,7 @@ class DeepInversionGenBN(NormalNN):
 
                 # eval update
                 self.log('Epoch:{epoch:.0f}/{total:.0f}'.format(epoch=self.epoch+1,total=self.config['schedule'][-1]))
-                self.log(' * Loss {loss.avg:.4e} | CE Loss {lossb.avg:.4e} | KD Loss {lossc.avg:.4e} | Middle Loss {lossd.avg:.3f} | Balancing Loss {losse.avg:.4e}'.format(loss=losses[0],lossb=losses[1],lossc=losses[2],lossd=losses[3],losse=losses[4]))
+                self.log(' * Loss {loss.avg:.4e} | CE Loss {lossb.avg:.4e} | KD Loss {lossc.avg:.4e} | Middle Loss {lossd.avg:.4e} | Balancing Loss {losse.avg:.4e}'.format(loss=losses[0],lossb=losses[1],lossc=losses[2],lossd=losses[3],losse=losses[4]))
                 self.log(' * Train Acc {acc.avg:.3f} | Train Acc Gen {accg.avg:.3f}'.format(acc=acc,accg=accg))
 
                 # Evaluate the performance of current task
