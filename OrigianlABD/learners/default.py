@@ -83,7 +83,7 @@ class NormalNN(nn.Module):
         
         np.save(os.path.join(file_path,'{}task_confusion_matrix.npy'.format(task_num)), cm1)
         plt.figure()
-        plt.matshow(cm1)
+        plt.matshow(cm1, cmap='jet')
         #plt.colorbar()
         plt.savefig(os.path.join(file_path,'{}task_confusion_mat.pdf'.format(task_num)),bbox_inches='tight')
         plt.close()
