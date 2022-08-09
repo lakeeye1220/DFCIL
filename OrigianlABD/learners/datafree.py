@@ -136,7 +136,7 @@ class DeepInversionGenBN(NormalNN):
                     self.validation(val_loader)
 
                 # reset
-                losses = [AverageMeter() for i in range(3)]
+                losses = [AverageMeter() for i in range(5)]
                 acc = AverageMeter()
                 accg = AverageMeter()
 

@@ -83,7 +83,6 @@ def create_args():
     parser.add_argument('--dw_kd',default=False,action='store_true',help='dw logits distillation')
     parser.add_argument('--kd_type',default=None,type=str,help='logits kd type',choices=['kd','abd','hkd_yj'])
     parser.add_argument('--kd_index',default='real_fake',type=str,help='classification index (real, fake, real_fake)')
-    parser.add_argument('--mu', type=float, default=1.0, help="KD loss balancing weight")
 
     parser.add_argument('--cc_gamma',default=0.4,type=float,help='middle kd cc gamma')
     parser.add_argument('--p_order',default=2,type=int,help='middle kd cc p_order')
