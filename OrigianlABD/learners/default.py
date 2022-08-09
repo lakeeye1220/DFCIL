@@ -267,8 +267,8 @@ class NormalNN(nn.Module):
                     acc = accumulate_acc(output, target-task_in[0], task, acc, topk=(self.top_k,))
             
             if confusion_mat:
-                y_true.append(target.cpu())
-                y_pred.append(output.argmax(dim=1).cpu())
+                y_true.append(target.detach().cpu())
+                y_pred.append(output.argmax(dim=1).detach().cpu())
         model.train(orig_mode)
 
         if confusion_mat:
