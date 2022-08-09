@@ -620,7 +620,7 @@ class iTinyIMNET(iDataset):
         from os import path
         root = self.root
         FileNameEnd = 'JPEG'
-        train_dir = path.join(root, 'tiny-imagenet/tiny-imagenet-200/train')
+        train_dir = path.join(root, 'train')
         self.class_names = sorted(os.listdir(train_dir))
         self.names2index = {v: k for k, v in enumerate(self.class_names)}
         self.data = []
@@ -628,7 +628,7 @@ class iTinyIMNET(iDataset):
 
         if self.train:
             for label in self.class_names:
-                d = path.join(root, 'tiny-imagenet/tiny-imagenet-200/train', label)
+                d = path.join(root, 'train', label)
                 for directory, _, names in os.walk(d):
                     for name in names:
                         filename = path.join(directory, name)
@@ -636,11 +636,11 @@ class iTinyIMNET(iDataset):
                             self.data.append(filename)
                             self.targets.append(self.names2index[label])
         else:
-            val_dir = path.join(root, 'tiny-imagenet/tiny-imagenet-200/val')
-            with open(path.join(val_dir, 'val_annotations.txt'), 'r') as f:
+            val_dir = path.join(root, 'val_images_no_split')
+            with open(path.join(root,'val', 'val_annotations.txt'), 'r') as f:
                 infos = f.read().strip().split('\n')
                 infos = [info.strip().split('\t')[:2] for info in infos]
-                self.data = [path.join(val_dir, 'images', info[0])for info in infos]
+                self.data = [path.join(val_dir, info[0])for info in infos]
                 self.targets = [self.names2index[info[1]] for info in infos]
 
 
