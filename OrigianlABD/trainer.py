@@ -145,6 +145,8 @@ class Trainer:
                         'classification_type':args.classification_type,
                         'dw_classification':args.dw_classification,
                         'classification_index':args.classification_index,
+                        'kd_type':args.kd_type,
+                        'kd_index':args.kd_index,
                         }
         self.learner_type, self.learner_name = args.learner_type, args.learner_name
         self.learner = learners.__dict__[self.learner_type].__dict__[self.learner_name](self.learner_config)
