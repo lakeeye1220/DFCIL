@@ -8,6 +8,7 @@ import copy
 import numpy as np
 import os
 import matplotlib.pyplot as plt
+import tensorflow as tf
 class NormalNN(nn.Module):
     """
     consider citing the benchmarking environment this was built on top of
@@ -228,7 +229,7 @@ class NormalNN(nn.Module):
         self.optimizer.step()
         return total_loss.detach(), logits
 
-    def validation(self, dataloader, model=None, task_in = None,  verbal = True):
+    def validation(self, dataloader, model=None, task_in = None,  verbal = True, confusion_mat=False):
 
         if model is None:
             model = self.model
@@ -237,6 +238,9 @@ class NormalNN(nn.Module):
         batch_timer = Timer()
         acc = AverageMeter()
         batch_timer.tic()
+
+        y_true=[]
+        y_pred=[]
 
         orig_mode = model.training
         model.eval()
@@ -262,13 +266,20 @@ class NormalNN(nn.Module):
                     output = model.forward(input)[:, task_in]
                     acc = accumulate_acc(output, target-task_in[0], task, acc, topk=(self.top_k,))
             
+            if confusion_mat:
+                y_true.append(target.cpu())
+                y_pred.append(output.argmax(dim=1).cpu())
         model.train(orig_mode)
 
+        if confusion_mat:
+            y_true=torch.cat(y_true, dim=0)
+            y_pred=torch.cat(y_pred, dim=0)
+            cm = tf.math.confusion_matrix(y_true, y_pred)
+            return cm
         if verbal:
             self.log(' * Val Acc {acc.avg:.3f}, Total time {time:.2f}'
                     .format(acc=acc, time=batch_timer.toc()))
         return acc.avg
-
 
     ##########################################
     #             MODEL UTILS                #
