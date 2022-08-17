@@ -2,13 +2,13 @@
 
 # process inputs
 DEFAULTGPU=0
-GPUID=${2:-$DEFAULTDR}
-DATAROOT="/data"
+GPUID=0
+DATAROOT="../data/dataset"
 
 # benchmark settings
 DATE=AAAI2023
 SPLIT=5
-OUTDIR=outputs/${DATE}/DFCIL-twentytask/TinyImageNet100
+OUTDIR=outputs/${DATE}-test/DFCIL-twentytask/TinyImageNet100
 
 ###############################################################
 
@@ -23,8 +23,8 @@ MAXTASK=-1
 
 # hard coded inputs
 REPEAT=1
-SCHEDULE="100 150 200 250"
-PI=10000
+SCHEDULE="1"
+PI=1
 MODELNAME=resnet32
 BS=128
 WD=0.0002
@@ -36,7 +36,7 @@ LR=0.1
 # #         OURS          #
 # #########################
 
-python3 -u run_dfcil.py --dataset TinyImageNet100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT --dataroot $DATAROOT \
+python -u run_dfcil.py --dataset TinyImageNet100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT --dataroot $DATAROOT \
     --first_split_size $SPLIT --other_split_size $SPLIT --schedule $SCHEDULE --schedule_type decay --batch_size $BS \
     --optimizer $OPT --lr $LR --momentum $MOM --weight_decay $WD \
     --mu 5e-2 --memory 0 --model_name $MODELNAME --model_type resnet \

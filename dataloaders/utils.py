@@ -17,6 +17,9 @@ dataset_stats = {
     'TinyImageNet': {'mean': (0.4389, 0.4114, 0.3682),
                  'std' : (0.2402, 0.2350, 0.2268),
                  'size' : 64},  
+    'TinyImageNet100': {'mean': (0.4389, 0.4114, 0.3682),
+                 'std' : (0.2402, 0.2350, 0.2268),
+                 'size' : 64},  
                 }
 
 # transformations

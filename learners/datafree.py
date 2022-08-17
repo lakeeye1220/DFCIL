@@ -22,6 +22,7 @@ class ISCF(NormalNN):
         self.power_iters = self.config['power_iters']
         self.deep_inv_params = self.config['deep_inv_params']
         self.kd_criterion = nn.MSELoss(reduction="none")
+        self.dataset=self.config['dataset']
 
         # gen parameters
         self.generator = self.create_generator()
@@ -152,7 +153,7 @@ class ISCF(NormalNN):
             self.previous_previous_teacher = self.previous_teacher
         
         # new teacher
-        if (self.out_dim == self.valid_out_dim): need_train = False
+        if (self.out_dim == self.valid_out_dim) or (self.dataset== 'TinyImageNet100' and self.valid_out_dim==100): need_train = False
         self.previous_teacher = Teacher(solver=copy.deepcopy(self.model), generator=self.generator, gen_opt = self.generator_optimizer, img_shape = (-1, train_dataset.nch,train_dataset.im_size, train_dataset.im_size), iters = self.power_iters, deep_inv_params = self.deep_inv_params, class_idx = np.arange(self.valid_out_dim), train = need_train, config = self.config)
         self.sample(self.previous_teacher, self.batch_size, self.device, return_scores=False)
         if len(self.config['gpuid']) > 1:
@@ -315,7 +316,7 @@ class ISCF(NormalNN):
             weq_regularizer*=self.config['weq_mu']
         else:
             weq_regularizer=torch.zeros((1,),requires_grad=True).cuda()
-            
+
         total_loss = loss_class + loss_kd + loss_sp + weq_regularizer
 
         self.optimizer.zero_grad()

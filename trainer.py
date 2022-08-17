@@ -18,6 +18,7 @@ class Trainer:
         self.log_dir = args.log_dir
         self.batch_size = args.batch_size
         self.workers = args.workers
+        self.task_step_size=args.other_split_size
 
         # for generative models, pre-process data to be 0...1; otherwise, pre-process data to be zero mean, unit variance
         if args.learner_type == 'dgr':
@@ -44,13 +45,13 @@ class Trainer:
             num_classes = 100
             self.dataset_size = [32,32,3]
             args.dataroot=os.path.join(args.dataroot, 'cifar100')
-        elif args.dataset == 'ImageNet':
+        elif args.dataset == 'ImageNet' or args.dataset == 'ImageNet50':
             Dataset = dataloaders.iIMAGENET
             num_classes = 1000
             self.dataset_size = [224,224,3]
             self.top_k = 5
             args.dataroot=os.path.join(args.dataroot, 'imagenet')
-        elif args.dataset == 'TinyImageNet':
+        elif args.dataset == 'TinyImageNet' or args.dataset == 'TinyImageNet100':
             Dataset = dataloaders.iTinyIMNET
             num_classes = 200
             self.dataset_size = [64,64,3]
@@ -109,6 +110,7 @@ class Trainer:
 
         # Prepare the self.learner (model)
         self.learner_config = {'num_classes': num_classes,
+                        'dataset': args.dataset,
                         'lr': args.lr,
                         'momentum': args.momentum,
                         'weight_decay': args.weight_decay,
@@ -175,6 +177,9 @@ class Trainer:
             np.random.seed(self.seed*100 + i)
             torch.manual_seed(self.seed*100 + i)
             torch.cuda.manual_seed(self.seed*100 + i)
+            torch.random.manual_seed(self.seed*100 + i)
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
 
             # print name
             train_name = self.task_names[i]
@@ -230,6 +235,12 @@ class Trainer:
                 np.savetxt(save_file, np.asarray(temp_table[mkey]), delimiter=",", fmt='%.2f')  
             if avg_train_time is not None: avg_metrics['time']['global'][i] = avg_train_time
             avg_metrics['mem']['global'][:] = self.learner.count_memory(self.dataset_size)
+            if (self.learner_config['dataset']== 'TinyImageNet100' and (self.current_t_index+1)*self.task_step_size==100):
+                break
+            elif self.learner_config['dataset']== 'ImageNet50' and ((self.current_t_index+1)*self.task_step_size==100):
+                break
+            else:
+                pass
 
         return avg_metrics 
     
