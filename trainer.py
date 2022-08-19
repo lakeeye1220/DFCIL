@@ -62,6 +62,7 @@ class Trainer:
         # load tasks
         class_order = np.arange(num_classes).tolist()
         class_order_logits = np.arange(num_classes).tolist()
+        #shuffle the class order 
         if args.rand_split:
             print('=============================================')
             print('Shuffling....')

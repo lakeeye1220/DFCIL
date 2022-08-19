@@ -24,7 +24,7 @@ class ISCF(NormalNN):
         self.kd_criterion = nn.MSELoss(reduction="none")
         self.dataset=self.config['dataset']
 
-        # gen parameters
+        # generator parameters
         self.generator = self.create_generator()
         self.generator_optimizer = Adam(params=self.generator.parameters(), lr=self.deep_inv_params[0])
         self.beta = self.config['beta']
@@ -33,6 +33,7 @@ class ISCF(NormalNN):
         if self.gpu:
             self.cuda_gen()
         
+        #SPKD loss definition
         self.md_criterion = SP(reduction='none')
     ##########################################
     #           MODEL TRAINING               #
@@ -65,6 +66,7 @@ class ISCF(NormalNN):
             if val_loader is not None:
                 self.validation(val_loader)
 
+            #compute the 5 losses of ISCF frameworks - LCE(local CE) + SPKD(Intermediate K.D) + LKD(Logit KD) + FT(Finetuning) + WEQ(Weight equalizer)
             losses = [AverageMeter() for i in range(5)]
             acc = AverageMeter()
             accg = AverageMeter()
@@ -92,20 +94,20 @@ class ISCF(NormalNN):
                     if self.inversion_replay:
                         x_replay, y_replay, y_replay_hat = self.sample(self.previous_teacher, len(x), self.device)
 
-                    # if KD
+                    # From 2task, we use the old samples by model-inversion approach and we combine the real images with synthetic images
                     if self.inversion_replay:
                         y_hat = self.previous_teacher.generate_scores(x, allowed_predictions=np.arange(self.last_valid_out_dim))
                         _, y_hat_com = self.combine_data(((x, y_hat),(x_replay, y_replay_hat)))
                     else:
                         y_hat_com = None
 
-                    # combine inputs and generated samples for classification
+                    # combine inputs and generated samples for SPKD,LKD and FT
                     if self.inversion_replay:
                         x_com, y_com = self.combine_data(((x, y),(x_replay, y_replay)))
                     else:
                         x_com, y_com = x, y
 
-                    # sd data weighting (NOT online learning compatible)
+                    # sd data weighting for LCE and FT loss 
                     if self.dw:
                         dw_cls = self.dw_k[y_com.long()]
                     else:
@@ -152,7 +154,7 @@ class ISCF(NormalNN):
         if self.previous_teacher is not None:
             self.previous_previous_teacher = self.previous_teacher
         
-        # new teacher
+        # define the new model - current model 
         if (self.out_dim == self.valid_out_dim) or (self.dataset== 'TinyImageNet100' and self.valid_out_dim==100): need_train = False
         self.previous_teacher = Teacher(solver=copy.deepcopy(self.model), generator=self.generator, gen_opt = self.generator_optimizer, img_shape = (-1, train_dataset.nch,train_dataset.im_size, train_dataset.im_size), iters = self.power_iters, deep_inv_params = self.deep_inv_params, class_idx = np.arange(self.valid_out_dim), train = need_train, config = self.config)
         self.sample(self.previous_teacher, self.batch_size, self.device, return_scores=False)
@@ -232,17 +234,13 @@ class ISCF(NormalNN):
         mappings = torch.ones(targets.size(), dtype=torch.float32)
         if self.gpu:
             mappings = mappings.cuda()
-        #print("ABD self.last_valid_out_dim shape : ",self.last_valid_out_dim) #5
-        #print("ABD self.valid_out_dim", self.valid_out_dim) #10
 
         rnt = 1.0 * self.last_valid_out_dim / self.valid_out_dim
-        #print("rnt  :",rnt)
         mappings[:self.last_valid_out_dim] = rnt
         mappings[self.last_valid_out_dim:] = 1-rnt
         dw_cls = mappings[targets.long()]
 
         # forward pass
-        # logits_pen = self.model.forward(x=inputs, pen=True)
         logits_pen,m = self.model.forward(inputs, middle=True)
 
         if len(self.config['gpuid']) > 1:
@@ -254,7 +252,7 @@ class ISCF(NormalNN):
         class_idx = np.arange(self.batch_size) # real
         if self.inversion_replay:
 
-            # local classification
+            # local classification - LCE loss: the logit dimension is from last_valid_out_dim to valid_out_dim
             loss_class = self.criterion(logits[class_idx,self.last_valid_out_dim:self.valid_out_dim], (targets[class_idx]-self.last_valid_out_dim).long(), dw_cls[class_idx]) 
             
             # ft classification  
@@ -262,13 +260,14 @@ class ISCF(NormalNN):
                 loss_class += self.criterion(self.model.module.last(logits_pen.detach()), targets.long(), dw_cls)
             else:
                 loss_class += self.criterion(self.model.last(logits_pen.detach()), targets.long(), dw_cls)
-            
+        
+        #first task local classification when we do not use any synthetic data     
         else:
             loss_class = self.criterion(logits[class_idx], targets[class_idx].long(), dw_cls[class_idx])
 
 
         
-        #Middle K.D
+        #SPKD - Intermediate KD
         if self.previous_teacher: # after 2nd task
             middle_index= np.arange(2*self.batch_size) # real n fake
             with torch.no_grad():
@@ -286,18 +285,19 @@ class ISCF(NormalNN):
         else:
             loss_sp=torch.zeros((1,), requires_grad=True).cuda()
 
-        # KD
+        # Logit KD for maintaining the output probability 
         if self.previous_teacher:
             kd_index= np.arange(2*self.batch_size)
             with torch.no_grad():
                 logits_prevpen = self.previous_teacher.solver.forward(inputs[kd_index],pen=True)
                 logits_prev=self.previous_linear(logits_prevpen)[:,:self.last_valid_out_dim].detach()
 
-            loss_kd=(F.mse_loss(logits[kd_index,:self.last_valid_out_dim],logits_prev,reduction='none').sum(dim=1)) * self.mu / task_step
-            loss_kd=loss_kd.mean()
+            loss_lkd=(F.mse_loss(logits[kd_index,:self.last_valid_out_dim],logits_prev,reduction='none').sum(dim=1)) * self.mu / task_step
+            loss_lkd=loss_lkd.mean()
         else:
-            loss_kd = torch.zeros((1,), requires_grad=True).cuda()
-
+            loss_lkd = torch.zeros((1,), requires_grad=True).cuda()
+        
+        # weight equalizer for balancing the average norm of weight 
         if self.previous_teacher:
             if len(self.config['gpuid']) > 1:
                 last_weights=self.model.module.last.weight[:self.valid_out_dim,:].detach()
@@ -317,11 +317,12 @@ class ISCF(NormalNN):
         else:
             weq_regularizer=torch.zeros((1,),requires_grad=True).cuda()
 
-        total_loss = loss_class + loss_kd + loss_sp + weq_regularizer
+        # calculate the 5 losses - LCE + SPKD + LKD + FT + WEQ, loss_class include the LCE and FT losses
+        total_loss = loss_class + loss_lkd + loss_sp + weq_regularizer
 
         self.optimizer.zero_grad()
         total_loss.backward()
         # step
         self.optimizer.step()
 
-        return total_loss.detach(), loss_class.detach(), loss_kd.detach(), loss_sp.detach(), weq_regularizer.detach(), logits
+        return total_loss.detach(), loss_class.detach(), loss_lkd.detach(), loss_sp.detach(), weq_regularizer.detach(), logits

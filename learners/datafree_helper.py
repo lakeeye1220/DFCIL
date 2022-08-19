@@ -3,30 +3,14 @@ from torch import nn
 import torch.nn.functional as F
 import math
 from tqdm import tqdm
-"""
-Some content adapted from the following:
-@article{fang2019datafree,
-    title={Data-Free Adversarial Distillation},	
-    author={Gongfan Fang and Jie Song and Chengchao Shen and Xinchao Wang and Da Chen and Mingli Song},	  
-    journal={arXiv preprint arXiv:1912.11006},	
-    year={2019}
-}
-@inproceedings{yin2020dreaming,
-	title = {Dreaming to Distill: Data-free Knowledge Transfer via DeepInversion},
-	author = {Yin, Hongxu and Molchanov, Pavlo and Alvarez, Jose M. and Li, Zhizhong and Mallya, Arun and Hoiem, Derek and Jha, Niraj K and Kautz, Jan},
-	booktitle = {The IEEE/CVF Conf. Computer Vision and Pattern Recognition (CVPR)},
-	month = June,
-	year = {2020}
-}
-"""
 
 class Teacher(nn.Module):
 
     def __init__(self, solver, generator, gen_opt, img_shape, iters, class_idx, deep_inv_params, train = True, config=None):
 
         super().__init__()
-        self.solver = solver
-        self.generator = generator
+        self.solver = solver #classifier
+        self.generator = generator #generator
         self.gen_opt = gen_opt
         self.solver.eval()
         self.generator.eval()
@@ -34,7 +18,7 @@ class Teacher(nn.Module):
         self.iters = iters
         self.config = config
 
-        # hyperparameters
+        # hyperparameters for image synthesis
         self.di_lr = deep_inv_params[0]
         self.r_feature_weight = deep_inv_params[1]
         self.di_var_scale = deep_inv_params[2]
@@ -46,7 +30,6 @@ class Teacher(nn.Module):
         self.class_idx = list(class_idx)
         self.num_k = len(self.class_idx)
 
-        # first time?
         self.first_time = train
 
         # set up criteria for optimization
@@ -116,7 +99,7 @@ class Teacher(nn.Module):
         return y_hat
 
     def get_images(self, bs=256, epochs=1000, idx=-1):
-
+        # synthesize old samples using model inversion
         # clear cuda cache
         torch.cuda.empty_cache()
 
@@ -130,7 +113,7 @@ class Teacher(nn.Module):
             self.gen_opt.zero_grad()
             self.solver.zero_grad()
 
-            # content
+            # data conetent loss
             outputs = self.solver(inputs)[:,:self.num_k]
             loss = self.criterion(outputs / self.content_temp, torch.argmax(outputs, dim=1)) * self.content_weight
 
@@ -138,7 +121,7 @@ class Teacher(nn.Module):
             softmax_o_T = F.softmax(outputs, dim = 1).mean(dim = 0)
             loss += (1.0 + (softmax_o_T * torch.log(softmax_o_T) / math.log(self.num_k)).sum())
 
-            # R_feature loss
+            # Statstics alignment
             for mod in self.loss_r_feature_layers: 
                 loss_distr = mod.r_feature * self.r_feature_weight / len(self.loss_r_feature_layers)
                 if len(self.config['gpuid']) > 1:
@@ -150,7 +133,7 @@ class Teacher(nn.Module):
             loss_var = self.mse_loss(inputs, inputs_smooth).mean()
             loss = loss + self.di_var_scale * loss_var
 
-            # backward pass
+            # backward pass - update the generator
             loss.backward()
 
             self.gen_opt.step()
@@ -160,10 +143,9 @@ class Teacher(nn.Module):
         self.generator.eval()
 
 class DeepInversionFeatureHook():
-    '''
-    Implementation of the forward hook to track feature statistics and compute a loss on them.
-    Will compute mean and variance, and will use l2 as a loss
-    '''
+    
+    #Implementation of the forward hook to track feature statistics and compute a loss on them.
+    #Will compute mean and variance, and will use l2 as a loss
 
     def __init__(self, module, gram_matrix_weight, layer_weight):
         self.hook = module.register_forward_hook(self.hook_fn)
@@ -186,18 +168,7 @@ class DeepInversionFeatureHook():
         self.hook.remove()
 
 class Gaussiansmoothing(nn.Module):
-    """
-    Apply gaussian smoothing on a
-    1d, 2d or 3d tensor. Filtering is performed seperately for each channel
-    in the input using a depthwise convolution.
-    Arguments:
-        channels (int, sequence): Number of channels of the input tensors. Output will
-            have this number of channels as well.
-        kernel_size (int, sequence): Size of the gaussian kernel.
-        sigma (float, sequence): Standard deviation of the gaussian kernel.
-        dim (int, optional): The number of dimensions of the data.
-            Default value is 2 (spatial).
-    """
+    #Apply gaussian smoothing on a 1d, 2d or 3d tensor. Filtering is performed seperately for each channel in the input using a depthwise convolution.
     def __init__(self, channels, kernel_size, sigma, dim=2):
         super(Gaussiansmoothing, self).__init__()
         kernel_size = [kernel_size] * dim
@@ -239,11 +210,6 @@ class Gaussiansmoothing(nn.Module):
             )
 
     def forward(self, input):
-        """
-        Apply gaussian filter to input.
-        Arguments:
-            input (torch.Tensor): Input to apply gaussian filter on.
-        Returns:
-            filtered (torch.Tensor): Filtered output.
-        """
+        #Apply gaussian filter to input.
+        #filtered (torch.Tensor): Filtered output.
         return self.conv(input, weight=self.weight, groups=self.groups)

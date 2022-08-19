@@ -17,4 +17,4 @@ class SP(nn.Module):
         G_t = torch.mm(fm_t,fm_t.t())
         norm_G_t = F.normalize(G_t,p=2,dim=1)
         loss = F.mse_loss(norm_G_s,norm_G_t,reduction=self.reduction)
-        return loss
+        return loss 

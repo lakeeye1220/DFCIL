@@ -75,6 +75,7 @@ class NormalNN(nn.Module):
     ##########################################
 
     def visualize_confusion_matrix(self, val_loader,file_path,task_num):
+        #plot the confusion matrix
         cm=self.validation(val_loader,confusion_mat=True)
         if cm.shape[0]<self.config['num_classes']:
             cm1 = np.pad(cm, ((0,self.config['num_classes']-cm.shape[0]),(0,self.config['num_classes']-cm.shape[1])), 'constant', constant_values=0)
@@ -83,12 +84,13 @@ class NormalNN(nn.Module):
         
         np.save(os.path.join(file_path,'{}task_confusion_matrix.npy'.format(task_num)), cm1)
         plt.figure()
-        plt.matshow(cm1, cmap='jet')
+        plt.matshow(cm1, cmap='viridis')
         #plt.colorbar()
         plt.savefig(os.path.join(file_path,'{}task_confusion_mat.pdf'.format(task_num)),bbox_inches='tight')
         plt.close()
 
     def visualize_weight(self,file_path,task_num):
+        #plot the L1-weight norm per each task 
         class_norm=[]
         if len(self.config['gpuid'])>1:
             weight=self.model.module.last.weight
@@ -205,6 +207,7 @@ class NormalNN(nn.Module):
             return None
 
     def criterion(self, logits, targets, data_weights):
+        # calculate the LCE and FT losses with data_weighting
         loss_supervised = (self.criterion_fn(logits, targets.long()) * data_weights).mean()
         return loss_supervised 
 
@@ -219,7 +222,7 @@ class NormalNN(nn.Module):
         logits = self.forward(inputs)
         total_loss = self.criterion(logits, targets.long(), dw_cls)
 
-        # KD
+        # vanilla KD
         if target_scores is not None:
             if kd_index is None: kd_index = np.arange(len(logits))
             total_loss += self.mu * loss_fn_kd(logits[kd_index], target_scores[kd_index], dw_cls[kd_index], np.arange(self.last_valid_out_dim).tolist(), self.DTemp)
@@ -230,11 +233,10 @@ class NormalNN(nn.Module):
         return total_loss.detach(), logits
 
     def validation(self, dataloader, model=None, task_in = None,  verbal = True, confusion_mat=False):
-
+        #evaluation the model performance, print the top-1 accuracy per each task
         if model is None:
             model = self.model
 
-        # This function doesn't distinguish tasks.
         batch_timer = Timer()
         acc = AverageMeter()
         batch_timer.tic()
@@ -408,7 +410,7 @@ class NormalNN(nn.Module):
     
     def add_valid_output_dim(self, dim=0):
 
-        # This function is kind of ad-hoc, but it is the simplest way to support incremental class learning
+        # gradually increasing the classification head dimension
         self.log('Incremental class: Old valid output dimension:', self.valid_out_dim)
         self.valid_out_dim += dim
         self.log('Incremental class: New Valid output dimension:', self.valid_out_dim)
@@ -447,9 +449,9 @@ def accumulate_acc(output, target, task, meter, topk):
     return meter
 
 def loss_fn_kd(scores, target_scores, data_weights, allowed_predictions, T=2., soft_t = False):
-    """Compute knowledge-distillation (KD) loss given [scores] and [target_scores].
-    Both [scores] and [target_scores] should be tensors, although [target_scores] should be repackaged.
-    'Hyperparameter': temperature"""
+    #Compute knowledge-distillation (KD) loss given [scores] and [target_scores].
+    #Both [scores] and [target_scores] should be tensors, although [target_scores] should be repackaged.
+    #Hyperparameter: temperature
 
 
     log_scores_norm = F.log_softmax(scores[:, allowed_predictions] / T, dim=1)

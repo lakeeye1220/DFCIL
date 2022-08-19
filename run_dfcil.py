@@ -35,7 +35,7 @@ def create_args():
     parser.add_argument('--repeat', type=int, default=1, help="Repeat the experiment N times")
     parser.add_argument('--overwrite', type=int, default=0, metavar='N', help='Train regardless of whether saved model exists')
 
-    # training args
+    # training Args
     parser.add_argument('--optimizer', type=str, default='SGD', help="SGD|Adam|RMSprop|amsgrad|Adadelta|Adagrad|Adamax ...")
     parser.add_argument('--train_aug', dest='train_aug', default=False, action='store_true',
                         help="Allow data augmentation during training")
@@ -48,7 +48,7 @@ def create_args():
                         help="decay")
     parser.add_argument('--batch_size', type=int, default=64)
 
-    # data free knoweldge distilation
+    # image synthesis Args
     parser.add_argument('--power_iters', type=int, default=10, help="backprop power iterations for producing images")
     parser.add_argument('--deep_inv_params', nargs="+", type=float, default=[-1],
                          help="learning rate, BN loss weight, variance prior weight, CE loss temp, CE loss weight")
@@ -163,8 +163,10 @@ if __name__ == '__main__':
         max_task = trainer.max_task
         if r == 0: 
             for mkey in metric_keys: 
+                #global accuracy
                 avg_metrics[mkey]['global'] = np.zeros((max_task,args.repeat))
                 if (not (mkey in global_only)):
+                    # per task accuracy
                     avg_metrics[mkey]['pt'] = np.zeros((max_task,max_task,args.repeat))
                     avg_metrics[mkey]['pt-local'] = np.zeros((max_task,max_task,args.repeat))
 
