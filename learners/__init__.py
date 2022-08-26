@@ -1,4 +1,4 @@
 from . import default
 from . import datafree
-from . import our_datafree
+from . import maxnorm_datafree
 from . import regularizers
