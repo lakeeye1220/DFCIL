@@ -76,7 +76,8 @@ class NormalNN(nn.Module):
 
     def visualize_confusion_matrix(self, val_loader,file_path,task_num):
         #plot the confusion matrix
-        cm=self.validation(val_loader,confusion_mat=True)
+        y_true,y_pred=self.validation(val_loader,need_logits=True)
+        cm = tf.math.confusion_matrix(y_true, y_pred)
         if cm.shape[0]<self.config['num_classes']:
             cm1 = np.pad(cm, ((0,self.config['num_classes']-cm.shape[0]),(0,self.config['num_classes']-cm.shape[1])), 'constant', constant_values=0)
         else:
@@ -87,6 +88,20 @@ class NormalNN(nn.Module):
         plt.matshow(cm1, cmap='viridis')
         #plt.colorbar()
         plt.savefig(os.path.join(file_path,'{}task_confusion_mat.pdf'.format(task_num)),bbox_inches='tight')
+        plt.close()
+    
+    def visualize_marginal_likelihood(self, val_loader,file_path,task_num):
+        y_true,y_pred=self.validation(val_loader,need_logits=True)
+        softened_y_pred=torch.softmax(y_pred[:,:self.valid_out_dim],dim=1)
+        classes=np.arange(self.valid_out_dim)
+        marginal_likelihood=softened_y_pred.mean(dim=0)
+        plt.figure()
+        plt.plot(classes,marginal_likelihood.detach().numpy())
+        plt.xlabel('Class Index')
+        plt.ylabel('Marginal Likelihood')
+        plt.xlim(0,self.valid_out_dim)
+        plt.savefig(os.path.join(file_path,'{}task_marginal_likelihood.pdf'.format(task_num)),bbox_inches='tight')
+        np.savetxt(os.path.join(file_path,'{}task_marginal_likelihood.csv'.format(task_num)), marginal_likelihood, delimiter=",", fmt='%.2f')
         plt.close()
 
     def visualize_weight(self,file_path,task_num):
@@ -232,7 +247,7 @@ class NormalNN(nn.Module):
         self.optimizer.step()
         return total_loss.detach(), logits
 
-    def validation(self, dataloader, model=None, task_in = None,  verbal = True, confusion_mat=False):
+    def validation(self, dataloader, model=None, task_in = None,  verbal = True, need_logits=False):
         #evaluation the model performance, print the top-1 accuracy per each task
         if model is None:
             model = self.model
@@ -268,16 +283,15 @@ class NormalNN(nn.Module):
                     output = model.forward(input)[:, task_in]
                     acc = accumulate_acc(output, target-task_in[0], task, acc, topk=(self.top_k,))
             
-            if confusion_mat:
+            if need_logits:
                 y_true.append(target.detach().cpu())
                 y_pred.append(output.argmax(dim=1).detach().cpu())
         model.train(orig_mode)
 
-        if confusion_mat:
+        if need_logits:
             y_true=torch.cat(y_true, dim=0)
             y_pred=torch.cat(y_pred, dim=0)
-            cm = tf.math.confusion_matrix(y_true, y_pred)
-            return cm
+            return y_true, y_pred
         if verbal:
             self.log(' * Val Acc {acc.avg:.3f}, Total time {time:.2f}'
                     .format(acc=acc, time=batch_timer.toc()))
