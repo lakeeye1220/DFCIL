@@ -2,7 +2,7 @@
 
 # process inputs
 DEFAULTGPU=0
-GPUID=6
+GPUID=1,2
 
 # benchmark settings
 DATE=ICCV2021
@@ -22,8 +22,8 @@ MAXTASK=-1
 
 # hard coded inputs
 REPEAT=1
-SCHEDULE="100 150 200 250"
-PI=10000
+SCHEDULE="1 2"
+PI=2
 MODELNAME=resnet32
 BS=128
 WD=0.0002
@@ -36,7 +36,7 @@ LR=0.1
 #########################
 
 # Full Method
-python3 -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
+python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
     --first_split_size $SPLIT --other_split_size $SPLIT --schedule $SCHEDULE --schedule_type decay --batch_size $BS \
     --optimizer $OPT --lr $LR --momentum $MOM --weight_decay $WD \
     --mu 1e-1 --memory 0 --model_name $MODELNAME --model_type resnet \
@@ -45,3 +45,4 @@ python3 -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPU
     --beta 1 --power_iters $PI --deep_inv_params 1e-3 5e1 1e-3 1e3 1 \
     --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/proposed \
     --kd_type hkd_yj --middle_kd_type sp --middle_mu 100 --ft -dw_cls --balancing
+
