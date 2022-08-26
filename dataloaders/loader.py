@@ -552,12 +552,13 @@ class iIMAGENET(iDataset):
     def load(self):
         self.dw = False
         self.data, self.targets = [], []
-        images_path = os.path.join(self.root, self.base_folder)
+        #images_path = os.path.join(self.root, self.base_folder)
+        images_path=self.root
         if self.train or self.validation:
             images_path = os.path.join(images_path, 'train')
             data_dict = get_data(images_path)
         else:
-            images_path = os.path.join(images_path, 'val')
+            images_path = os.path.join(images_path, 'val3')
             data_dict = get_data(images_path)
         y = 0
         for key in data_dict.keys():
@@ -565,6 +566,7 @@ class iIMAGENET(iDataset):
             self.data.extend([data_dict[key][i] for i in np.arange(0,num_y)])
             self.targets.extend([y for i in np.arange(0,num_y)])
             y += 1
+
 
 
     def __getitem__(self, index, simple = False):
