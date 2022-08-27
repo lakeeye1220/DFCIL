@@ -74,6 +74,9 @@ class ISCF(NormalNN):
             batch_timer = Timer()
             self.save_gen = False
             self.save_gen_later = False
+            if self.inversion_replay:
+                self.pgdFunc.setPerLayerThresh(self.model)
+
             for epoch in range(self.config['schedule'][-1]):
                 self.epoch=epoch
                 if epoch > 0: self.scheduler.step()
@@ -134,7 +137,8 @@ class ISCF(NormalNN):
                 self.log('Epoch:{epoch:.0f}/{total:.0f}'.format(epoch=self.epoch+1,total=self.config['schedule'][-1]))
                 self.log(' * Loss {loss.avg:.4e} | CE Loss {lossb.avg:.4e} | LKD Loss {lossc.avg:.4e} | SP Loss {lossd.avg:.4e} | WEQ Reg {losse.avg:.4e}'.format(loss=losses[0],lossb=losses[1],lossc=losses[2],lossd=losses[3],losse=losses[4]))
                 self.log(' * Train Acc {acc.avg:.3f} | Train Acc Gen {accg.avg:.3f}'.format(acc=acc,accg=accg))
-
+                if self.inversion_replay:
+                    self.pgdFunc.PGD(self.model)
                 # Evaluate the performance of current task
                 if val_loader is not None:
                     self.validation(val_loader)
@@ -261,15 +265,7 @@ class ISCF(NormalNN):
                 loss_class += self.criterion(self.model.last(logits_pen.detach()), targets.long(), dw_cls)
             else:
                 loss_class += self.criterion(self.model.last(logits_pen.detach()), targets.long(), dw_cls)
-            
-            self.pgdFunc.setPerLayerThresh(self.model)
-            active_layers = [self.model.last.weight, self.model.last.bias]
-            for param in self.model.parameters(): #freez all model paramters except the classifier layer
-                param.requires_grad = False
-            for param in active_layers:
-                param.requires_grad = True
-            self.pgdFunc.PGD(self.model)
-        #first task local classification when we do not use any synthetic data     
+            #first task local classification when we do not use any synthetic data     
         else:
             loss_class = self.criterion(logits[class_idx], targets[class_idx].long(), dw_cls[class_idx])
 
