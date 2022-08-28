@@ -77,7 +77,7 @@ class NormalNN(nn.Module):
     def visualize_confusion_matrix(self, val_loader,file_path,task_num):
         #plot the confusion matrix
         y_true,y_pred=self.validation(val_loader,need_logits=True)
-        cm = tf.math.confusion_matrix(y_true, y_pred)
+        cm = tf.math.confusion_matrix(y_true, y_pred.argmax(dim=1))
         if cm.shape[0]<self.config['num_classes']:
             cm1 = np.pad(cm, ((0,self.config['num_classes']-cm.shape[0]),(0,self.config['num_classes']-cm.shape[1])), 'constant', constant_values=0)
         else:
@@ -285,7 +285,7 @@ class NormalNN(nn.Module):
             
             if need_logits:
                 y_true.append(target.detach().cpu())
-                y_pred.append(output.argmax(dim=1).detach().cpu())
+                y_pred.append(output.detach().cpu())
         model.train(orig_mode)
 
         if need_logits:
