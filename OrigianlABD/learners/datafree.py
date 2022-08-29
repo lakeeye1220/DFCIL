@@ -25,12 +25,12 @@ class DeepInversionGenBN(NormalNN):
 
         # gen parameters
         self.generator = self.create_generator()
-        self.generator_optimizer = Adam(params=self.generator.parameters(), lr=self.deep_inv_params[0])
         self.beta = self.config['beta']
 
         # repeat call for generator network
         if self.gpu:
             self.cuda_gen()
+        self.generator_optimizer = Adam(params=self.generator.parameters(), lr=self.deep_inv_params[0])
         
     ##########################################
     #           MODEL TRAINING               #
@@ -227,7 +227,7 @@ class DeepInversionGenBN(NormalNN):
     def load_model(self, filename):
         self.generator.load_state_dict(torch.load(filename + 'generator.pth'))
         if self.gpu:
-            self.generator = self.generator.cuda()
+            self.generator = self.cuda_gen()
         self.generator.eval()
         super(DeepInversionGenBN, self).load_model(filename)
 
@@ -254,7 +254,11 @@ class DeepInversionGenBN(NormalNN):
         return self.count_parameter() + self.count_parameter_gen() + self.memory_size * dataset_size[0]*dataset_size[1]*dataset_size[2]
 
     def cuda_gen(self):
-        self.generator = self.generator.cuda()
+        if len(self.config['gpuid']) > 1:
+            self.generator = torch.nn.DataParallel(self.generator, device_ids=self.config['gpuid'], output_device=self.config['gpuid'][0])
+            self.generator = self.generator.cuda()
+        else:
+            self.model = self.model.cuda()
         return self
 
     def sample(self, teacher, dim, device, return_scores=True):
