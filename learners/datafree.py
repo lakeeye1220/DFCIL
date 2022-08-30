@@ -151,8 +151,8 @@ class ISCF(NormalNN):
         self.first_task = False
 
         # for eval
-        if self.previous_teacher is not None:
-            self.previous_previous_teacher = self.previous_teacher
+        # if self.previous_teacher is not None:
+        #     self.previous_previous_teacher = self.previous_teacher
         
         # define the new model - current model 
         if (self.out_dim == self.valid_out_dim) or (self.dataset== 'TinyImageNet100' and self.valid_out_dim==100): need_train = False

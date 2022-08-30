@@ -209,8 +209,8 @@ class NormalNN(nn.Module):
             train_dataset.update_coreset(self.memory_size, np.arange(self.last_valid_out_dim))
 
         # for eval
-        if self.previous_teacher is not None:
-            self.previous_previous_teacher = self.previous_teacher
+        # if self.previous_teacher is not None:
+        #     self.previous_previous_teacher = self.previous_teacher
 
         # new teacher
         teacher = Teacher(solver=self.model)
