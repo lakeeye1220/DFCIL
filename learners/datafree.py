@@ -326,3 +326,69 @@ class ISCF(NormalNN):
         self.optimizer.step()
 
         return total_loss.detach(), loss_class.detach(), loss_lkd.detach(), loss_sp.detach(), weq_regularizer.detach(), logits
+
+
+class AlwaysBeDreaming(ISCF):
+
+    def __init__(self, learner_config):
+        super(AlwaysBeDreaming, self).__init__(learner_config)
+        self.kl_loss = nn.KLDivLoss(reduction='batchmean').cuda()
+
+    def update_model(self, inputs, targets, target_scores = None, dw_force = None, kd_index = None):
+        
+        # class balancing
+        mappings = torch.ones(targets.size(), dtype=torch.float32)
+        if self.gpu:
+            mappings = mappings.cuda()
+        rnt = 1.0 * self.last_valid_out_dim / self.valid_out_dim
+        mappings[:self.last_valid_out_dim] = rnt
+        mappings[self.last_valid_out_dim:] = 1-rnt
+        dw_cls = mappings[targets.long()]
+
+        # forward pass
+        logits_pen = self.model.forward(x=inputs, pen=True)
+        if len(self.config['gpuid']) > 1:
+            logits = self.model.module.last(logits_pen)
+        else:
+            logits = self.model.last(logits_pen)
+        
+        # classification 
+        class_idx = np.arange(self.batch_size)
+        if self.inversion_replay:
+
+            # local classification
+            loss_class = self.criterion(logits[class_idx,self.last_valid_out_dim:self.valid_out_dim], (targets[class_idx]-self.last_valid_out_dim).long(), dw_cls[class_idx]) 
+
+            # ft classification  
+            with torch.no_grad():             
+                feat_class = self.model.forward(x=inputs, pen=True).detach()
+            if len(self.config['gpuid']) > 1:
+                loss_class += self.criterion(self.model.module.last(feat_class), targets.long(), dw_cls)
+            else:
+                loss_class += self.criterion(self.model.last(feat_class), targets.long(), dw_cls)
+            
+        else:
+            loss_class = self.criterion(logits[class_idx], targets[class_idx].long(), dw_cls[class_idx])
+
+        # KD
+        if target_scores is not None:
+
+            # hard - linear
+            kd_index = np.arange(2 * self.batch_size)
+            dw_KD = self.dw_k[-1 * torch.ones(len(kd_index),).long()]
+            logits_KD = self.previous_linear(logits_pen[kd_index])[:,:self.last_valid_out_dim]
+            logits_KD_past = self.previous_linear(self.previous_teacher.generate_scores_pen(inputs[kd_index]))[:,:self.last_valid_out_dim]
+            loss_kd = self.mu * (self.kd_criterion(logits_KD, logits_KD_past).sum(dim=1) * dw_KD).mean() / (logits_KD.size(1))
+        else:
+            loss_kd = torch.zeros((1,), requires_grad=True).cuda()
+            
+        total_loss = loss_class + loss_kd
+        self.optimizer.zero_grad()
+        total_loss.backward()
+
+        # step
+        self.optimizer.step()
+        loss_middle=torch.zeros((1,), requires_grad=True).cuda()
+        loss_balancing=torch.zeros((1,), requires_grad=True).cuda()
+
+        return total_loss.detach(), loss_class.detach(), loss_kd.detach(), loss_middle.detach(), loss_balancing.detach(), logits
