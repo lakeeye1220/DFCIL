@@ -3,11 +3,13 @@
 from cl_lite.core import App
 
 from datamodule import DataModule
-from module import Module
+from iscf_module import ISCFModule
+# from module import Module
 
 
 app = App(
-    Module,
+    ISCFModule,
+    # Module,
     DataModule,
     gpus=-1,
     benchmark=True,

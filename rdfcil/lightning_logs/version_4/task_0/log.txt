@@ -1,0 +1,260 @@
+=> Network Overview 
+ ISCFModule(
+  (_Module__evaluator): ILEvaluator(
+    (accuracy): Accuracy()
+    (accuracy_new): Accuracy()
+    (accuracy_old): Accuracy()
+  )
+  (_Module__extra_evaluators): ModuleDict()
+  (backbone): ISCF_ResNet(
+    (conv_1_3x3): Conv2d(3, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+    (bn_1): BatchNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (stage_1): Stage(
+      (blocks): ModuleList(
+        (0): ResidualBlock(
+          (conv_a): Conv2d(16, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+          (bn_a): BatchNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (conv_b): Conv2d(16, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+          (bn_b): BatchNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (1): ResidualBlock(
+          (conv_a): Conv2d(16, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+          (bn_a): BatchNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (conv_b): Conv2d(16, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+          (bn_b): BatchNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (2): ResidualBlock(
+          (conv_a): Conv2d(16, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+          (bn_a): BatchNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (conv_b): Conv2d(16, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+          (bn_b): BatchNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (3): ResidualBlock(
+          (conv_a): Conv2d(16, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+          (bn_a): BatchNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (conv_b): Conv2d(16, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+          (bn_b): BatchNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (4): ResidualBlock(
+          (conv_a): Conv2d(16, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+          (bn_a): BatchNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (conv_b): Conv2d(16, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+          (bn_b): BatchNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+      )
+    )
+    (stage_2): Stage(
+      (blocks): ModuleList(
+        (0): ResidualBlock(
+          (conv_a): Conv2d(16, 32, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+          (bn_a): BatchNorm2d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (conv_b): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+          (bn_b): BatchNorm2d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (downsampler): DownsampleStride()
+        )
+        (1): ResidualBlock(
+          (conv_a): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+          (bn_a): BatchNorm2d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (conv_b): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+          (bn_b): BatchNorm2d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (2): ResidualBlock(
+          (conv_a): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+          (bn_a): BatchNorm2d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (conv_b): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+          (bn_b): BatchNorm2d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (3): ResidualBlock(
+          (conv_a): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+          (bn_a): BatchNorm2d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (conv_b): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+          (bn_b): BatchNorm2d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (4): ResidualBlock(
+          (conv_a): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+          (bn_a): BatchNorm2d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (conv_b): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+          (bn_b): BatchNorm2d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+      )
+    )
+    (stage_3): Stage(
+      (blocks): ModuleList(
+        (0): ResidualBlock(
+          (conv_a): Conv2d(32, 64, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+          (bn_a): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (conv_b): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+          (bn_b): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (downsampler): DownsampleStride()
+        )
+        (1): ResidualBlock(
+          (conv_a): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+          (bn_a): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (conv_b): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+          (bn_b): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (2): ResidualBlock(
+          (conv_a): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+          (bn_a): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (conv_b): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+          (bn_b): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (3): ResidualBlock(
+          (conv_a): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+          (bn_a): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (conv_b): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+          (bn_b): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+      )
+    )
+    (stage_4): ResidualBlock(
+      (conv_a): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn_a): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (conv_b): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn_b): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    )
+  )
+  (head): DynamicSimpleHead(
+    (pool): AdaptiveAvgPool2d(output_size=1)
+    (neck): Identity()
+    (classifiers): ModuleList(
+      (0): Linear(in_features=64, out_features=20, bias=False)
+    )
+  )
+  (rkd): Identity()
+)
+
+
+=> Evaluation result (default) 39 
+
+ Accuracy (all | new | old): 67.10 |  0.00 |  0.00
+Confusion:
+ 84|  1|  0|  2|  3|  0|  0|  0|  4|  0|  0|  0|  0|  0|  4|  0|  0|  1|  0|  1
+  4| 87|  0|  0|  0|  0|  1|  0|  0|  1|  0|  1|  0|  0|  0|  6|  0|  0|  0|  0
+  0|  1| 78|  9|  0|  0|  0|  3|  0|  0|  0|  7|  1|  0|  0|  0|  0|  0|  0|  1
+  0|  0|  0| 77| 10|  0|  0|  1|  3|  2|  0|  1|  4|  0|  1|  0|  1|  0|  0|  0
+  0|  1|  1| 40| 44|  0|  0|  0|  0|  1|  0|  0| 11|  0|  0|  0|  0|  1|  0|  1
+  1|  1|  2|  7|  4| 52|  0| 10|  5|  0|  0|  0|  2|  0|  1|  0|  4|  0|  9|  2
+  0|  6|  0|  1|  0|  0| 78|  0|  1|  2|  1|  0|  0|  0|  0|  0|  0|  0| 11|  0
+  0|  0|  0|  3|  1|  0|  0| 87|  4|  1|  0|  0|  1|  0|  0|  0|  1|  1|  0|  1
+  4|  0|  2|  6|  0|  0|  0|  4| 75|  0|  0|  1|  0|  0|  0|  0|  6|  0|  1|  1
+  1|  0|  0| 10|  3|  0|  0|  1|  6| 73|  0|  0|  2|  0|  0|  0|  1|  0|  0|  3
+  0|  3|  0|  0|  1|  0|  4|  0|  1|  0| 82|  0|  1|  1|  0|  0|  0|  0|  7|  0
+  1|  0| 20|  5|  0|  0|  0|  1|  0|  2|  0| 66|  4|  0|  1|  0|  0|  0|  0|  0
+  2|  0|  0| 43| 26|  0|  0|  0|  0|  1|  0|  0| 26|  0|  2|  0|  0|  0|  0|  0
+  2|  1|  0|  2|  6|  0|  2|  0|  2|  8|  1|  0|  4| 60|  1|  0|  0|  2|  2|  7
+  6|  1|  0| 12|  2|  0|  0|  0|  2|  1|  0|  0|  1|  0| 74|  0|  0|  1|  0|  0
+  1| 34|  0|  0|  0|  0|  0|  0|  0|  1|  1|  0|  0|  0|  0| 63|  0|  0|  0|  0
+  3|  0|  1|  3|  0|  0|  0|  1| 31|  2|  0|  0|  1|  0|  0|  0| 56|  0|  1|  1
+  3|  1|  4| 19|  8|  1|  0|  6|  3|  2|  0|  0|  3|  0|  7|  0|  0| 43|  0|  0
+  1|  1|  0|  2|  3|  0|  4|  0|  0|  1|  1|  0|  1|  0|  0|  0|  1|  0| 84|  1
+  0|  0|  1| 14|  5|  0|  0|  2| 10|  4|  0|  4|  4|  0|  0|  0|  3|  0|  0| 53 
+
+
+
+=> Evaluation result (default) 79 
+
+ Accuracy (all | new | old): 76.50 |  0.00 |  0.00
+Confusion:
+ 88|  3|  0|  0|  0|  0|  0|  0|  2|  0|  1|  0|  0|  1|  2|  0|  0|  2|  0|  1
+  2| 78|  0|  0|  0|  0|  1|  0|  0|  1|  4|  1|  0|  1|  0|  7|  0|  4|  0|  1
+  0|  0| 77|  0|  0|  1|  0|  0|  0|  2|  0| 14|  1|  1|  0|  0|  0|  3|  0|  1
+  0|  0|  0| 48| 15|  2|  0|  4|  1|  4|  0|  1| 17|  4|  0|  0|  0|  2|  0|  2
+  1|  0|  0|  9| 58|  0|  0|  2|  0|  3|  1|  0| 19|  1|  0|  0|  3|  3|  0|  0
+  1|  0|  0|  1|  1| 82|  0|  1|  0|  2|  2|  0|  1|  0|  0|  0|  1|  2|  5|  1
+  0|  1|  0|  0|  0|  0| 77|  0|  0|  2|  3|  0|  0|  0|  0|  0|  1|  2| 13|  1
+  2|  0|  0|  0|  0|  0|  0| 92|  0|  0|  0|  1|  0|  0|  0|  0|  2|  3|  0|  0
+  4|  1|  1|  1|  3|  0|  0|  2| 71|  1|  1|  0|  0|  1|  0|  0| 10|  2|  1|  1
+  0|  0|  0|  0|  2|  0|  0|  0|  2| 85|  0|  0|  1|  1|  0|  0|  3|  0|  0|  6
+  0|  0|  0|  0|  0|  1|  0|  0|  0|  0| 96|  0|  0|  0|  0|  0|  0|  0|  2|  1
+  2|  0|  8|  0|  0|  0|  0|  1|  1|  3|  1| 79|  0|  2|  1|  0|  0|  1|  0|  1
+  2|  1|  0|  7| 19|  0|  0|  0|  0|  2|  0|  0| 64|  2|  0|  0|  0|  1|  0|  2
+  1|  0|  0|  0|  1|  0|  1|  0|  0|  4|  2|  0|  1| 89|  0|  0|  0|  0|  1|  0
+ 10|  0|  0|  3|  0|  1|  0|  0|  0|  3|  1|  0|  2|  0| 62|  0|  1| 15|  0|  2
+  0| 31|  0|  0|  0|  0|  0|  0|  0|  0|  3|  0|  0|  1|  0| 63|  0|  2|  0|  0
+  3|  1|  0|  0|  0|  1|  0|  2| 16|  1|  0|  0|  0|  0|  0|  0| 73|  1|  0|  2
+  3|  0|  0|  1|  0|  3|  0|  0|  0|  1|  0|  0|  1|  2|  0|  0|  1| 87|  0|  1
+  0|  0|  0|  0|  0|  0|  2|  0|  1|  1|  2|  0|  0|  0|  0|  0|  1|  1| 91|  1
+  1|  0|  1|  1|  0|  0|  0|  0|  6| 11|  1|  2|  1|  0|  0|  0|  3|  3|  0| 70 
+
+
+
+=> Evaluation result (default) 119 
+
+ Accuracy (all | new | old): 81.35 |  0.00 |  0.00
+Confusion:
+ 87|  3|  0|  0|  0|  0|  0|  0|  4|  0|  0|  0|  0|  0|  4|  0|  0|  0|  0|  2
+  0| 83|  0|  0|  0|  0|  1|  0|  0|  1|  0|  0|  0|  0|  0| 13|  0|  2|  0|  0
+  0|  0| 84|  0|  0|  0|  0|  0|  0|  0|  0| 14|  0|  0|  0|  0|  0|  1|  0|  1
+  0|  0|  0| 63| 21|  0|  0|  0|  3|  1|  0|  3|  3|  0|  1|  0|  1|  0|  0|  4
+  1|  0|  0| 12| 68|  0|  0|  0|  0|  2|  0|  1| 11|  1|  1|  0|  0|  3|  0|  0
+  0|  0|  0|  1|  2| 88|  0|  1|  1|  0|  0|  0|  0|  0|  1|  0|  4|  0|  2|  0
+  0|  2|  0|  0|  0|  0| 87|  0|  0|  1|  2|  0|  0|  0|  0|  0|  0|  0|  7|  1
+  0|  0|  1|  1|  1|  0|  0| 92|  2|  0|  0|  0|  0|  0|  0|  0|  2|  1|  0|  0
+  1|  0|  1|  0|  1|  0|  0|  0| 84|  1|  0|  0|  0|  0|  0|  0| 10|  1|  1|  0
+  1|  0|  0|  1|  2|  0|  0|  1|  2| 82|  0|  0|  0|  1|  0|  0|  2|  0|  0|  8
+  0|  1|  1|  0|  0|  1|  1|  0|  0|  0| 95|  0|  0|  0|  0|  0|  0|  0|  1|  0
+  0|  1|  6|  2|  0|  0|  0|  1|  2|  2|  1| 81|  0|  1|  1|  0|  0|  1|  0|  1
+  1|  0|  0| 15| 26|  0|  0|  0|  0|  1|  0|  0| 53|  0|  2|  0|  0|  0|  0|  2
+  2|  1|  0|  0|  1|  0|  1|  0|  1|  1|  1|  0|  0| 91|  0|  0|  0|  1|  0|  0
+  3|  2|  0|  1|  1|  1|  0|  0|  2|  0|  0|  0|  0|  0| 85|  0|  2|  2|  0|  1
+  1| 12|  0|  0|  0|  0|  0|  0|  0|  0|  1|  0|  0|  0|  0| 86|  0|  0|  0|  0
+  1|  0|  0|  0|  0|  1|  0|  0| 17|  1|  0|  0|  0|  0|  2|  0| 78|  0|  0|  0
+  5|  0|  0|  1|  3|  1|  0|  0|  1|  0|  0|  0|  2|  2|  7|  0|  1| 76|  0|  1
+  0|  2|  0|  2|  0|  1|  6|  0|  0|  0|  1|  0|  0|  0|  0|  0|  0|  0| 86|  2
+  0|  0|  1|  1|  2|  1|  0|  1|  4|  6|  1|  1|  1|  0|  0|  0|  2|  1|  0| 78 
+
+
+
+=> Evaluation result (default) 159 
+
+ Accuracy (all | new | old): 82.60 |  0.00 |  0.00
+Confusion:
+ 88|  2|  0|  0|  0|  0|  0|  1|  3|  0|  0|  0|  0|  0|  6|  0|  0|  0|  0|  0
+  0| 81|  0|  0|  0|  0|  1|  0|  0|  1|  0|  0|  0|  0|  0| 14|  0|  3|  0|  0
+  0|  0| 89|  0|  0|  0|  0|  0|  1|  0|  0|  9|  0|  0|  0|  0|  0|  0|  0|  1
+  0|  0|  0| 67| 15|  0|  0|  0|  3|  1|  0|  2|  6|  0|  1|  0|  1|  0|  0|  4
+  1|  0|  0| 11| 61|  0|  0|  0|  0|  2|  0|  0| 19|  2|  0|  0|  0|  4|  0|  0
+  0|  0|  0|  1|  1| 90|  0|  0|  1|  0|  0|  0|  0|  0|  1|  0|  3|  1|  2|  0
+  0|  2|  0|  0|  0|  0| 90|  0|  0|  1|  1|  0|  0|  0|  0|  0|  0|  0|  5|  1
+  0|  0|  1|  0|  1|  0|  0| 92|  1|  0|  0|  0|  1|  0|  0|  0|  1|  3|  0|  0
+  4|  0|  1|  0|  0|  0|  0|  0| 74|  1|  0|  0|  1|  1|  0|  1| 14|  1|  1|  1
+  1|  0|  0|  1|  2|  0|  0|  1|  1| 83|  0|  0|  0|  1|  0|  0|  2|  0|  0|  8
+  0|  0|  1|  0|  0|  1|  1|  0|  0|  0| 95|  0|  0|  0|  0|  0|  0|  0|  2|  0
+  0|  1| 10|  2|  0|  0|  0|  0|  2|  3|  1| 80|  0|  1|  0|  0|  0|  0|  0|  0
+  1|  0|  0| 12| 19|  0|  0|  0|  0|  1|  0|  1| 62|  0|  2|  0|  0|  0|  0|  2
+  1|  1|  0|  0|  1|  0|  1|  0|  1|  1|  1|  0|  0| 91|  0|  0|  0|  1|  1|  0
+  1|  2|  0|  1|  1|  2|  0|  0|  1|  0|  0|  0|  0|  0| 87|  0|  1|  3|  0|  1
+  1|  9|  0|  0|  0|  0|  0|  0|  0|  0|  0|  0|  0|  0|  0| 90|  0|  0|  0|  0
+  2|  0|  0|  0|  0|  1|  1|  0| 13|  0|  0|  0|  0|  0|  1|  0| 81|  1|  0|  0
+  4|  1|  1|  1|  1|  1|  0|  0|  1|  0|  0|  0|  3|  2|  4|  0|  0| 81|  0|  0
+  0|  2|  0|  1|  0|  1|  6|  0|  0|  0|  0|  0|  0|  0|  0|  0|  0|  0| 89|  1
+  0|  0|  1|  0|  1|  1|  0|  1|  3|  5|  1|  1|  1|  0|  0|  0|  3|  1|  0| 81 
+
+
+
+=> Evaluation result (default) 199 
+
+ Accuracy (all | new | old): 82.55 |  0.00 |  0.00
+Confusion:
+ 87|  3|  0|  0|  0|  0|  0|  1|  2|  0|  0|  0|  0|  0|  7|  0|  0|  0|  0|  0
+  0| 81|  0|  0|  0|  0|  1|  0|  0|  1|  0|  0|  0|  0|  0| 15|  0|  2|  0|  0
+  0|  0| 88|  0|  0|  0|  0|  0|  1|  0|  0|  8|  0|  0|  0|  0|  2|  0|  0|  1
+  0|  0|  0| 66| 16|  0|  0|  0|  4|  1|  0|  3|  4|  0|  1|  0|  1|  0|  0|  4
+  1|  0|  0| 10| 61|  0|  0|  0|  0|  2|  0|  1| 18|  2|  1|  0|  0|  4|  0|  0
+  0|  0|  0|  1|  1| 90|  0|  0|  1|  0|  0|  0|  0|  0|  1|  0|  4|  0|  2|  0
+  0|  2|  0|  0|  0|  0| 89|  0|  0|  0|  2|  0|  0|  0|  0|  0|  0|  0|  6|  1
+  0|  0|  1|  0|  0|  1|  0| 93|  1|  0|  0|  0|  1|  0|  0|  0|  1|  1|  1|  0
+  3|  2|  1|  0|  0|  0|  0|  0| 73|  1|  0|  0|  0|  1|  0|  1| 16|  1|  1|  0
+  1|  0|  0|  1|  2|  0|  0|  1|  2| 82|  0|  0|  0|  1|  0|  0|  2|  0|  0|  8
+  1|  0|  0|  0|  0|  1|  1|  0|  0|  0| 94|  0|  0|  0|  0|  0|  0|  0|  3|  0
+  0|  2|  8|  2|  1|  0|  0|  1|  2|  2|  1| 80|  0|  0|  0|  0|  0|  1|  0|  0
+  0|  0|  0| 10| 18|  0|  0|  0|  0|  1|  0|  1| 66|  0|  2|  0|  0|  0|  0|  2
+  1|  1|  0|  0|  0|  0|  1|  0|  1|  1|  1|  0|  1| 90|  0|  0|  0|  1|  1|  1
+  0|  3|  0|  0|  2|  1|  0|  0|  1|  1|  0|  0|  0|  0| 87|  0|  1|  3|  0|  1
+  1|  8|  0|  0|  0|  0|  0|  0|  0|  0|  1|  0|  0|  0|  0| 90|  0|  0|  0|  0
+  2|  0|  0|  0|  0|  1|  1|  0| 12|  1|  0|  0|  0|  0|  1|  0| 82|  0|  0|  0
+  4|  0|  0|  2|  1|  1|  0|  0|  1|  0|  0|  0|  1|  2|  5|  0|  0| 82|  1|  0
+  0|  2|  0|  1|  0|  1|  6|  0|  0|  0|  0|  0|  0|  0|  0|  0|  0|  0| 89|  1
+  0|  0|  1|  1|  0|  1|  0|  1|  4|  4|  1|  1|  2|  0|  0|  0|  1|  2|  0| 81 
+
