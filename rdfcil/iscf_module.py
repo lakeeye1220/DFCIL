@@ -70,7 +70,7 @@ class ISCFModule(FeatureHookMixin, FinetuningMixin, cl.Module):
         finetuning_lr: float = 0.005,
         lambda_ce: float = 0.5,
         lambda_hkd: float = 0.15,
-        lambda_rkd: float = 0.5,
+        lambda_sp: float = 0.5,
         num_inv_iters: int = 5000,
         inv_lr: float = 0.001,
         inv_tau: float = 1000.0,

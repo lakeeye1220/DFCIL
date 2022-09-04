@@ -133,3 +133,4 @@ RelatedWork/outputs
 *.pyc
 *.pth
 AlwaysBeDreaming/outputs
+lightning_logs/

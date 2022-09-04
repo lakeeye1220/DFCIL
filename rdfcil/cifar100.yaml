@@ -66,11 +66,11 @@ model:
   milestones:
   - 80
   - 120
-  finetuning_epochs: 40
-  finetuning_lr: 0.005
-  lambda_ce: 0.5
-  lambda_hkd: 0.15
-  lambda_rkd: 0.5
+  # finetuning_epochs: 40
+  # finetuning_lr: 0.005
+  lambda_ce: 1
+  lambda_hkd: 0.1
+  lambda_sp: 100
   num_inv_iters: 5000
   inv_lr: 0.001
   inv_tau: 1000.0
