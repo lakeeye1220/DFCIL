@@ -126,7 +126,7 @@ class ISCFModule(FeatureHookMixin, FinetuningMixin, cl.Module):
             "hkd",
             nn.MSELoss(),
             ["input_hkd", "target_hkd"],
-            self.hparams.lambda_hkd / self.model_old.head.num_classes,
+            self.hparams.lambda_hkd / (self.head.num_classes-self.model_old.head.num_classes),
         )
 
 
