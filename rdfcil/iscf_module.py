@@ -32,12 +32,12 @@ class ISCF_ResNet(CifarResNet):
         x = self.conv_1_3x3(x)
         x = F.relu(self.bn_1(x), inplace=True)
 
-        feats_s1, x = self.stage_1(x)
-        feats_s2, x = self.stage_2(x)
-        feats_s3, x = self.stage_3(x)
-        x = self.stage_4(x)
+        feats_s1, x1 = self.stage_1(x)
+        feats_s2, x2 = self.stage_2(x1)
+        feats_s3, x3 = self.stage_3(x2)
+        x4 = self.stage_4(x3)
 
-        return x,[feats_s1, feats_s2, feats_s3]
+        return x4,[x1, x2, x3]
 
 class SP(nn.Module):
     def __init__(self,reduction='mean'):
