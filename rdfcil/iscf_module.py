@@ -151,7 +151,7 @@ class ISCFModule(FeatureHookMixin, FinetuningMixin, cl.Module):
             alpha_pr=self.hparams.inv_alpha_pr,
             alpha_rf=self.hparams.inv_alpha_rf,
         )
-        self.model_old=deepcopy(self.model_old).eval()
+        self.model_old=deepcopy(self.backbone).eval()
         self.model_old.head=deepcopy(self.head).eval()
         freeze(self.model_old)
 
