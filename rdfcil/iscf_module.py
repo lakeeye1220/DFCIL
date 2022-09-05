@@ -129,15 +129,11 @@ class ISCFModule(FeatureHookMixin, FinetuningMixin, cl.Module):
             self.hparams.lambda_hkd * self.model_old.head.num_classes,
         )
 
-        self.register_loss(
-            "sp",
-            self.sp,
-            ["input_sp", "target_sp"],
-            self.hparams.lambda_sp,
-        )
 
     def update_old_model(self):
-        model_old = [("backbone", self.backbone), ("head", self.head)]
+        self.backbone.zero_grad()
+        self.head.zero_grad()
+        model_old = [("backbone", self.backbone),("head", self.head)]
         self.model_old = deepcopy(nn.Sequential(OrderedDict(model_old))).eval()
         freeze(self.model_old)
 
@@ -263,13 +259,13 @@ class ISCFModule(FeatureHookMixin, FinetuningMixin, cl.Module):
             # ft classification
             kwargs["ft_weight"] = self.cls_weight.to(self.device)
             kwargs["ft_prediction"] = outputs
+            kwargs["ft_target"]=target_all
 
             # sp
             loss_sp=[]
             for i in range(len(middles)):
                 loss_sp.append(self.sp(middles[i],old_middles[i]))
-            loss_sp=torch.cat(loss_sp).sum()/len(middles)
-
+            loss_sp=torch.tensor(loss_sp).sum()/len(middles)*self.hparams.lambda_sp
             # hkd
             kwargs["input_hkd"] = outputs[:, :n_old]
             kwargs["target_hkd"] = self.model_old.head(old_z)
