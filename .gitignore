@@ -1,0 +1,8 @@
+*.csv
+*.pth
+*.log
+*.yaml
+*.pdf
+__pycache__/
+*.npy
+
