@@ -275,13 +275,9 @@ class ISCFModule(FeatureHookMixin, FinetuningMixin, cl.Module):
             kwargs["target_hkd"] = self.model_old.head(old_z)
 
             # weq
-            last_weight=self.head.weight.detach()
-            last_bias=self.head.bias.detach()
-            cur_weight=self.head.weight
-            cur_bias=self.head.bias
-            last_params=torch.cat([last_weight,last_bias],dim=1)
-            cur_params=torch.cat([cur_weight,cur_bias],dim=1)
-            loss_weq=F.mse_loss(last_params.norm(dim=1,keepdim=True),cur_params.norm(dim=1,keepdim=True))
+            last_weight=self.head.embeddings.detach()
+            cur_weight=self.head.embeddings
+            loss_weq=F.mse_loss(last_weight.norm(dim=1,keepdim=True),cur_weight.norm(dim=1,keepdim=True))
         else: # task 0
             kwargs = dict(
                 input=input,
