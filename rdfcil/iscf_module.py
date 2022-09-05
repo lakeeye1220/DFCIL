@@ -122,12 +122,12 @@ class ISCFModule(FeatureHookMixin, FinetuningMixin, cl.Module):
             nn.functional.cross_entropy,
             ["ft_prediction", "ft_target","ft_weight"],
         )
-        self.register_loss(
-            "hkd",
-            nn.MSELoss(),
-            ["input_hkd", "target_hkd"],
-            self.hparams.lambda_hkd / (self.head.num_classes-self.model_old.head.num_classes),
-        )
+        # self.register_loss(
+        #     "hkd",
+        #     nn.MSELoss(),
+        #     ["input_hkd", "target_hkd"],
+        #     self.hparams.lambda_hkd / (self.head.num_classes-self.model_old.head.num_classes),
+        # )
 
 
     def update_old_model(self):
@@ -254,11 +254,11 @@ class ISCFModule(FeatureHookMixin, FinetuningMixin, cl.Module):
             n_old = self.model_old.head.num_classes
             kwargs["target"] = kwargs["target"] - n_old
             kwargs["prediction"] = kwargs["prediction"][:int(outputs.shape[0]//2), n_old:]
-            kwargs["lcl_weight"]=self.cls_weight[n_old:].to(self.device)
+            kwargs["lcl_weight"]=self.cls_weight[n_old:].detach().clone().to(self.device)
 
             # ft classification
             outputs_ft=self.head(z.detach().clone()) # only cls head
-            kwargs["ft_weight"] = self.cls_weight.to(self.device)
+            kwargs["ft_weight"] = self.cls_weight.detach().clone().to(self.device)
             kwargs["ft_prediction"] = outputs_ft
             kwargs["ft_target"]=target_all
 
@@ -268,9 +268,10 @@ class ISCFModule(FeatureHookMixin, FinetuningMixin, cl.Module):
                 loss_sp.append(self.sp(middles[i],old_middles[i]))
             loss_sp=torch.tensor(loss_sp).sum()/len(middles)*self.hparams.lambda_sp
             # hkd
-            kwargs["input_hkd"] = outputs[:, :n_old]
-            kwargs["target_hkd"] = self.model_old.head(old_z)
-
+            # kwargs["input_hkd"] = outputs[:, :n_old]
+            # kwargs["target_hkd"] = self.model_old.head(old_z).detach()
+            loss_kd=(F.mse_loss(outputs[:,:n_old],self.model_old.head(old_z).detach(),reduction='none').sum(dim=1))*self.hparams.lambda_hkd / (self.head.num_classes-self.model_old.head.num_classes)
+            loss_kd=loss_kd.mean()
             # weq
             last_weight=self.head.embeddings.detach()
             cur_weight=self.head.embeddings
@@ -294,7 +295,7 @@ class ISCFModule(FeatureHookMixin, FinetuningMixin, cl.Module):
                     "loss/sp":loss_sp
                 }
             )
-            loss+=loss_weq+loss_sp
+            loss+=(loss_weq+loss_sp+loss_kd)
 
         self.log_dict(loss_dict)
         indices, counts = target_all.cpu().unique(return_counts=True)
