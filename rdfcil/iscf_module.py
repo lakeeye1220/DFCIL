@@ -257,8 +257,9 @@ class ISCFModule(FeatureHookMixin, FinetuningMixin, cl.Module):
             kwargs["lcl_weight"]=self.cls_weight[n_old:].to(self.device)
 
             # ft classification
+            outputs_ft=self.head(z.detach().clone()) # only cls head
             kwargs["ft_weight"] = self.cls_weight.to(self.device)
-            kwargs["ft_prediction"] = outputs
+            kwargs["ft_prediction"] = outputs_ft
             kwargs["ft_target"]=target_all
 
             # sp
