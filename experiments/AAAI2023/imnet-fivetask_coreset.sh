@@ -35,7 +35,7 @@ LR=0.1
 
 
 # Naive Rehearsal
-python3 -u run_dfcil.py --dataset ImageNet --train_aug --rand_split --repeat $REPEAT --dataroot $DATAROOT \
+python3 -u run_dfcil.py --dataset ImageNet50 --train_aug --rand_split --repeat $REPEAT --dataroot $DATAROOT \
     --first_split_size $SPLIT --other_split_size $SPLIT --schedule $SCHEDULE --schedule_type decay --batch_size $BS \
     --optimizer $OPT --lr $LR --momentum $MOM --weight_decay $WD \
     --memory 2000 --model_name $MODELNAME --model_type resnet \
@@ -43,7 +43,7 @@ python3 -u run_dfcil.py --dataset ImageNet --train_aug --rand_split --repeat $RE
     --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/rehearsal "$@"
 
 # LwF - Coreset
-python3 -u run_dfcil.py --dataset ImageNet --train_aug --rand_split --repeat $REPEAT --dataroot $DATAROOT \
+python3 -u run_dfcil.py --dataset ImageNet50 --train_aug --rand_split --repeat $REPEAT --dataroot $DATAROOT \
     --first_split_size $SPLIT --other_split_size $SPLIT --schedule $SCHEDULE --schedule_type decay --batch_size $BS \
     --optimizer $OPT --lr $LR --momentum $MOM --weight_decay $WD \
     --mu 1 --memory 2000 --model_name $MODELNAME --model_type resnet \
