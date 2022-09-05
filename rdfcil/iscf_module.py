@@ -153,7 +153,7 @@ class ISCFModule(FeatureHookMixin, FinetuningMixin, cl.Module):
 
         self.sp = SP(reduction='mean')
 
-        self.register_feature_hook("pen", "head.neck")
+        #self.register_feature_hook("pen", "head.neck")
 
     def init_setup(self, stage=None):
         if self.datamodule.dataset.startswith("imagenet"):
