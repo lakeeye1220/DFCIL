@@ -392,3 +392,107 @@ class AlwaysBeDreaming(ISCF):
         loss_balancing=torch.zeros((1,), requires_grad=True).cuda()
 
         return total_loss.detach(), loss_class.detach(), loss_kd.detach(), loss_middle.detach(), loss_balancing.detach(), logits
+
+
+
+
+class TESTFAKE(ISCF):
+    def __init__(self, learner_config):
+        super(TESTFAKE, self).__init__(learner_config)
+        self.kl_loss = nn.KLDivLoss(reduction='batchmean')
+        self.md_criterion = SP(reduction='none')
+
+    def update_model(self, inputs, targets, target_scores = None, dw_force = None, kd_index = None):
+        task_step=self.valid_out_dim-self.last_valid_out_dim
+        # class balancing
+        mappings = torch.ones(targets.size(), dtype=torch.float32)
+        if self.gpu:
+            mappings = mappings.cuda()
+
+        rnt = 1.0 * self.last_valid_out_dim / self.valid_out_dim
+        mappings[:self.last_valid_out_dim] = rnt
+        mappings[self.last_valid_out_dim:] = 1-rnt
+        dw_cls = mappings[targets.long()]
+
+        # forward pass
+        logits_pen,m = self.model.forward(inputs, middle=True)
+
+        if len(self.config['gpuid']) > 1:
+            logits = self.model.module.last(logits_pen)
+        else:
+            logits = self.model.last(logits_pen)
+        
+        # classification 
+        class_idx = np.arange(self.batch_size) # real
+        if self.inversion_replay:
+            # local classification - LCE loss: the logit dimension is from last_valid_out_dim to valid_out_dim
+            loss_class = self.criterion(logits[class_idx,self.last_valid_out_dim:self.valid_out_dim], (targets[class_idx]-self.last_valid_out_dim).long(), dw_cls[class_idx]) 
+            # ft classification  
+            if len(self.config['gpuid']) > 1:
+                loss_class += self.criterion(self.model.module.last(logits_pen.detach()), targets.long(), dw_cls)
+            else:
+                loss_class += self.criterion(self.model.last(logits_pen.detach()), targets.long(), dw_cls)
+        
+        #first task local classification when we do not use any synthetic data     
+        else:
+            loss_class = self.criterion(logits[class_idx], targets[class_idx].long(), dw_cls[class_idx])
+        
+        #SPKD - Intermediate KD
+        if self.previous_teacher: # after 2nd task
+            middle_index= np.arange(2*self.batch_size) # real n fake
+            with torch.no_grad():
+                logits_prev_middle,pm = self.previous_teacher.solver.forward(inputs[middle_index],middle=True)
+            if len(pm)==3:
+                out1_pm,out2_pm,out3_pm=pm
+                out1_m,out2_m,out3_m=m
+                loss_sp = (self.md_criterion(out1_m[middle_index],out1_pm)+self.md_criterion(out2_m[middle_index],out2_pm)+self.md_criterion(out3_m[middle_index],out3_pm))/3.
+            else: # for imagenet
+                out1_pm,out2_pm,out3_pm,out4_pm=pm
+                out1_m,out2_m,out3_m,out4_m=m
+                loss_sp = (self.md_criterion(out1_m[middle_index],out1_pm)+self.md_criterion(out2_m[middle_index],out2_pm)+self.md_criterion(out3_m[middle_index],out3_pm)+self.md_criterion(out4_m[middle_index],out4_pm))/4.
+            
+            loss_sp = loss_sp.mean()*self.config['sp_mu']
+        else:
+            loss_sp=torch.zeros((1,), requires_grad=True).cuda()
+
+        # Logit KD for maintaining the output probability 
+        if self.previous_teacher:
+            kd_index= np.arange(self.batch_size)+self.batch_size # fake
+            with torch.no_grad():
+                logits_prevpen = self.previous_teacher.solver.forward(inputs[kd_index],pen=True)
+                logits_prev=self.previous_linear(logits_prevpen)[:,:self.last_valid_out_dim].detach()
+
+            loss_lkd=(F.mse_loss(logits[kd_index,:self.last_valid_out_dim],logits_prev,reduction='none').sum(dim=1)) * self.mu / task_step
+            loss_lkd=loss_lkd.mean()
+        else:
+            loss_lkd = torch.zeros((1,), requires_grad=True).cuda()
+        
+        # weight equalizer for balancing the average norm of weight 
+        if self.previous_teacher:
+            if len(self.config['gpuid']) > 1:
+                last_weights=self.model.module.last.weight[:self.valid_out_dim,:].detach()
+                last_bias=self.model.module.last.bias[:self.valid_out_dim].detach().unsqueeze(-1)
+                cur_weights=self.model.module.last.weight[:self.valid_out_dim,:] 
+                cur_bias=self.model.module.last.bias[:self.valid_out_dim].unsqueeze(-1) 
+            else:
+                last_weights=self.model.last.weight[:self.valid_out_dim,:].detach()
+                last_bias=self.model.last.bias[:self.valid_out_dim].detach().unsqueeze(-1)
+                cur_weights=self.model.last.weight[:self.valid_out_dim,:]
+                cur_bias=self.model.last.bias[:self.valid_out_dim].unsqueeze(-1) 
+
+            last_params=torch.cat([last_weights,last_bias],dim=1)
+            cur_params=torch.cat([cur_weights,cur_bias],dim=1)
+            weq_regularizer=F.mse_loss(last_params.norm(dim=1,keepdim=True).mean().expand(self.valid_out_dim),cur_params.norm(dim=1))
+            weq_regularizer*=self.config['weq_mu']
+        else:
+            weq_regularizer=torch.zeros((1,),requires_grad=True).cuda()
+
+        # calculate the 5 losses - LCE + SPKD + LKD + FT + WEQ, loss_class include the LCE and FT losses
+        total_loss = loss_class + loss_lkd + loss_sp + weq_regularizer
+
+        self.optimizer.zero_grad()
+        total_loss.backward()
+        # step
+        self.optimizer.step()
+
+        return total_loss.detach(), loss_class.detach(), loss_lkd.detach(), loss_sp.detach(), weq_regularizer.detach(), logits
