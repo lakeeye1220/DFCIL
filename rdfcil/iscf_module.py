@@ -233,6 +233,8 @@ class ISCFModule(FeatureHookMixin, FinetuningMixin, cl.Module):
         if self.model_old is not None:
             _ = self.model_old.eval() if self.model_old.training else None
             _ = self.inversion.eval() if self.inversion.training else None
+            n_old = self.model_old.head.num_classes
+            n_cur = self.head.num_classes
 
             input_rh, target_rh = self.inversion.sample(input.shape[0])
             target_all = torch.cat([target_t, target_rh])
@@ -250,15 +252,21 @@ class ISCFModule(FeatureHookMixin, FinetuningMixin, cl.Module):
                 prediction=outputs,
             )
 
+
             # local classification
-            n_old = self.model_old.head.num_classes
+            mappings = torch.ones(target_all.size(), dtype=torch.float32,device=self.device)
+            rnt = 1.0 * n_old / n_cur
+            mappings[:n_old] = rnt
+            mappings[n_old:] = 1-rnt
+            dw_cls = mappings[target_all.long()]
+
             kwargs["target"] = kwargs["target"] - n_old
             kwargs["prediction"] = kwargs["prediction"][:int(outputs.shape[0]//2), n_old:]
-            kwargs["lcl_weight"]=self.cls_weight[n_old:].detach().clone().to(self.device)
+            kwargs["lcl_weight"]=dw_cls[:int(outputs.shape[0]//2)]
 
             # ft classification
             outputs_ft=self.head(z.detach().clone()) # only cls head
-            kwargs["ft_weight"] = self.cls_weight.detach().clone().to(self.device)
+            kwargs["ft_weight"] = dw_cls
             kwargs["ft_prediction"] = outputs_ft
             kwargs["ft_target"]=target_all
 
@@ -270,7 +278,7 @@ class ISCFModule(FeatureHookMixin, FinetuningMixin, cl.Module):
             # hkd
             # kwargs["input_hkd"] = outputs[:, :n_old]
             # kwargs["target_hkd"] = self.model_old.head(old_z).detach()
-            loss_kd=(F.mse_loss(outputs[:,:n_old],self.model_old.head(old_z).detach(),reduction='none').sum(dim=1))*self.hparams.lambda_hkd / (self.head.num_classes-self.model_old.head.num_classes)
+            loss_kd=(F.mse_loss(outputs[:,:n_old],self.model_old.head(old_z).detach(),reduction='none').sum(dim=1))*self.hparams.lambda_hkd / (n_cur-n_old)
             loss_kd=loss_kd.mean()
             # weq
             last_weight=self.head.embeddings.detach()
