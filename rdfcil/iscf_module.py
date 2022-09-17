@@ -254,15 +254,15 @@ class ISCFModule(FeatureHookMixin, FinetuningMixin, cl.Module):
 
 
             # local classification
-            mappings = torch.ones(target_all.size(), dtype=torch.float32,device=self.device)
+            mappings = torch.ones(n_cur.size(), dtype=torch.float32,device=self.device)
             rnt = 1.0 * n_old / n_cur
             mappings[:n_old] = rnt
             mappings[n_old:] = 1-rnt
-            dw_cls = mappings[target_all.long()]
+            dw_cls = mappings
 
             kwargs["target"] = kwargs["target"] - n_old
             kwargs["prediction"] = kwargs["prediction"][:int(outputs.shape[0]//2), n_old:]
-            kwargs["lcl_weight"]=dw_cls[:int(outputs.shape[0]//2)]
+            kwargs["lcl_weight"]=dw_cls[n_old:]
 
             # ft classification
             outputs_ft=self.head(z.detach().clone()) # only cls head
@@ -285,11 +285,13 @@ class ISCFModule(FeatureHookMixin, FinetuningMixin, cl.Module):
             cur_weight=self.head.embeddings
             loss_weq=F.mse_loss(last_weight.norm(dim=1,keepdim=True),cur_weight.norm(dim=1,keepdim=True))
         else: # task 0
+            mappings = torch.ones(n_cur.size(), dtype=torch.float32,device=self.device)
+            dw_cls = mappings
             kwargs = dict(
                 input=input,
                 target=target_t,
                 prediction=self(input),
-                lcl_weight=torch.ones_like(target_t, dtype=torch.float32),
+                lcl_weight=dw_cls
                 # lcl_weight=self.cls_weight[:self.head.num_classes].detach().to(self.device),
             )
 
