@@ -175,6 +175,7 @@ class ISCFModule(FeatureHookMixin, FinetuningMixin, cl.Module):
 
         if current_task == 0 or resume_from_checkpoint is not None:
             self.init_setup(stage)
+            self.print(f"=> Network Overview \n {self}")
         else:
             self.update_old_model()
             self.head.append(self.datamodule.num_classes)
@@ -183,27 +184,11 @@ class ISCFModule(FeatureHookMixin, FinetuningMixin, cl.Module):
         self.cls_weight = torch.ones(self.head.num_classes)
         self.register_losses()
 
-        self.print(f"=> Network Overview \n {self}")
 
     def forward(self, input):
         output = self.backbone(input)
         output = self.head(output)
         return output
-
-    def check_finetuning(self, at_epoch_end: bool = True):
-        if not self.should_start_finetuning(at_epoch_end):
-            return super().check_finetuning(at_epoch_end)
-
-        result = super().check_finetuning(at_epoch_end)
-        if self.model_old is not None:
-            _ = [self.unregister_loss(name) for name in ["rkd"]]
-            self.register_loss(
-                "ce",
-                nn.functional.cross_entropy,
-                ["prediction", "target", "ft_weight"],
-                self.hparams.lambda_ce,
-            )
-        return result
 
     def on_train_start(self):
         super().on_train_start()
@@ -241,7 +226,8 @@ class ISCFModule(FeatureHookMixin, FinetuningMixin, cl.Module):
 
             input_int=torch.cat([input, input_rh])
             # middle
-            old_z,old_middles = self.model_old.forward_feat(input_int)
+            with torch.no_grad():
+                old_z,old_middles = self.model_old.forward_feat(input_int)
             z,middles = self.backbone.forward_feat(input_int)
             outputs=self.head(z)
                    
