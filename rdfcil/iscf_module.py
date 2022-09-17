@@ -289,7 +289,8 @@ class ISCFModule(FeatureHookMixin, FinetuningMixin, cl.Module):
                 input=input,
                 target=target_t,
                 prediction=self(input),
-                lcl_weight=self.cls_weight[:self.head.num_classes].detach().to(self.device),
+                lcl_weight=torch.ones_like(target_t, dtype=torch.float32),
+                # lcl_weight=self.cls_weight[:self.head.num_classes].detach().to(self.device),
             )
 
 
