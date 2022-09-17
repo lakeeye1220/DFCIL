@@ -230,11 +230,11 @@ class ISCFModule(FeatureHookMixin, FinetuningMixin, cl.Module):
         target_t = self.datamodule.transform_target(target)
         target_all = target_t
 
+        n_cur = self.head.num_classes
         if self.model_old is not None:
             _ = self.model_old.eval() if self.model_old.training else None
             _ = self.inversion.eval() if self.inversion.training else None
             n_old = self.model_old.head.num_classes
-            n_cur = self.head.num_classes
 
             input_rh, target_rh = self.inversion.sample(input.shape[0])
             target_all = torch.cat([target_t, target_rh])
@@ -254,7 +254,7 @@ class ISCFModule(FeatureHookMixin, FinetuningMixin, cl.Module):
 
 
             # local classification
-            mappings = torch.ones(n_cur.size(), dtype=torch.float32,device=self.device)
+            mappings = torch.ones((n_cur), dtype=torch.float32,device=self.device)
             rnt = 1.0 * n_old / n_cur
             mappings[:n_old] = rnt
             mappings[n_old:] = 1-rnt
@@ -285,7 +285,7 @@ class ISCFModule(FeatureHookMixin, FinetuningMixin, cl.Module):
             cur_weight=self.head.embeddings
             loss_weq=F.mse_loss(last_weight.norm(dim=1,keepdim=True),cur_weight.norm(dim=1,keepdim=True))
         else: # task 0
-            mappings = torch.ones(n_cur.size(), dtype=torch.float32,device=self.device)
+            mappings = torch.ones((n_cur), dtype=torch.float32,device=self.device)
             dw_cls = mappings
             kwargs = dict(
                 input=input,
