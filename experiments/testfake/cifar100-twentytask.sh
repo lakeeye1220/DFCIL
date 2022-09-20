@@ -7,7 +7,7 @@ DEFAULTGPU=0
 GPUID=7
 
 # benchmark settings
-DATE=TESTFAKE
+DATE=TESTFAKE_1.5mu
 SPLIT=5
 OUTDIR=outputs/${DATE}/DFCIL-twentytask/CIFAR100
 
@@ -23,7 +23,7 @@ OVERWRITE=0
 MAXTASK=-1
 
 # hard coded inputs
-REPEAT=1
+REPEAT=3
 SCHEDULE="100 150 200 250"
 PI=10000
 MODELNAME=resnet32
@@ -41,7 +41,7 @@ LR=0.1
 python3 -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
     --first_split_size $SPLIT --other_split_size $SPLIT --schedule $SCHEDULE --schedule_type decay --batch_size $BS \
     --optimizer $OPT --lr $LR --momentum $MOM --weight_decay $WD \
-    --mu 2.5e-2 --memory 0 --model_name $MODELNAME --model_type resnet \
+    --mu 0.75e-1 --memory 0 --model_name $MODELNAME --model_type resnet \
     --learner_type datafree --learner_name TESTFAKE \
     --gen_model_name CIFAR_GEN --gen_model_type generator \
     --beta 1 --power_iters $PI --deep_inv_params 1e-3 5e1 1e-3 1e3 1 \
