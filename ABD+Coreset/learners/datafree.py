@@ -265,8 +265,6 @@ class ISCF(NormalNN):
         else:
             loss_class = self.criterion(logits[class_idx], targets[class_idx].long(), dw_cls[class_idx])
 
-
-        
         #SPKD - Intermediate KD
         if self.previous_teacher: # after 2nd task
             middle_index= np.arange(2*self.batch_size) # real n fake
@@ -287,12 +285,19 @@ class ISCF(NormalNN):
 
         # Logit KD for maintaining the output probability 
         if self.previous_teacher:
+            if self.config['lock_hkd_feature']:
+                logits_hkd=self.model.module.last(logits_pen.detach())
+            else:
+                logits_hkd=logits
+
             kd_index= np.arange(2*self.batch_size)
             with torch.no_grad():
                 logits_prevpen = self.previous_teacher.solver.forward(inputs[kd_index],pen=True)
                 logits_prev=self.previous_linear(logits_prevpen)[:,:self.last_valid_out_dim].detach()
+                if self.config['downscale_logit_cur'] !=0:
+                    logits_prev*=self.config['downscale_logit_cur']
 
-            loss_lkd=(F.mse_loss(logits[kd_index,:self.last_valid_out_dim],logits_prev,reduction='none').sum(dim=1)) * self.mu / task_step
+            loss_lkd=(F.mse_loss(logits_hkd[kd_index,:self.last_valid_out_dim],logits_prev,reduction='none').sum(dim=1)) * self.mu / task_step
             loss_lkd=loss_lkd.mean()
         else:
             loss_lkd = torch.zeros((1,), requires_grad=True).cuda()

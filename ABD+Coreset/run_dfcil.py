@@ -69,6 +69,10 @@ def create_args():
     parser.add_argument('--mu', type=float, default=1.0, help="KD loss balancing weight")
     parser.add_argument('--sp_mu', type=float, default=1.0, help="SP KD loss balancing weight")
     parser.add_argument('--weq_mu', type=float, default=1.0, help="Weight Equalizer regularizer")
+
+    # TEST Args
+    parser.add_argument('--lock_hkd_feature', action='store_true', help="lock the feature extractor during HKD training")
+    parser.add_argument('--downscale_logit_cur', type=float,default=0, help="downscale the logits of current task")
     
     return parser
 
