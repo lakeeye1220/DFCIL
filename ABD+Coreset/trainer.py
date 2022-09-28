@@ -39,34 +39,34 @@ class Trainer:
             Dataset = dataloaders.iCIFAR10
             num_classes = 10
             self.dataset_size = [32,32,3]
-            args.dataroot=os.path.join(args.dataroot, 'cifar10')
+            args.dataroot_dataset=os.path.join(args.dataroot, 'cifar10')
         elif args.dataset == 'CIFAR100':
             Dataset = dataloaders.iCIFAR100
             num_classes = 100
             self.dataset_size = [32,32,3]
-            args.dataroot=os.path.join(args.dataroot, 'cifar100')
+            args.dataroot_dataset=os.path.join(args.dataroot, 'cifar100')
         elif args.dataset == 'ImageNet':
             Dataset = dataloaders.iIMAGENET
             num_classes = 1000
             self.dataset_size = [224,224,3]
             self.top_k = 5
-            args.dataroot=os.path.join(args.dataroot, 'imagenet')
+            args.dataroot_dataset=os.path.join(args.dataroot, 'imagenet')
         elif args.dataset == 'ImageNet50':
             Dataset = dataloaders.iIMAGENET
             num_classes = 50
             self.dataset_size = [224,224,3]
             self.top_k = 5
-            args.dataroot=os.path.join(args.dataroot, 'imagenet')
+            args.dataroot_dataset=os.path.join(args.dataroot, 'imagenet')
         elif args.dataset == 'TinyImageNet':
             Dataset = dataloaders.iTinyIMNET
             num_classes = 200
             self.dataset_size = [64,64,3]
-            args.dataroot=os.path.join(args.dataroot, 'tiny-imagenet')
+            args.dataroot_dataset=os.path.join(args.dataroot, 'tiny-imagenet')
         elif args.dataset == 'TinyImageNet100':
             Dataset = dataloaders.iTinyIMNET
             num_classes = 100
             self.dataset_size = [64,64,3]
-            args.dataroot=os.path.join(args.dataroot, 'tiny-imagenet')
+            args.dataroot_dataset=os.path.join(args.dataroot, 'tiny-imagenet')
         else:
             raise ValueError('Dataset not implemented!')
 
@@ -106,10 +106,10 @@ class Trainer:
         # datasets and dataloaders
         train_transform = dataloaders.utils.get_transform(dataset=args.dataset, phase='train', aug=args.train_aug, dgr=self.dgr)
         test_transform  = dataloaders.utils.get_transform(dataset=args.dataset, phase='test', aug=args.train_aug, dgr=self.dgr)
-        self.train_dataset = Dataset(args.dataroot, train=True, tasks=self.tasks,
+        self.train_dataset = Dataset(args.dataroot_dataset, train=True, tasks=self.tasks,
                             download_flag=True, transform=train_transform, 
                             seed=self.seed, validation=args.validation)
-        self.test_dataset  = Dataset(args.dataroot, train=False, tasks=self.tasks,
+        self.test_dataset  = Dataset(args.dataroot_dataset, train=False, tasks=self.tasks,
                                 download_flag=False, transform=test_transform, 
                                 seed=self.seed, validation=args.validation)
 
