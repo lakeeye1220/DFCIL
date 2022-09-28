@@ -169,18 +169,18 @@ class Trainer:
         else:
             return self.learner.validation(test_loader)
 
-    def train(self, avg_metrics):
+    def train(self, avg_metrics,repeat_idx):
     
         # temporary results saving
         temp_table = {}
         for mkey in self.metric_keys: temp_table[mkey] = []
         temp_dir = self.log_dir + '/temp/'
         if not os.path.exists(temp_dir): os.makedirs(temp_dir)
-        visualize_path= os.path.join(self.log_dir,'visualize_weight')
+        visualize_path= os.path.join(self.log_dir,'visualize_weight','repeat-{}'.format(repeat_idx))
         if not os.path.exists(visualize_path): os.makedirs(visualize_path)
-        visualize_cm_path=os.path.join(self.log_dir,'visualize_confusion_matrix')
+        visualize_cm_path=os.path.join(self.log_dir,'visualize_confusion_matrix','repeat-{}'.format(repeat_idx))
         if not os.path.exists(visualize_cm_path): os.makedirs(visualize_cm_path)
-        visualize_ml_path=os.path.join(self.log_dir,'visualize_marginal_likelihood')
+        visualize_ml_path=os.path.join(self.log_dir,'visualize_marginal_likelihood','repeat-{}'.format(repeat_idx))
         if not os.path.exists(visualize_ml_path): os.makedirs(visualize_ml_path)
 
         # for each task
