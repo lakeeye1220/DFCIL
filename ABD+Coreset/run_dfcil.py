@@ -27,7 +27,7 @@ def create_args():
     parser.add_argument('--gen_model_name', type=str, default='MLP', help="The name of actual model for the generator")
     parser.add_argument('--learner_type', type=str, default='default', help="The type (filename) of learner")
     parser.add_argument('--learner_name', type=str, default='NormalNN', help="The class name of learner")
-    parser.add_argument('--dataroot', type=str, default='~\data\dataset\\', help="The root folder of dataset or downloaded data")
+    parser.add_argument('--dataroot', type=str, default='/data', help="The root folder of dataset or downloaded data")
     parser.add_argument('--dataset', type=str, default='MNIST', help="CIFAR10|MNIST")
     parser.add_argument('--load_model_dir', type=str, default=None, help="try loading from external model directory")
     parser.add_argument('--workers', type=int, default=8, help="#Thread for dataloader")
@@ -72,6 +72,7 @@ def create_args():
 
     # TEST Args
     parser.add_argument('--lock_hkd_feature', action='store_true', help="lock the feature extractor during HKD training")
+    parser.add_argument('--no_ft', action='store_true', help="no ft")
     parser.add_argument('--downscale_logit_cur', type=float,default=0, help="downscale the logits of current task")
     
     return parser

@@ -147,6 +147,7 @@ class Trainer:
                         'tasks': self.tasks_logits,
                         'top_k': self.top_k,
                         'sp_mu':args.sp_mu,
+                        'no_ft':args.no_ft,
                         'weq_mu':args.weq_mu,
                         'lock_hkd_feature':args.lock_hkd_feature,
                         'downscale_logit_cur':args.downscale_logit_cur,

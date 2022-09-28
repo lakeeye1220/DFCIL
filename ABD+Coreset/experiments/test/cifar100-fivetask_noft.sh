@@ -5,7 +5,7 @@ DEFAULTGPU=0
 GPUID=7
 
 # benchmark settings
-DATE=LogitKD_downscale_logit_cur1.0
+DATE=LogitKD_no_ft
 SPLIT=20
 OUTDIR=outputs/${DATE}/DFCIL-fivetask/CIFAR100
 
@@ -44,4 +44,4 @@ python3 -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPU
     --gen_model_name CIFAR_GEN --gen_model_type generator \
     --beta 1 --power_iters $PI --deep_inv_params 1e-3 5e1 1e-3 1e3 1 \
     --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/iscf \
-    --sp_mu 100 --weq_mu 1 --downscale_logit_cur 1.0 
+    --sp_mu 100 --weq_mu 1 --no_ft

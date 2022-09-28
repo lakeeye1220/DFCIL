@@ -2,7 +2,7 @@
 # process inputs
 # command : bash experiments/cifar100-fivetask.sh --gpuid $GPUID
 DEFAULTGPU=0
-GPUID=0
+GPUID=1
 
 # benchmark settings
 DATE=LogitKD_lock_feature
@@ -36,7 +36,7 @@ LR=0.1
 #########################
 
 # Full Method
-python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
+python3 -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
     --first_split_size $SPLIT --other_split_size $SPLIT --schedule $SCHEDULE --schedule_type decay --batch_size $BS \
     --optimizer $OPT --lr $LR --momentum $MOM --weight_decay $WD \
     --mu 1e-1 --memory 0 --model_name $MODELNAME --model_type resnet \

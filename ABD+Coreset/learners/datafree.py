@@ -255,11 +255,12 @@ class ISCF(NormalNN):
             # local classification - LCE loss: the logit dimension is from last_valid_out_dim to valid_out_dim
             loss_class = self.criterion(logits[class_idx,self.last_valid_out_dim:self.valid_out_dim], (targets[class_idx]-self.last_valid_out_dim).long(), dw_cls[class_idx]) 
             
-            # ft classification  
-            if len(self.config['gpuid']) > 1:
-                loss_class += self.criterion(self.model.module.last(logits_pen.detach()), targets.long(), dw_cls)
-            else:
-                loss_class += self.criterion(self.model.last(logits_pen.detach()), targets.long(), dw_cls)
+            # ft classification 
+            if ~self.config['no_ft']:
+                if len(self.config['gpuid']) > 1:
+                    loss_class += self.criterion(self.model.module.last(logits_pen.detach()), targets.long(), dw_cls)
+                else:
+                    loss_class += self.criterion(self.model.last(logits_pen.detach()), targets.long(), dw_cls)
         
         #first task local classification when we do not use any synthetic data     
         else:
@@ -286,7 +287,10 @@ class ISCF(NormalNN):
         # Logit KD for maintaining the output probability 
         if self.previous_teacher:
             if self.config['lock_hkd_feature']:
-                logits_hkd=self.model.module.last(logits_pen.detach())
+                if len(self.config['gpuid']) > 1:
+                    logits_hkd=self.model.module.last(logits_pen.detach())
+                else:
+                    logits_hkd=self.model.last(logits_pen.detach())
             else:
                 logits_hkd=logits
 
@@ -295,7 +299,7 @@ class ISCF(NormalNN):
                 logits_prevpen = self.previous_teacher.solver.forward(inputs[kd_index],pen=True)
                 logits_prev=self.previous_linear(logits_prevpen)[:,:self.last_valid_out_dim].detach()
                 if self.config['downscale_logit_cur'] !=0:
-                    logits_prev*=self.config['downscale_logit_cur']
+                    logits_prev[np.arange(self.batch_size)]*=self.config['downscale_logit_cur']
 
             loss_lkd=(F.mse_loss(logits_hkd[kd_index,:self.last_valid_out_dim],logits_prev,reduction='none').sum(dim=1)) * self.mu / task_step
             loss_lkd=loss_lkd.mean()
