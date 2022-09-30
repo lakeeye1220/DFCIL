@@ -300,6 +300,10 @@ class ISCF(NormalNN):
                 logits_prev=self.previous_linear(logits_prevpen)[:,:self.last_valid_out_dim].detach()
                 if self.config['downscale_logit_cur'] !=0:
                     logits_prev[np.arange(self.batch_size)]*=self.config['downscale_logit_cur']
+                if self.config['new_softkd']:
+                    new_idx=np.arange(self.batch_size)
+                    logits_prev[new_idx]=torch.softmax(logits_prev[new_idx]/2.0,dim=1)
+                    logits_hkd[new_idx]=torch.softmax(logits_hkd[new_idx]/2.0,dim=1)
 
             loss_lkd=(F.mse_loss(logits_hkd[kd_index,:self.last_valid_out_dim],logits_prev,reduction='none').sum(dim=1)) * self.mu / task_step
             loss_lkd=loss_lkd.mean()
@@ -307,7 +311,7 @@ class ISCF(NormalNN):
             loss_lkd = torch.zeros((1,), requires_grad=True).cuda()
         
         # weight equalizer for balancing the average norm of weight 
-        if self.previous_teacher:
+        if self.previous_teacher and not self.config['no_weq']:
             if len(self.config['gpuid']) > 1:
                 last_weights=self.model.module.last.weight[:self.valid_out_dim,:].detach()
                 last_bias=self.model.module.last.bias[:self.valid_out_dim].detach().unsqueeze(-1)

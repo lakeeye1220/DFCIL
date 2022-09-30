@@ -73,6 +73,8 @@ def create_args():
     # TEST Args
     parser.add_argument('--lock_hkd_feature', action='store_true', help="lock the feature extractor during HKD training")
     parser.add_argument('--no_ft', action='store_true', help="no ft")
+    parser.add_argument('--no_weq', action='store_true', help="no weq")
+    parser.add_argument('--new_softkd', action='store_true', help="new softkd")
     parser.add_argument('--downscale_logit_cur', type=float,default=0, help="downscale the logits of current task")
     
     return parser

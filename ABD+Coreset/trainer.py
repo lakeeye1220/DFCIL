@@ -148,6 +148,8 @@ class Trainer:
                         'top_k': self.top_k,
                         'sp_mu':args.sp_mu,
                         'no_ft':args.no_ft,
+                        'no_weq':args.no_weq,
+                        'new_softkd':args.new_softkd,
                         'weq_mu':args.weq_mu,
                         'lock_hkd_feature':args.lock_hkd_feature,
                         'downscale_logit_cur':args.downscale_logit_cur,
