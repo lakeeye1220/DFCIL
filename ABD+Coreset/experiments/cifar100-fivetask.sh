@@ -2,7 +2,7 @@
 # process inputs
 # command : bash experiments/cifar100-fivetask.sh --gpuid $GPUID
 DEFAULTGPU=0
-GPUID=0
+GPUID=7
 
 # benchmark settings
 DATE=AAAI2023

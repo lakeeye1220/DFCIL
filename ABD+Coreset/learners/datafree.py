@@ -302,8 +302,9 @@ class ISCF(NormalNN):
                     logits_prev[np.arange(self.batch_size)]*=self.config['downscale_logit_cur']
                 if self.config['new_softkd']:
                     new_idx=np.arange(self.batch_size)
-                    logits_prev[new_idx]=torch.softmax(logits_prev[new_idx]/2.0,dim=1)
-                    logits_hkd[new_idx]=torch.softmax(logits_hkd[new_idx]/2.0,dim=1)
+                    logits_prev[new_idx]=logits_prev[new_idx,:self.last_valid_out_dim].mean(dim=1,keepdim=True).expand_as(logits_prev[new_idx])
+                    #logits_prev[new_idx]=torch.softmax(logits_prev[new_idx]/2.0,dim=1)
+                    #logits_hkd[new_idx]=torch.softmax(logits_hkd[new_idx]/2.0,dim=1)
 
             loss_lkd=(F.mse_loss(logits_hkd[kd_index,:self.last_valid_out_dim],logits_prev,reduction='none').sum(dim=1)) * self.mu / task_step
             loss_lkd=loss_lkd.mean()
