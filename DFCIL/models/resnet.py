@@ -163,6 +163,11 @@ class ResNet(nn.Module):
             self.layer3 = self._make_layer(block, 64, num_blocks[2], stride=2)
             self.last = nn.Linear(64, num_classes)
 
+            self.projection = nn.Linear(64,64,bias=False)
+            self.projection_bn = nn.BatchNorm1d(64,64)
+            self.projection_relu = nn.ReLU()
+            self.bn_normalize = nn.BatchNorm1d(64,64,affine=False)
+
             self.apply(_weights_init)
         else: # len(num_blocks) 4
             
@@ -174,7 +179,10 @@ class ResNet(nn.Module):
             self.layer3 = self._make_layer(block, 256, num_blocks[2], stride=2)
             self.layer4 = self._make_layer(block, 512, num_blocks[3], stride=2)
             self.avgpool = nn.AdaptiveAvgPool2d((1,1))
+            
             self.last = nn.Linear(512*block.expansion, num_classes)
+            self.bn_normalize = nn.BatchNorm1d(512,512,affine=False)
+            
             self.apply(_weights_init)
 
     def _make_layer(self, block, planes, num_blocks, stride):
@@ -186,7 +194,7 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def forward(self, x, middle=False, pen=False):
+    def forward(self, x, middle=False, pen=False, bn_normalize=False):
         if self.len_blocks ==3 :
             out = F.relu(self.bn1(self.conv1(x)))
             out1 = self.layer1(out)
@@ -197,9 +205,16 @@ class ResNet(nn.Module):
             if pen:
                 return out_pen
 
+            if bn_normalize:
+                out = self.projection(out_pen)
+                out = self.projection_bn(out)
+                out = self.projection_relu(out)
+                out_bn = self.bn_normalize(out)
+                #print("out bn shape : ",out_bn.shape, "vlaue : ",out_bn)
+                return out_bn
+
             if middle:
                 return out_pen, [out1,out2,out3]
-
             else:
                 out = self.last(out_pen)
                 return out

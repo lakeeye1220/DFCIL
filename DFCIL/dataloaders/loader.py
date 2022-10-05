@@ -28,7 +28,8 @@ class iDataset(data.Dataset):
                 tasks=None, seed=-1, validation=False, kfolds=5):
 
         # process rest of args
-        self.root = os.path.expanduser(root)
+        self.root = './data'
+        #self.root = os.path.expanduser(root)
         self.transform = transform
         self.train = train  # training set or test set
         self.validation = validation

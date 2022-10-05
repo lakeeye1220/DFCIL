@@ -32,8 +32,12 @@ class NormalNN(nn.Module):
         self.batch_size = learner_config['batch_size']
         self.previous_teacher = None
         self.tasks = learner_config['tasks']
+        self.fakegt_idx = learner_config['fakegt_idx']
+        self.acc_fakegt_idx = learner_config['acc_fakegt_idx']
+        self.gt_idx = learner_config['gt_idx']
         self.top_k = learner_config['top_k']
-
+        self.lastbs_img = learner_config['lastbs_img']
+        
         # replay memory parameters
         self.memory_size = self.config['memory']
         self.task_count = 0
@@ -110,7 +114,115 @@ class NormalNN(nn.Module):
         plt.xlim(0,weight.shape[0])
         plt.savefig(os.path.join(file_path,'{}task_class_norm.pdf'.format(task_num)),bbox_inches='tight')
         np.savetxt(os.path.join(file_path,'{}task_class_norm.csv'.format(task_num)), class_norm, delimiter=",", fmt='%.2f')
+
+    def plot_per_class_accuracy(self, trnloader=None, train_data=None,valloader=None, test_data=None, nClasses=100, file_path=None, task_num=0,num_seen=None, device = 'cuda'):
+        fakegt_idx = sum(self.fakegt_idx,[]) #29995
+        #print("self.fake_idx : ",fakegt_idx)
+        gt_idx = sum(self.gt_idx,[]) #100
+        print("real length : ",len(gt_idx),"fake length : ",len(fakegt_idx))
+        subsets = {target: torch.utils.data.Subset(test_data, (np.array(test_data.targets)==target).nonzero()[0]) for target in gt_idx[:self.valid_out_dim]}
+        testloader = {target: torch.utils.data.DataLoader(subset,batch_size=100) for target, subset in subsets.items()}
+        result_dict = {}
+
+        for key in list(testloader.keys()):
+            class_acc = 0.0
+            for idx, (input, target, task) in enumerate(testloader[key]):
+                if self.gpu:
+                    with torch.no_grad():
+                        input = input.cuda()
+                        target = target.cuda()
+                output = self.model.forward(input)[:, :self.valid_out_dim]
+                class_acc += accuracy(output, target,topk=(self.top_k,))
+            result_dict[key] = class_acc
+        #print(result_dict)
+       
+        if num_seen is None:
+            labels = [int(train_data[i][1]) for i in range(len(train_data))] + [i for i in fakegt_idx]
+            labels = np.asarray(labels, dtype=np.int64)
+            print("total lengh of labels : ",labels.shape)
+            num_seen = np.asarray([len(labels[labels==k]) for k in range(self.valid_out_dim)], dtype=np.int64)
+
+        print("num_seen : ",num_seen)
+
+        plt.figure(figsize=(15,4), dpi=64, facecolor='w', edgecolor='k')
+        plt.xticks(list(range(self.config['num_classes'])), [str(i) for i in range(self.config['num_classes'])], rotation=90, fontsize=8);  # Set text labels.
+        plt.title('#images and accuracy per class', fontsize=20)
+        ax1 = plt.gca()    
+        ax2=ax1.twinx()
+        #print("v : ", [v for k,v in result_dict.items()])
+        ax1.bar(list(range(self.config['num_classes'])), [v for k,v in result_dict.items()]+[0]*(self.config['num_classes']-self.valid_out_dim), alpha=0.7, width=1,linewidth=2,color='tab:blue')
+        #for idx,label in enumerate(result_dict):
+        #    print("label : ",result_dict[label])
+        #    ax1.bar(label, result_dict[label], alpha=0.7, width=1,color='tab:blue')
+        ax1.set_ylabel('accuracy', fontsize=16, color='tab:blue')
+        ax1.tick_params(axis='y', labelcolor='tab:blue', labelsize=16)
+
+        ax2.set_ylabel('#images', fontsize=16, color='r')
+        ax2.plot(num_seen, linewidth=4, color='r')
+        ax2.tick_params(axis='y', labelcolor='r', labelsize=16)
+    
+        ax1.legend(prop={'size': 14})
+
+        plt.savefig(os.path.join(file_path,'{}task_imgs_per_class.pdf'.format(task_num)),bbox_inches='tight')
+        np.savetxt(os.path.join(file_path,'{}task_imgs_per_class.csv'.format(task_num)),num_seen, delimiter=",", fmt='%.2f')   
+        #np.savetxt(os.path.join(file_path,'{}task_acc_per_class.csv'.format(task_num)),[v for k,v in result_dict.items()], delimiter=",", fmt='%.2f')   
         plt.close()
+
+    def plot_per_class_accuracy2(self, trnloader=None, train_data=None,valloader=None, test_data=None, nClasses=100, file_path=None, task_num=0,num_seen=None, device = 'cuda'):
+        #print("self.fake_idx : ",self.fakegt_idx)
+        acc_fakegt_idx = sum(self.acc_fakegt_idx,[])
+        print("len of acc_fakegt_idx : default.py 172", len(acc_fakegt_idx))
+        fakegt_idx = sum(self.fakegt_idx,[]) #29995
+        gt_idx = sum(self.gt_idx,[]) #100
+        print("real length : ",len(gt_idx),"fake length : ",len(acc_fakegt_idx))
+        subsets = {target: torch.utils.data.Subset(test_data, (np.array(test_data.targets)==target).nonzero()[0]) for target in gt_idx[:self.valid_out_dim]}
+        testloader = {target: torch.utils.data.DataLoader(subset,batch_size=100) for target, subset in subsets.items()}
+        result_dict = {}
+
+        for key in list(testloader.keys()):
+            class_acc = 0.0
+            for idx, (input, target, task) in enumerate(testloader[key]):
+                if self.gpu:
+                    with torch.no_grad():
+                        input = input.cuda()
+                        target = target.cuda()
+                output = self.model.forward(input)[:, :self.valid_out_dim]
+                class_acc += accuracy(output, target,topk=(self.top_k,))
+            result_dict[key] = class_acc
+        #print(result_dict)
+       
+        if num_seen is None:
+            labels = [int(train_data[i][1]) for i in range(len(train_data))] + [i for i in acc_fakegt_idx]
+            labels = np.asarray(labels, dtype=np.int64)
+            #print("total lengh of labels : ",labels.shape)
+            num_seen = np.asarray([len(labels[labels==k]) for k in range(self.valid_out_dim)], dtype=np.int64)
+
+        #print("num_seen : ",num_seen)
+
+        plt.figure(figsize=(15,4), dpi=64, facecolor='w', edgecolor='k')
+        plt.xticks(list(range(self.config['num_classes'])), [str(i) for i in range(self.config['num_classes'])], rotation=90, fontsize=8);  # Set text labels.
+        plt.title('#images and accuracy per class', fontsize=20)
+        ax1 = plt.gca()    
+        ax2=ax1.twinx()
+        #print("v : ", [v for k,v in result_dict.items()])
+        ax1.bar(list(range(self.config['num_classes'])), [v for k,v in result_dict.items()]+[0]*(self.config['num_classes']-self.valid_out_dim), alpha=0.7, width=1,linewidth=2,color='tab:blue')
+        #for idx,label in enumerate(result_dict):
+        #    print("label : ",result_dict[label])
+        #    ax1.bar(label, result_dict[label], alpha=0.7, width=1,color='tab:blue')
+        ax1.set_ylabel('accuracy', fontsize=16, color='tab:blue')
+        ax1.tick_params(axis='y', labelcolor='tab:blue', labelsize=16)
+
+        ax2.set_ylabel('#images', fontsize=16, color='r')
+        ax2.plot(num_seen, linewidth=4, color='r')
+        ax2.tick_params(axis='y', labelcolor='r', labelsize=16)
+    
+        ax1.legend(prop={'size': 14})
+
+        plt.savefig(os.path.join(file_path,'{}task_imgs_per_class.pdf'.format(task_num)),bbox_inches='tight')
+        np.savetxt(os.path.join(file_path,'{}task_acc_per_class.csv'.format(task_num)),[v for k,v in result_dict.items()], delimiter=",", fmt='%.2f')   
+        np.savetxt(os.path.join(file_path,'{}task_total_imgs_per_class.csv'.format(task_num)),num_seen, delimiter=",", fmt='%.2f')   
+        plt.close()
+
 
     def learn_batch(self, train_loader, train_dataset, model_save_dir, val_loader=None):
         
@@ -247,7 +359,6 @@ class NormalNN(nn.Module):
         orig_mode = model.training
         model.eval()
         for i, (input, target, task) in enumerate(dataloader):
-
             if self.gpu:
                 with torch.no_grad():
                     input = input.cuda()
@@ -298,7 +409,7 @@ class NormalNN(nn.Module):
                 labels = np.asarray(labels, dtype=np.int64)
                 num_seen = np.asarray([len(labels[labels==k]) for k in range(self.valid_out_dim)], dtype=np.float32)
 
-            self.log('num seen:' + str(num_seen))
+            #self.log('num seen:' + str(num_seen))
             
             # in case a zero exists in PL...
             num_seen += 1
@@ -308,6 +419,7 @@ class NormalNN(nn.Module):
             seen = torch.tensor(seen)
             seen_dw = np.ones(self.valid_out_dim + 1, dtype=np.float32)
             seen_dw[:self.valid_out_dim] = num_seen.sum() / (num_seen * len(num_seen))
+
             seen_dw = torch.tensor(seen_dw)
 
             self.dw_k = seen_dw
@@ -353,11 +465,26 @@ class NormalNN(nn.Module):
         elif self.config['optimizer'] == 'Adam':
             optimizer_arg['betas'] = (self.config['momentum'],0.999)
 
+        finetune_optimizer_arg = {'params':self.model.parameters(),
+                         'lr':self.config['finetune_lr'],
+                         'weight_decay':self.config['weight_decay']}
+        if self.config['finetune_optimizer'] in ['SGD','RMSprop']:
+            optimizer_arg['momentum'] = self.config['momentum']
+        elif self.config['finetune_optimizer'] in ['Rprop']:
+            optimizer_arg.pop('weight_decay')
+        elif self.config['finetune_optimizer'] == 'amsgrad':
+            optimizer_arg['amsgrad'] = True
+            self.config['finetune_optimizer'] = 'Adam'
+        elif self.config['finetune_optimizer'] == 'Adam':
+            optimizer_arg['betas'] = (self.config['momentum'],0.999)
+
         # create optimizers
         self.optimizer = torch.optim.__dict__[self.config['optimizer']](**optimizer_arg)
+        self.finetune_optimizer = torch.optim.__dict__[self.config['finetune_optimizer']](**finetune_optimizer_arg)
         
         # create schedulesif self.schedule_type == 'decay':
         self.scheduler = torch.optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=self.schedule, gamma=0.1)
+        #self.finetune_scheduler = torch.optim.lr_scheduler.MultiStepLR(self.finetune_optimizer, milestones=self.schedule, gamma=0.1)
 
     # returns optimizer for passed model
     def new_optimizer(self, model):

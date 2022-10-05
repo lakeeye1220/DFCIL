@@ -69,7 +69,19 @@ def create_args():
     parser.add_argument('--mu', type=float, default=1.0, help="KD loss balancing weight")
     parser.add_argument('--sp_mu', type=float, default=1.0, help="SP KD loss balancing weight")
     parser.add_argument('--weq_mu', type=float, default=1.0, help="Weight Equalizer regularizer")
-    
+
+    #add yujin
+    parser.add_argument('--cgan', default=False, action='store_true', help='conditional GAN type')
+    parser.add_argument('--lastbs_img',default=False, action='store_true', help='plot the number of images by last one batch(True) or total images(False)')
+    parser.add_argument('--finetuning',default=False, action='store_true', help='finetuning phase on our framework')
+    parser.add_argument('--finetune_optimizer', type=str, default='SGD', help="SGD|Adam|RMSprop|amsgrad|Adadelta|Adagrad|Adamax ...")
+    parser.add_argument('--finetune_lr', type=float, default=0.0001, help="Learning rate")
+    parser.add_argument('--finetune_epoch', type=int, default=20, help="finetuning epoch")
+    parser.add_argument('--tent', default=False,action='store_true',help='BN option')
+    parser.add_argument('--adversarial', default=False, action='store_true',help ='add the adversarial loss')
+    parser.add_argument('--confusion', default=False, action='store_true',help ='confusion matrix loss')
+    parser.add_argument('--reparam', default=False, action='store_true',help ='latent reparameterization')
+    parser.add_argument('--diag',default=False, action='store_true',help ='BalowTwins loss diagonal term')
     return parser
 
 def get_args(argv):

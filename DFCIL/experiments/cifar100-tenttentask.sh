@@ -1,14 +1,13 @@
-# CIFAR-100 ten task shell script
+# CIFAR-100 five task shell script
 # process inputs
-# command : bash experiments/cifar100-tentask.sh --gpuid $GPUID
-
+# command : bash experiments/cifar100-fivetask.sh --gpuid $GPUID
 DEFAULTGPU=0
-#GPUID=${2:-$DEFAULTDR}
 GPUID=3
+
 # benchmark settings
-DATE=ISCF_cgan_DIimage
+DATE=ISCF_BNfinetune2
 SPLIT=10
-OUTDIR=outputs/${DATE}/DFCIL-tentask/CIFAR100
+OUTDIR=outputs/${DATE}/DFCIL-${SPLIT}task/CIFAR100
 
 ###############################################################
 
@@ -37,12 +36,12 @@ LR=0.1
 #########################
 
 # Full Method
-python3 -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
+python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
     --first_split_size $SPLIT --other_split_size $SPLIT --schedule $SCHEDULE --schedule_type decay --batch_size $BS \
     --optimizer $OPT --lr $LR --momentum $MOM --weight_decay $WD \
-    --mu 5e-2 --memory 0 --model_name $MODELNAME --model_type resnet \
-    --learner_type datafree --learner_name ISCF \
+    --mu 1e-1 --memory 0 --model_name $MODELNAME --model_type resnet \
+    --learner_type bntrain_datafree --learner_name ISCF \
     --gen_model_name CIFAR_GEN --gen_model_type generator \
     --beta 1 --power_iters $PI --deep_inv_params 1e-3 5e1 1e-3 1e3 1 \
     --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/iscf \
-    --sp_mu 100 --weq_mu 1 --cgan
+    --sp_mu 100 --weq_mu 1 --finetuning --finetune_optimizer $OPT --finetune_lr 0.001 --finetune_epoch 20

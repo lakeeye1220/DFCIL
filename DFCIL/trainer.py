@@ -76,6 +76,8 @@ class Trainer:
             print('post-shuffle:' + str(class_order))
             print('=============================================')
         self.tasks = []
+        self.fakegt_idx=[]
+        self.acc_fakegt_idx=[]
         self.tasks_logits = []
         p = 0
         while p < num_classes and (args.max_task == -1 or len(self.tasks) < args.max_task):
@@ -137,13 +139,25 @@ class Trainer:
                         'top_k': self.top_k,
                         'sp_mu':args.sp_mu,
                         'weq_mu':args.weq_mu,
+                        'gt_idx':self.tasks,
+                        'fakegt_idx':self.fakegt_idx,
+                        'acc_fakegt_idx':self.acc_fakegt_idx,
+                        'cgan':args.cgan,
+                        'lastbs_img':args.lastbs_img,
+                        'finetuning':args.finetuning,
+                        'finetune_epoch':args.finetune_epoch,
+                        'finetune_optimizer':args.optimizer,
+                        'finetune_lr':args.finetune_lr,
+                        'adversarial':args.adversarial,
+                        'confusion':args.confusion,
+                        'reparam':args.reparam,
+                        'diag':args.diag
                         }
         self.learner_type, self.learner_name = args.learner_type, args.learner_name
         self.learner = learners.__dict__[self.learner_type].__dict__[self.learner_name](self.learner_config)
         self.learner.print_model()
 
     def task_eval(self, t_index, local=False):
-
         val_name = self.task_names[t_index]
         print('validation split name:', val_name)
         
@@ -154,9 +168,10 @@ class Trainer:
             return self.learner.validation(test_loader, task_in = self.tasks_logits[t_index])
         else:
             return self.learner.validation(test_loader)
+        #print('trainer.py tasks_logits 161.py :',self.task_logits)
+        #print('len of self.task_logits : ', len(self.task_logits))
 
     def train(self, avg_metrics):
-    
         # temporary results saving
         temp_table = {}
         for mkey in self.metric_keys: temp_table[mkey] = []
@@ -166,10 +181,14 @@ class Trainer:
         if not os.path.exists(visualize_path): os.makedirs(visualize_path)
         visualize_cm_path=os.path.join(self.log_dir,'visualize_confusion_matrix')
         if not os.path.exists(visualize_cm_path): os.makedirs(visualize_cm_path)
+        visualize_class_path=os.path.join(self.log_dir,'accuracy and images per class')
+        if not os.path.exists(visualize_class_path): os.makedirs(visualize_class_path)
+        visualize_class_path2=os.path.join(self.log_dir,'accuracy and total images per class')
+        if not os.path.exists(visualize_class_path2): os.makedirs(visualize_class_path2)
+
 
         # for each task
         for i in range(self.max_task):
-
             # save current task index
             self.current_t_index = i
 
@@ -216,13 +235,18 @@ class Trainer:
             else:
                 model_save_dir = self.model_top_dir + '/models/repeat-'+str(self.seed+1)+'/task-'+self.task_names[i]+'/'
             if not os.path.exists(model_save_dir): os.makedirs(model_save_dir)
-            avg_train_time = self.learner.learn_batch(train_loader, self.train_dataset, model_save_dir, test_loader)
+            avg_train_time = self.learner.learn_batch(train_loader, self.train_dataset, model_save_dir, test_loader,False)
+            if self.learner_config['finetuning']:
+                avg_train_time2 = self.learner.learn_batch(train_loader,self.train_dataset,model_save_dir,test_loader,self.learner_config['finetuning'])
 
             # save model
             self.learner.save_model(model_save_dir)
             self.learner.visualize_weight(visualize_path, self.current_t_index)
             self.learner.visualize_confusion_matrix(test_loader,visualize_cm_path, self.current_t_index)
-            
+            #if self.learner_config['lastbs_img']:
+            self.learner.plot_per_class_accuracy(train_loader, self.train_dataset, test_loader, self.test_dataset, 100, visualize_class_path, self.current_t_index, None,device = 'cuda')
+            #else: #false - total image plot
+            self.learner.plot_per_class_accuracy2(train_loader, self.train_dataset, test_loader, self.test_dataset, 100, visualize_class_path2, self.current_t_index, None,device = 'cuda')
             # evaluate acc
             acc_table = []
             self.reset_cluster_labels = True
