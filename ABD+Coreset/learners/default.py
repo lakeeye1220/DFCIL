@@ -413,7 +413,7 @@ class NormalNN(nn.Module):
         return model
 
     def print_model(self):
-        self.log(self.model)
+        # self.log(self.model)
         self.log('#parameter of model:', self.count_parameter())
     
     def reset_model(self):

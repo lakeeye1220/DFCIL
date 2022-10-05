@@ -147,12 +147,8 @@ class Trainer:
                         'tasks': self.tasks_logits,
                         'top_k': self.top_k,
                         'sp_mu':args.sp_mu,
-                        'no_ft':args.no_ft,
-                        'no_weq':args.no_weq,
-                        'new_softkd':args.new_softkd,
                         'weq_mu':args.weq_mu,
-                        'lock_hkd_feature':args.lock_hkd_feature,
-                        'downscale_logit_cur':args.downscale_logit_cur,
+                        'cgan':args.cgan,
                         }
         self.learner_type, self.learner_name = args.learner_type, args.learner_name
         self.learner = learners.__dict__[self.learner_type].__dict__[self.learner_name](self.learner_config)

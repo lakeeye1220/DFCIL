@@ -2,10 +2,10 @@
 # process inputs
 # command : bash experiments/cifar100-fivetask.sh --gpuid $GPUID
 DEFAULTGPU=0
-GPUID=5
+GPUID=0
 
 # benchmark settings
-DATE=LogitKD_new_softkd
+DATE=TEST_v2
 SPLIT=20
 OUTDIR=outputs/${DATE}/DFCIL-fivetask/CIFAR100
 
@@ -21,9 +21,9 @@ OVERWRITE=0
 MAXTASK=-1
 
 # hard coded inputs
-REPEAT=3
-SCHEDULE="100 150 200 250"
-PI=10000
+REPEAT=1
+SCHEDULE="1"
+PI=2
 MODELNAME=resnet32
 BS=128
 WD=0.0002
@@ -36,7 +36,7 @@ LR=0.1
 #########################
 
 # Full Method
-python3 -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
+python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
     --first_split_size $SPLIT --other_split_size $SPLIT --schedule $SCHEDULE --schedule_type decay --batch_size $BS \
     --optimizer $OPT --lr $LR --momentum $MOM --weight_decay $WD \
     --mu 1e-1 --memory 0 --model_name $MODELNAME --model_type resnet \
@@ -44,4 +44,4 @@ python3 -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPU
     --gen_model_name CIFAR_GEN --gen_model_type generator \
     --beta 1 --power_iters $PI --deep_inv_params 1e-3 5e1 1e-3 1e3 1 \
     --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/iscf \
-    --sp_mu 100 --weq_mu 1 --new_softkd
+    --sp_mu 100 --weq_mu 1 "$@"

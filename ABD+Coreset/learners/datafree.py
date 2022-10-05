@@ -189,6 +189,8 @@ class ISCF(NormalNN):
         self.log('=> Saving generator model to:', filename)
         torch.save(model_state, filename + 'generator.pth')
         super(ISCF, self).save_model(filename)
+        # if self.config['cgan']: # 얘네 generator reset안하네..?
+        #     self.generator.apply(weight_reset,self.valid_out_dim)
 
     def load_model(self, filename):
         self.generator.load_state_dict(torch.load(filename + 'generator.pth'))
@@ -198,20 +200,27 @@ class ISCF(NormalNN):
         super(ISCF, self).load_model(filename)
 
     def create_generator(self):
+        print("Creating generator")
         cfg = self.config
 
         # Define the backbone (MLP, LeNet, VGG, ResNet ... etc) of model
-        generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']]()
+        if cfg['cgan']:
+            generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']](bn=False,cgan=True,num_classes=cfg['num_classes'])#,num_classes=self.valid_out_dim) # update 하면 self.valid_out_dim
+        else:
+            generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']]()
         return generator
 
     def print_model(self):
         super(ISCF, self).print_model()
-        self.log(self.generator)
+        # self.log(self.generator)
         self.log('#parameter of generator:', self.count_parameter_gen())
     
     def reset_model(self):
         super(ISCF, self).reset_model()
-        self.generator.apply(weight_reset)
+        if self.config['cgan']:
+            self.generator.apply(weight_reset,self.valid_out_dim)
+        else:
+            self.generator.apply(weight_reset)
 
     def count_parameter_gen(self):
         return sum(p.numel() for p in self.generator.parameters())

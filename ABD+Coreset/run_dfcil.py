@@ -71,11 +71,7 @@ def create_args():
     parser.add_argument('--weq_mu', type=float, default=1.0, help="Weight Equalizer regularizer")
 
     # TEST Args
-    parser.add_argument('--lock_hkd_feature', action='store_true', help="lock the feature extractor during HKD training")
-    parser.add_argument('--no_ft', action='store_true', help="no ft")
-    parser.add_argument('--no_weq', action='store_true', help="no weq")
-    parser.add_argument('--new_softkd', action='store_true', help="new softkd")
-    parser.add_argument('--downscale_logit_cur', type=float,default=0, help="downscale the logits of current task")
+    parser.add_argument('--cgan', action='store_true', help="use conditional gan")
     
     return parser
 

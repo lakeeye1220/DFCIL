@@ -59,7 +59,10 @@ class Teacher(nn.Module):
         # sample images
         self.generator.eval()
         with torch.no_grad():
-            x_i = self.generator.sample(size)
+            if self.config['cgan']:
+                x_i, y_i = self.generator.sample(size)
+            else:
+                x_i = self.generator.sample(size)
 
         # get predicted logit-scores
         with torch.no_grad():
@@ -67,7 +70,10 @@ class Teacher(nn.Module):
         y_hat = y_hat[:, self.class_idx]
 
         # get predicted class-labels (indexed according to each class' position in [self.class_idx]!)
-        _, y = torch.max(y_hat, dim=1)
+        if self.config['cgan']:
+            y=y_i
+        else:
+            _, y = torch.max(y_hat, dim=1)
 
         return (x_i, y, y_hat) if return_scores else (x_i, y)
 
@@ -107,7 +113,10 @@ class Teacher(nn.Module):
         for epoch in tqdm(range(epochs)):
 
             # sample from generator
-            inputs = self.generator.sample(bs)
+            if self.config['cgan']:
+                inputs, y_i = self.generator.sample(bs)
+            else:
+                inputs = self.generator.sample(bs)
 
             # forward with images
             self.gen_opt.zero_grad()
@@ -115,28 +124,34 @@ class Teacher(nn.Module):
 
             # data conetent loss
             outputs = self.solver(inputs)[:,:self.num_k]
-            loss = self.criterion(outputs / self.content_temp, torch.argmax(outputs, dim=1)) * self.content_weight
+            if ~self.config['cgan']:
+                y_i=torch.argmax(outputs, dim=1)
+            cnt_loss = self.criterion(outputs / self.content_temp, y_i) * self.content_weight
 
             # class balance
             softmax_o_T = F.softmax(outputs, dim = 1).mean(dim = 0)
-            loss += (1.0 + (softmax_o_T * torch.log(softmax_o_T) / math.log(self.num_k)).sum())
+            bnc_loss= (1.0 + (softmax_o_T * torch.log(softmax_o_T) / math.log(self.num_k)).sum())
 
             # Statstics alignment
+            loss_distrs=0
             for mod in self.loss_r_feature_layers: 
                 loss_distr = mod.r_feature * self.r_feature_weight / len(self.loss_r_feature_layers)
                 if len(self.config['gpuid']) > 1:
                     loss_distr = loss_distr.to(device=torch.device('cuda:'+str(self.config['gpuid'][0])))
-                loss = loss + loss_distr
+                loss_distrs+=loss_distr
 
             # image prior
             inputs_smooth = self.smoothing(F.pad(inputs, (2, 2, 2, 2), mode='reflect'))
             loss_var = self.mse_loss(inputs, inputs_smooth).mean()
-            loss = loss + self.di_var_scale * loss_var
+            loss_var = self.di_var_scale * loss_var
 
             # backward pass - update the generator
+            loss=(cnt_loss + bnc_loss + loss_distrs + loss_var)
             loss.backward()
 
             self.gen_opt.step()
+            if epoch % 1000 == 0:
+                print("Epoch: %d, Loss: %.4e, cnt_loss: %.4e, bnc_loss: %.4e, loss_distrs: %.4e, loss_var: %.4e" % (epoch, loss, cnt_loss, bnc_loss, loss_distrs, loss_var))
 
         # clear cuda cache
         torch.cuda.empty_cache()
