@@ -127,6 +127,8 @@ class Teacher(nn.Module):
             if ~self.config['cgan']:
                 y_i=torch.argmax(outputs, dim=1)
             cnt_loss = self.criterion(outputs / self.content_temp, y_i) * self.content_weight
+            with torch.no_grad():
+                ce_loss=self.criterion(outputs, y_i).detach().clone()
 
             # class balance
             softmax_o_T = F.softmax(outputs, dim = 1).mean(dim = 0)
@@ -151,7 +153,7 @@ class Teacher(nn.Module):
 
             self.gen_opt.step()
             if epoch % 1000 == 0:
-                print("Epoch: %d, Loss: %.4e, cnt_loss: %.4e, bnc_loss: %.4e, loss_distrs: %.4e, loss_var: %.4e" % (epoch, loss, cnt_loss, bnc_loss, loss_distrs, loss_var))
+                print("Epoch: %d, Loss: %.3e, cnt_loss: %.3e (CE: %.3e), bnc_loss: %.3e, loss_distrs: %.3e, loss_var: %.3e" % (epoch, loss, cnt_loss,ce_loss, bnc_loss, loss_distrs, loss_var))
 
         # clear cuda cache
         torch.cuda.empty_cache()
