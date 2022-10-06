@@ -110,6 +110,8 @@ class Teacher(nn.Module):
         torch.cuda.empty_cache()
 
         self.generator.train()
+        if self.config['cgan']:
+            self.generator.update_num_classes(self.num_k)
         for epoch in tqdm(range(epochs)):
 
             # sample from generator
