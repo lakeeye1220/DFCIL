@@ -3,6 +3,8 @@ from torch import nn
 import torch.nn.functional as F
 import math
 from tqdm import tqdm
+import torchvision
+import os
 
 class Teacher(nn.Module):
 
@@ -133,8 +135,11 @@ class Teacher(nn.Module):
                 ce_loss=self.criterion(outputs, y_i).detach().clone()
 
             # class balance
-            softmax_o_T = F.softmax(outputs, dim = 1).mean(dim = 0)
-            bnc_loss= (1.0 + (softmax_o_T * torch.log(softmax_o_T) / math.log(self.num_k)).sum())
+            if ~self.config['cgan']:
+                softmax_o_T = F.softmax(outputs, dim = 1).mean(dim = 0)
+                bnc_loss= (1.0 + (softmax_o_T * torch.log(softmax_o_T) / math.log(self.num_k)).sum())
+            else:
+                bnc_loss = 0
 
             # Statstics alignment
             loss_distrs=0
@@ -161,6 +166,13 @@ class Teacher(nn.Module):
         torch.cuda.empty_cache()
         self.generator.eval()
 
+        c=torch.cat(torch.arange(0,self.num_k)*10,dim=0).cuda()
+        z = torch.randn(10*self.num_k, self.generator.z_dim//2).cuda()
+        with torch.no_grad():
+            samples=self.generator.sample(z,c)
+            grid=torchvision.utils.make_grid(samples, nrow=self.num_k, padding=1, normalize=True, range=None, scale_each=False, pad_value=0)
+            torchvision.utils.save_image(grid, os.path.join(self.config['model_save_dir'],'generated_images.png'.format(idx)), nrow=1, padding=0, normalize=False, range=None, scale_each=False, pad_value=0)
+        
 class DeepInversionFeatureHook():
     
     #Implementation of the forward hook to track feature statistics and compute a loss on them.

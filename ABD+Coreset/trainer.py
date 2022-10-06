@@ -149,6 +149,7 @@ class Trainer:
                         'sp_mu':args.sp_mu,
                         'weq_mu':args.weq_mu,
                         'cgan':args.cgan,
+                        'log_dir':self.log_dir,
                         }
         self.learner_type, self.learner_name = args.learner_type, args.learner_name
         self.learner = learners.__dict__[self.learner_type].__dict__[self.learner_name](self.learner_config)

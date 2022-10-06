@@ -40,7 +40,7 @@ class ISCF(NormalNN):
     ##########################################
 
     def learn_batch(self, train_loader, train_dataset, model_save_dir, val_loader=None):
-        
+        self.config['model_save_dir']=model_save_dir
         self.pre_steps()
 
         # try to load model
