@@ -189,6 +189,8 @@ class ISCF(NormalNN):
         self.log('=> Saving generator model to:', filename)
         torch.save(model_state, filename + 'generator.pth')
         super(ISCF, self).save_model(filename)
+        # if self.config['cgan']: # 얘네 generator reset안하네..?
+        #     self.generator.apply(weight_reset,self.valid_out_dim)
 
     def load_model(self, filename):
         self.generator.load_state_dict(torch.load(filename + 'generator.pth'))
@@ -198,20 +200,27 @@ class ISCF(NormalNN):
         super(ISCF, self).load_model(filename)
 
     def create_generator(self):
+        print("Creating generator")
         cfg = self.config
 
         # Define the backbone (MLP, LeNet, VGG, ResNet ... etc) of model
-        generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']]()
+        if cfg['cgan']:
+            generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']](bn=False,cgan=True,num_classes=cfg['num_classes'])#,num_classes=self.valid_out_dim) # update 하면 self.valid_out_dim
+        else:
+            generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']]()
         return generator
 
     def print_model(self):
         super(ISCF, self).print_model()
-        self.log(self.generator)
+        # self.log(self.generator)
         self.log('#parameter of generator:', self.count_parameter_gen())
     
     def reset_model(self):
         super(ISCF, self).reset_model()
-        self.generator.apply(weight_reset)
+        if self.config['cgan']:
+            self.generator.apply(weight_reset,self.valid_out_dim)
+        else:
+            self.generator.apply(weight_reset)
 
     def count_parameter_gen(self):
         return sum(p.numel() for p in self.generator.parameters())
@@ -256,11 +265,10 @@ class ISCF(NormalNN):
             loss_class = self.criterion(logits[class_idx,self.last_valid_out_dim:self.valid_out_dim], (targets[class_idx]-self.last_valid_out_dim).long(), dw_cls[class_idx]) 
             
             # ft classification 
-            if ~self.config['no_ft']:
-                if len(self.config['gpuid']) > 1:
-                    loss_class += self.criterion(self.model.module.last(logits_pen.detach()), targets.long(), dw_cls)
-                else:
-                    loss_class += self.criterion(self.model.last(logits_pen.detach()), targets.long(), dw_cls)
+            if len(self.config['gpuid']) > 1:
+                loss_class += self.criterion(self.model.module.last(logits_pen.detach()), targets.long(), dw_cls)
+            else:
+                loss_class += self.criterion(self.model.last(logits_pen.detach()), targets.long(), dw_cls)
         
         #first task local classification when we do not use any synthetic data     
         else:
@@ -286,33 +294,18 @@ class ISCF(NormalNN):
 
         # Logit KD for maintaining the output probability 
         if self.previous_teacher:
-            if self.config['lock_hkd_feature']:
-                if len(self.config['gpuid']) > 1:
-                    logits_hkd=self.model.module.last(logits_pen.detach())
-                else:
-                    logits_hkd=self.model.last(logits_pen.detach())
-            else:
-                logits_hkd=logits
-
+            logits_hkd=logits
             kd_index= np.arange(2*self.batch_size)
             with torch.no_grad():
                 logits_prevpen = self.previous_teacher.solver.forward(inputs[kd_index],pen=True)
                 logits_prev=self.previous_linear(logits_prevpen)[:,:self.last_valid_out_dim].detach()
-                if self.config['downscale_logit_cur'] !=0:
-                    logits_prev[np.arange(self.batch_size)]*=self.config['downscale_logit_cur']
-                if self.config['new_softkd']:
-                    new_idx=np.arange(self.batch_size)
-                    logits_prev[new_idx]=logits_prev[new_idx,:self.last_valid_out_dim].mean(dim=1,keepdim=True).expand_as(logits_prev[new_idx])
-                    #logits_prev[new_idx]=torch.softmax(logits_prev[new_idx]/2.0,dim=1)
-                    #logits_hkd[new_idx]=torch.softmax(logits_hkd[new_idx]/2.0,dim=1)
-
             loss_lkd=(F.mse_loss(logits_hkd[kd_index,:self.last_valid_out_dim],logits_prev,reduction='none').sum(dim=1)) * self.mu / task_step
             loss_lkd=loss_lkd.mean()
         else:
             loss_lkd = torch.zeros((1,), requires_grad=True).cuda()
         
         # weight equalizer for balancing the average norm of weight 
-        if self.previous_teacher and not self.config['no_weq']:
+        if self.previous_teacher:
             if len(self.config['gpuid']) > 1:
                 last_weights=self.model.module.last.weight[:self.valid_out_dim,:].detach()
                 last_bias=self.model.module.last.bias[:self.valid_out_dim].detach().unsqueeze(-1)
