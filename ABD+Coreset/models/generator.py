@@ -209,6 +209,9 @@ class CGenerator(nn.Module):
         img = nn.functional.interpolate(img,scale_factor=2)
         img = self.conv_blocks2(img)
         return img
+    
+    def update_num_classes(self,num_classes):
+        self.num_classes=num_classes
 
     def sample(self, size):
         
@@ -226,7 +229,7 @@ class CGenerator(nn.Module):
 
 def CIFAR_GEN(bn = False, cgan=False, num_classes=10):
     if cgan:
-        return CGenerator(zdim=200, in_channel=3, img_sz=32, num_classes=num_classes)
+        return CGenerator(zdim=1000, in_channel=3, img_sz=32, num_classes=num_classes)
     else:
         return Generator(zdim=1000, in_channel=3, img_sz=32)
 
