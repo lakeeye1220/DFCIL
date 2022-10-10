@@ -235,7 +235,10 @@ class Teacher(nn.Module):
         c=torch.cat([torch.arange(0,self.num_k)]*10,dim=0).cuda()
         z = torch.randn(10*self.num_k, self.generator.z_dim//2).cuda()
         with torch.no_grad():
-            samples=self.generator.sample(z,c)
+            if self.config['cgan']:
+                samples=self.generator(z,c)
+            else:
+                samples = self.generator.sample(self.num_k*10)
             grid=torchvision.utils.make_grid(samples, nrow=self.num_k, padding=1, normalize=True, range=None, scale_each=False, pad_value=0)
             torchvision.utils.save_image(grid, os.path.join(self.config['model_save_dir'],'generated_images.png'.format(idx)), nrow=1, padding=0, normalize=False, range=None, scale_each=False, pad_value=0)
         
