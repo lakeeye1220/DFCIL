@@ -114,15 +114,15 @@ class Teacher(nn.Module):
         self.generator.train()
         if self.config['cgan']:
             self.generator.update_num_classes(self.num_k)
-            if 'cifar' in self.config['dataset']:
+            if 'CIFAR' in self.config['dataset']:
                 n_dim=64
             else:
                 n_dim=512
             self.discriminator=nn.Sequential(
                 nn.Linear(n_dim, 512),
-                nn.LeakyReLU(0.2, inplace=True),
+                nn.LeakyReLU(0.2),
                 nn.Linear(512, 256),
-                nn.LeakyReLU(0.2, inplace=True),
+                nn.LeakyReLU(0.2),
                 nn.Linear(256, 1),
                 nn.Sigmoid())
             self.discriminator.cuda()
@@ -202,7 +202,7 @@ class Teacher(nn.Module):
                 loss_var = self.mse_loss(inputs, inputs_smooth).mean()
                 loss_var = self.di_var_scale * loss_var
                 loss=(cnt_loss + g_loss + loss_distrs + loss_var)
-                loss.backward()
+                loss.backward(retain_graph=True)
                 self.gen_opt.step()
 
                 # train discriminator
@@ -210,7 +210,7 @@ class Teacher(nn.Module):
                 try:
                     (x, y, task) = next(train_iter)
                 except:
-                    train_iter = iter(self.train_loader)
+                    train_iter = iter(self.train_dataloader)
                     (x, y, task) = next(train_iter)
 
                 x = x.cuda()
@@ -218,7 +218,7 @@ class Teacher(nn.Module):
                 out_real_pen = self.solver(x,pen=True)
                 y_real_hat = self.discriminator(out_real_pen)
                 d_real_loss = F.mse_loss(y_real_hat, torch.ones_like(y_real_hat).cuda())
-                out_fake_pen = self.solver(inputs,pen=True)
+                out_fake_pen = self.solver(inputs.detach().clone(),pen=True)
                 y_fake_hat = self.discriminator(out_fake_pen)
                 d_fake_loss = F.mse_loss(y_fake_hat, torch.zeros_like(y_fake_hat).cuda())
                 d_loss = (d_real_loss + d_fake_loss) / 2
@@ -226,7 +226,7 @@ class Teacher(nn.Module):
                 self.discriminator_opt.step()
                 self.solver.zero_grad()
                 if epoch % 1000 == 0:
-                    print("Epoch: %d, Loss: %.3e, cnt_loss: %.3e (CE: %.3e), bnc_loss: %.3e, loss_distrs: %.3e, loss_var: %.3e" % (epoch, loss, cnt_loss,ce_loss, bnc_loss, loss_distrs, loss_var))
+                    print("Epoch: %d, g_loss: %.3e, cnt_loss: %.3e (CE: %.3e), d_loss: %.3e, loss_distrs: %.3e, loss_var: %.3e" % (epoch, loss, cnt_loss,ce_loss, d_loss, loss_distrs, loss_var))
 
         # clear cuda cache
         torch.cuda.empty_cache()
