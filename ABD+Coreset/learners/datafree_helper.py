@@ -114,7 +114,7 @@ class Teacher(nn.Module):
         self.generator.train()
         if self.config['cgan']:
             self.generator.update_num_classes(self.num_k)
-            if 'cifar' in self.config['dataset']:
+            if 'CIFAR' in self.config['dataset']:
                 n_dim=64
             else:
                 n_dim=512
@@ -183,6 +183,7 @@ class Teacher(nn.Module):
                 outputs = self.solver.last(out_pen)[:,:self.num_k]
 
                 # discriminator loss measures
+                print(out_pen.shape)
                 y_hat = self.discriminator(out_pen)
                 g_loss= F.mse_loss(y_hat, torch.ones_like(y_hat).cuda())
                 # content loss
@@ -235,7 +236,7 @@ class Teacher(nn.Module):
         c=torch.cat([torch.arange(0,self.num_k)]*10,dim=0).cuda()
         z = torch.randn(10*self.num_k, self.generator.z_dim//2).cuda()
         with torch.no_grad():
-            samples=self.generator.sample(z,c)
+            samples=self.generator(z,c)
             grid=torchvision.utils.make_grid(samples, nrow=self.num_k, padding=1, normalize=True, range=None, scale_each=False, pad_value=0)
             torchvision.utils.save_image(grid, os.path.join(self.config['model_save_dir'],'generated_images.png'.format(idx)), nrow=1, padding=0, normalize=False, range=None, scale_each=False, pad_value=0)
         
