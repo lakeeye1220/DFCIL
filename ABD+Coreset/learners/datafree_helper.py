@@ -232,7 +232,7 @@ class Teacher(nn.Module):
         torch.cuda.empty_cache()
         self.generator.eval()
 
-        c=torch.cat(torch.arange(0,self.num_k)*10,dim=0).cuda()
+        c=torch.cat([torch.arange(0,self.num_k)]*10,dim=0).cuda()
         z = torch.randn(10*self.num_k, self.generator.z_dim//2).cuda()
         with torch.no_grad():
             samples=self.generator.sample(z,c)
