@@ -150,6 +150,7 @@ class Trainer:
                         'weq_mu':args.weq_mu,
                         'cgan':args.cgan,
                         'log_dir':self.log_dir,
+                        'init_generator':args.init_generator,
                         }
         self.learner_type, self.learner_name = args.learner_type, args.learner_name
         self.learner = learners.__dict__[self.learner_type].__dict__[self.learner_name](self.learner_config)

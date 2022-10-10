@@ -42,6 +42,9 @@ class ISCF(NormalNN):
     def learn_batch(self, train_loader, train_dataset, model_save_dir, val_loader=None):
         self.config['model_save_dir']=model_save_dir
         self.pre_steps()
+        if self.config['cgan'] and self.inversion_replay:
+            self.previous_teacher.train_dataloader = train_loader
+            self.sample(self.previous_teacher, self.batch_size, self.device, return_scores=False)
 
         # try to load model
         need_train = True
@@ -154,10 +157,17 @@ class ISCF(NormalNN):
         # if self.previous_teacher is not None:
         #     self.previous_previous_teacher = self.previous_teacher
         
+
+        # reset generator
+        if self.config['init_generator']:
+            self.reset_generator()
+            self.generator_optimizer = Adam(params=self.generator.parameters(), lr=self.deep_inv_params[0])
+        
         # define the new model - current model 
         if (self.out_dim == self.valid_out_dim) or (self.dataset== 'TinyImageNet100' and self.valid_out_dim==100): need_train = False
         self.previous_teacher = Teacher(solver=copy.deepcopy(self.model), generator=self.generator, gen_opt = self.generator_optimizer, img_shape = (-1, train_dataset.nch,train_dataset.im_size, train_dataset.im_size), iters = self.power_iters, deep_inv_params = self.deep_inv_params, class_idx = np.arange(self.valid_out_dim), train = need_train, config = self.config)
-        self.sample(self.previous_teacher, self.batch_size, self.device, return_scores=False)
+        if not self.config['cgan']:
+            self.sample(self.previous_teacher, self.batch_size, self.device, return_scores=False)
         if len(self.config['gpuid']) > 1:
             self.previous_linear = copy.deepcopy(self.model.module.last)
         else:
@@ -217,6 +227,9 @@ class ISCF(NormalNN):
     
     def reset_model(self):
         super(ISCF, self).reset_model()
+        self.reset_generator()
+
+    def reset_generator(self):
         if self.config['cgan']:
             self.generator.apply(weight_reset,self.valid_out_dim)
         else:

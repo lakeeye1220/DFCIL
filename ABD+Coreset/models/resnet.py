@@ -143,7 +143,7 @@ class ResNet(nn.Module):
             return out_pen
 
         if middle:
-            return out_pen, out1,out2,out3
+            return out_pen, out1, out2, out3
 
         else:
             out = self.last(out_pen)
