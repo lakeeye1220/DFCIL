@@ -114,23 +114,23 @@ class Teacher(nn.Module):
         self.generator.train()
         if self.config['cgan']:
             self.generator.update_num_classes(self.num_k)
-        #     if 'CIFAR' in self.config['dataset']:
-        #         n_dim=64
-        #     else:
-        #         n_dim=512
-        #     self.discriminator=nn.Sequential(
-        #         nn.Linear(n_dim, 512),
-        #         nn.LeakyReLU(0.2),
-        #         nn.Linear(512, 256),
-        #         nn.LeakyReLU(0.2),
-        #         nn.Linear(256, 1),
-        #         nn.Sigmoid())
-        #     self.discriminator.cuda()
-        #     self.discriminator_opt = torch.optim.Adam(self.discriminator.parameters(), lr=0.0002, betas=(0.5, 0.999))
-        #     try:
-        #         train_iter = iter(self.train_dataloader)
-        #     except:
-        #         raise NotImplementedError("No train dataloader provided for cgan")
+            if 'CIFAR' in self.config['dataset']:
+                n_dim=64
+            else:
+                n_dim=512
+            self.discriminator=nn.Sequential(
+                nn.Linear(n_dim, 512),
+                nn.LeakyReLU(0.2),
+                nn.Linear(512, 256),
+                nn.LeakyReLU(0.2),
+                nn.Linear(256, 1),
+                nn.Sigmoid())
+            self.discriminator.cuda()
+            self.discriminator_opt = torch.optim.Adam(self.discriminator.parameters(), lr=0.0002, betas=(0.5, 0.999))
+            try:
+                train_iter = iter(self.train_dataloader)
+            except:
+                raise NotImplementedError("No train dataloader provided for cgan")
                     
         for epoch in tqdm(range(epochs)):
             ##### without cgan option #####
@@ -177,62 +177,56 @@ class Teacher(nn.Module):
             if self.config['cgan']:
 
                 # train generator
-                inputs, y_i, z = self.generator.sample(bs, self.solver)
+                self.gen_opt.zero_grad()
+                inputs, y_i = self.generator.sample(bs)
                 out_pen = self.solver(inputs,pen=True)
                 outputs = self.solver.last(out_pen)[:,:self.num_k]
-                self.gen_opt.zero_grad()
-                self.solver.zero_grad()
 
-                # mse with out_pen and z
-                loss_mse = self.mse_loss(out_pen, z)
-
-                with torch.no_grad():
-                    ce_loss=self.criterion(outputs, y_i).detach().clone()
-
-
+                # discriminator loss measures
+                y_hat = self.discriminator(out_pen)
+                g_loss= F.mse_loss(y_hat, torch.ones_like(y_hat).cuda())
                 # content loss
                 cnt_loss = self.criterion(outputs / self.content_temp, y_i) * self.content_weight
+                with torch.no_grad():
+                    ce_loss=self.criterion(outputs, y_i).detach().clone()
+                # Statstics alignment
+                loss_distrs=0
+                for mod in self.loss_r_feature_layers: 
+                    loss_distr = mod.r_feature * self.r_feature_weight / len(self.loss_r_feature_layers)
+                    if len(self.config['gpuid']) > 1:
+                        loss_distr = loss_distr.to(device=torch.device('cuda:'+str(self.config['gpuid'][0])))
+                    loss_distrs+=loss_distr
 
-                # # Statstics alignment
-                # loss_distrs=0
-                # for mod in self.loss_r_feature_layers: 
-                #     loss_distr = mod.r_feature * self.r_feature_weight / len(self.loss_r_feature_layers)
-                #     if len(self.config['gpuid']) > 1:
-                #         loss_distr = loss_distr.to(device=torch.device('cuda:'+str(self.config['gpuid'][0])))
-                #     loss_distrs+=loss_distr
+                # image prior
+                inputs_smooth = self.smoothing(F.pad(inputs, (2, 2, 2, 2), mode='reflect'))
+                loss_var = self.mse_loss(inputs, inputs_smooth).mean()
+                loss_var = self.di_var_scale * loss_var
+                loss=(cnt_loss + g_loss + loss_distrs + loss_var)
+                loss.backward(retain_graph=True)
+                self.gen_opt.step()
 
-                # # image prior
-                # inputs_smooth = self.smoothing(F.pad(inputs, (2, 2, 2, 2), mode='reflect'))
-                # loss_var = self.mse_loss(inputs, inputs_smooth).mean()
-                # loss_var = self.di_var_scale * loss_var
-                # loss=(cnt_loss + loss_distrs + loss_var)
-                # loss.backward(retain_graph=True)
-                # self.gen_opt.step()
+                # train discriminator
+                self.discriminator_opt.zero_grad()
+                try:
+                    (x, y, task) = next(train_iter)
+                except:
+                    train_iter = iter(self.train_dataloader)
+                    (x, y, task) = next(train_iter)
 
-                # # train discriminator
-                # self.discriminator_opt.zero_grad()
-                # try:
-                #     (x, y, task) = next(train_iter)
-                # except:
-                #     train_iter = iter(self.train_dataloader)
-                #     (x, y, task) = next(train_iter)
-
-                # x = x.cuda()
-                # y = y.cuda()
-                # out_real_pen = self.solver(x,pen=True)
-                # y_real_hat = self.discriminator(out_real_pen)
-                # d_real_loss = F.mse_loss(y_real_hat, torch.ones_like(y_real_hat).cuda())
-                # out_fake_pen = self.solver(inputs.detach().clone(),pen=True)
-                # y_fake_hat = self.discriminator(out_fake_pen)
-                # d_fake_loss = F.mse_loss(y_fake_hat, torch.zeros_like(y_fake_hat).cuda())
-                # d_loss = (d_real_loss + d_fake_loss) / 2
-                # d_loss.backward()
-                # self.discriminator_opt.step()
-                # self.solver.zero_grad()
-                # if epoch % 1000 == 0:
-                #     print("Epoch: %d, g_loss: %.3e, cnt_loss: %.3e (CE: %.3e), d_loss: %.3e, loss_distrs: %.3e, loss_var: %.3e" % (epoch, loss, cnt_loss,ce_loss, d_loss, loss_distrs, loss_var))
+                x = x.cuda()
+                y = y.cuda()
+                out_real_pen = self.solver(x,pen=True)
+                y_real_hat = self.discriminator(out_real_pen)
+                d_real_loss = F.mse_loss(y_real_hat, torch.ones_like(y_real_hat).cuda())
+                out_fake_pen = self.solver(inputs.detach().clone(),pen=True)
+                y_fake_hat = self.discriminator(out_fake_pen)
+                d_fake_loss = F.mse_loss(y_fake_hat, torch.zeros_like(y_fake_hat).cuda())
+                d_loss = (d_real_loss + d_fake_loss) / 2
+                d_loss.backward()
+                self.discriminator_opt.step()
+                self.solver.zero_grad()
                 if epoch % 1000 == 0:
-                    print(f"Epoch: {epoch:5d}, Loss: {loss:.3e} CNT_loss: {cnt_loss:.3e} (CE: {ce_loss:.3e}) MSE_loss: {loss_mse:.3e}")
+                    print("Epoch: %d, g_loss: %.3e, cnt_loss: %.3e (CE: %.3e), d_loss: %.3e, loss_distrs: %.3e, loss_var: %.3e" % (epoch, loss, cnt_loss,ce_loss, d_loss, loss_distrs, loss_var))
 
         # clear cuda cache
         torch.cuda.empty_cache()
