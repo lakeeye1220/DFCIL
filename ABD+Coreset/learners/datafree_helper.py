@@ -62,7 +62,7 @@ class Teacher(nn.Module):
         self.generator.eval()
         with torch.no_grad():
             if self.config['cgan']:
-                x_i, y_i = self.generator.sample(size)
+                x_i, y_i, _ = self.generator.sample(size)
             else:
                 x_i = self.generator.sample(size)
 
@@ -184,7 +184,7 @@ class Teacher(nn.Module):
                 self.solver.zero_grad()
 
                 # mse with out_pen and z
-                loss_mse = self.mse_loss(out_pen, z)
+                loss_mse = self.mse_loss(out_pen, z[:,:out_pen.shape[1]]).mean()
 
                 with torch.no_grad():
                     ce_loss=self.criterion(outputs, y_i).detach().clone()
@@ -193,21 +193,23 @@ class Teacher(nn.Module):
                 # content loss
                 cnt_loss = self.criterion(outputs / self.content_temp, y_i) * self.content_weight
 
-                # # Statstics alignment
-                # loss_distrs=0
-                # for mod in self.loss_r_feature_layers: 
-                #     loss_distr = mod.r_feature * self.r_feature_weight / len(self.loss_r_feature_layers)
-                #     if len(self.config['gpuid']) > 1:
-                #         loss_distr = loss_distr.to(device=torch.device('cuda:'+str(self.config['gpuid'][0])))
-                #     loss_distrs+=loss_distr
+                # Statstics alignment
+                loss_distrs=0
+                for mod in self.loss_r_feature_layers: 
+                    loss_distr = mod.r_feature * self.r_feature_weight / len(self.loss_r_feature_layers)
+                    if len(self.config['gpuid']) > 1:
+                        loss_distr = loss_distr.to(device=torch.device('cuda:'+str(self.config['gpuid'][0])))
+                    loss_distrs+=loss_distr
+                loss= (cnt_loss+loss_mse+loss_distrs)
 
                 # # image prior
                 # inputs_smooth = self.smoothing(F.pad(inputs, (2, 2, 2, 2), mode='reflect'))
                 # loss_var = self.mse_loss(inputs, inputs_smooth).mean()
                 # loss_var = self.di_var_scale * loss_var
                 # loss=(cnt_loss + loss_distrs + loss_var)
-                # loss.backward(retain_graph=True)
-                # self.gen_opt.step()
+                self.gen_opt.zero_grad()
+                loss.backward()
+                self.gen_opt.step()
 
                 # # train discriminator
                 # self.discriminator_opt.zero_grad()
@@ -232,17 +234,18 @@ class Teacher(nn.Module):
                 # if epoch % 1000 == 0:
                 #     print("Epoch: %d, g_loss: %.3e, cnt_loss: %.3e (CE: %.3e), d_loss: %.3e, loss_distrs: %.3e, loss_var: %.3e" % (epoch, loss, cnt_loss,ce_loss, d_loss, loss_distrs, loss_var))
                 if epoch % 1000 == 0:
-                    print(f"Epoch: {epoch:5d}, Loss: {loss:.3e} CNT_loss: {cnt_loss:.3e} (CE: {ce_loss:.3e}) MSE_loss: {loss_mse:.3e}")
+                    print(f"Epoch: {epoch:5d}, Loss: {loss:.3e} CNT_loss: {cnt_loss:.3e} (CE: {ce_loss:.3e}) MSE_loss: {loss_mse:.3e} loss_distrs: {loss_distrs:.3e}")
 
         # clear cuda cache
         torch.cuda.empty_cache()
         self.generator.eval()
 
-        c=torch.cat([torch.arange(0,self.num_k)]*10,dim=0).cuda()
-        z = torch.randn(10*self.num_k, self.generator.z_dim//2).cuda()
         with torch.no_grad():
             if self.config['cgan']:
-                samples=self.generator(z,c)
+                #samples=self.generator(z,c)
+                samples, y_i, z = self.generator.sample(bs, self.solver)
+                sorted_,indices = torch.sort(y_i)
+                samples = samples[indices]
             else:
                 samples = self.generator.sample(self.num_k*10)
             grid=torchvision.utils.make_grid(samples, nrow=self.num_k, padding=1, normalize=True, range=None, scale_each=False, pad_value=0)
