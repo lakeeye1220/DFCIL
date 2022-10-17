@@ -62,7 +62,7 @@ class Teacher(nn.Module):
         self.generator.eval()
         with torch.no_grad():
             if self.config['cgan']:
-                x_i, y_i, _ = self.generator.sample(size)
+                x_i, y_i, _ = self.generator.sample(size,self.solver)
             else:
                 x_i = self.generator.sample(size)
 
@@ -193,6 +193,10 @@ class Teacher(nn.Module):
                 # content loss
                 cnt_loss = self.criterion(outputs / self.content_temp, y_i) * self.content_weight
 
+                # uniform loss
+                softmax_o_T = F.softmax(outputs, dim = 1).mean(dim = 0)
+                uni_loss= (1.0 + (softmax_o_T * torch.log(softmax_o_T) / math.log(self.num_k)).sum())
+
                 # Statstics alignment
                 loss_distrs=0
                 for mod in self.loss_r_feature_layers: 
@@ -200,7 +204,7 @@ class Teacher(nn.Module):
                     if len(self.config['gpuid']) > 1:
                         loss_distr = loss_distr.to(device=torch.device('cuda:'+str(self.config['gpuid'][0])))
                     loss_distrs+=loss_distr
-                loss= (cnt_loss+loss_mse+loss_distrs)
+                loss= (cnt_loss+loss_mse+loss_distrs+uni_loss)
 
                 # # image prior
                 # inputs_smooth = self.smoothing(F.pad(inputs, (2, 2, 2, 2), mode='reflect'))
@@ -234,7 +238,7 @@ class Teacher(nn.Module):
                 # if epoch % 1000 == 0:
                 #     print("Epoch: %d, g_loss: %.3e, cnt_loss: %.3e (CE: %.3e), d_loss: %.3e, loss_distrs: %.3e, loss_var: %.3e" % (epoch, loss, cnt_loss,ce_loss, d_loss, loss_distrs, loss_var))
                 if epoch % 1000 == 0:
-                    print(f"Epoch: {epoch:5d}, Loss: {loss:.3e} CNT_loss: {cnt_loss:.3e} (CE: {ce_loss:.3e}) MSE_loss: {loss_mse:.3e} loss_distrs: {loss_distrs:.3e}")
+                    print(f"Epoch: {epoch:5d}, Loss: {loss:.3e} CNT_loss: {cnt_loss:.3e} (CE: {ce_loss:.3e}) MSE_loss: {loss_mse:.3e} loss_distrs: {loss_distrs:.3e} loss_uni: {uni_loss:3e}")
 
         # clear cuda cache
         torch.cuda.empty_cache()

@@ -2,10 +2,10 @@
 
 # process inputs
 DEFAULTGPU=0
-GPUID=7
+GPUID=2
 
 # benchmark settings
-DATE=ISCF_CGAN_latent
+DATE=ISCF_CGAN_latent_with_uniform_loss
 SPLIT=20
 OUTDIR=outputs/${DATE}/DFCIL-fivetask/CIFAR100
 
