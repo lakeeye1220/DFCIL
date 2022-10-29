@@ -5,7 +5,7 @@ DEFAULTGPU=0
 GPUID=0
 
 # benchmark settings
-DATE=ISCF_CGAN_latent_with_uniform_loss
+DATE=TEST_CGAN
 SPLIT=20
 OUTDIR=outputs/${DATE}/DFCIL-fivetask/CIFAR100
 
@@ -22,8 +22,8 @@ MAXTASK=-1
 
 # hard coded inputs
 REPEAT=3
-SCHEDULE="100 150 200 250"
-PI=10000
+SCHEDULE="1 2"
+PI=20
 MODELNAME=resnet32
 BS=128
 WD=0.0002
@@ -36,7 +36,7 @@ LR=0.1
 #########################
 
 # Full Method
-python3 -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
+python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
     --first_split_size $SPLIT --other_split_size $SPLIT --schedule $SCHEDULE --schedule_type decay --batch_size $BS \
     --optimizer $OPT --lr $LR --momentum $MOM --weight_decay $WD \
     --mu 1e-1 --memory 0 --model_name $MODELNAME --model_type resnet \

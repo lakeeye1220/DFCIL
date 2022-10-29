@@ -72,7 +72,7 @@ def create_args():
 
     # TEST Args
     parser.add_argument('--cgan', action='store_true', help="use conditional gan")
-    parser.add_argument('--init_generator', action='store_true', help="use conditional gan")
+    parser.add_argument('--init_generator', action='store_false', help="use conditional gan")
     
     return parser
 

@@ -253,8 +253,14 @@ class CGenerator(nn.Module):
         )
         self.num_classes=num_classes
 
+        # perclass
+        self.perclass_mean=nn.Parameter(torch.ones(num_classes).view(-1,1))
+        self.perclass_std=nn.Parameter(torch.ones(num_classes).view(-1,1))
+
     def update_num_classes(self,num_classes):
         self.num_classes=num_classes
+        self.perclass_mean=nn.Parameter(torch.ones(num_classes).cuda().view(-1,1))
+        self.perclass_std=nn.Parameter(torch.ones(num_classes).cuda().view(-1,1))
 
     def forward(self, z):
         out = self.l1(z)
@@ -269,10 +275,14 @@ class CGenerator(nn.Module):
 
     def sample(self, size, model):
         # sample z
-        z = torch.randn(size, model.last.weight.shape[1])
-        with torch.no_grad(model):
+        z = torch.randn(size, model.last.weight.shape[1]).cuda()
+        # sample class
+        class_index=torch.randint(0,self.num_classes,(size,),dtype=torch.long).cuda()
+        # sample perclass
+        z = z * self.perclass_std[class_index] + self.perclass_mean[class_index]
+        with torch.no_grad():
             y=model.last(z)[:,:self.num_classes].argmax(dim=1)
-        z = torch.cat((z,torch.random(size,self.z_dim-z.shape[1])),dim=1).cuda()
+        z = torch.cat((z,torch.randn(size,self.z_dim-z.shape[1]).cuda()),dim=1)
         X = self.forward(z)
         return X, y, z
 
