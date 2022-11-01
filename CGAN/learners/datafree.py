@@ -241,6 +241,7 @@ class ISCF(NormalNN):
     def reset_generator(self):
         if self.config['cgan']:
             self.generator.apply(weight_reset,self.valid_out_dim)
+            self.generator.to(self.device)
         else:
             self.generator.apply(weight_reset)
 
