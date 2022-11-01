@@ -216,17 +216,15 @@ class CGenerator(nn.Module):
 
     def sample(self, size):
         
-        c=torch.randint(0,self.num_classes,(size,))
+        c=torch.randint(0,self.num_classes,(size,)).cuda()
         # sample z
-        z = torch.randn(size, self.z_dim)
-        z = z.cuda()
-        c=c.cuda()
+        z = torch.randn(size, self.z_dim).cuda()
         X = self.forward(z,c)
         return X,c
 
     def apply(self, fn, num_classes):
         super().apply(fn)
-        self.embeddings=nn.Embedding(num_classes,self.z_dim//2)
+        self.embeddings=nn.Embedding(num_classes,self.z_dim).cuda()
 
 def CIFAR_GEN(bn = False, cgan=False, num_classes=10):
     if cgan:
