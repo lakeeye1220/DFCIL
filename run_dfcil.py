@@ -27,7 +27,7 @@ def create_args():
     parser.add_argument('--gen_model_name', type=str, default='MLP', help="The name of actual model for the generator")
     parser.add_argument('--learner_type', type=str, default='default', help="The type (filename) of learner")
     parser.add_argument('--learner_name', type=str, default='NormalNN', help="The class name of learner")
-    parser.add_argument('--dataroot', type=str, default='data', help="The root folder of dataset or downloaded data")
+    parser.add_argument('--dataroot', type=str, default='/data', help="The root folder of dataset or downloaded data")
     parser.add_argument('--dataset', type=str, default='MNIST', help="CIFAR10|MNIST")
     parser.add_argument('--load_model_dir', type=str, default=None, help="try loading from external model directory")
     parser.add_argument('--workers', type=int, default=8, help="#Thread for dataloader")
@@ -35,7 +35,7 @@ def create_args():
     parser.add_argument('--repeat', type=int, default=1, help="Repeat the experiment N times")
     parser.add_argument('--overwrite', type=int, default=0, metavar='N', help='Train regardless of whether saved model exists')
 
-    # training args
+    # training Args
     parser.add_argument('--optimizer', type=str, default='SGD', help="SGD|Adam|RMSprop|amsgrad|Adadelta|Adagrad|Adamax ...")
     parser.add_argument('--train_aug', dest='train_aug', default=False, action='store_true',
                         help="Allow data augmentation during training")
@@ -65,7 +65,12 @@ def create_args():
     parser.add_argument('--temp', type=float, default=2., dest='temp', help="temperature for distillation")
     parser.add_argument('--mu', type=float, default=1.0, help="KD loss balancing weight")
     parser.add_argument('--beta', type=float, default=0.5, help="FT loss balancing weight")
-
+    
+    # TEST Args
+    parser.add_argument('--init_generator', action='store_false', help="use reinit generator")
+    parser.add_argument('--cgan', default=None, type=str, help="use cgan (disc, latent)")
+    
+    
     return parser
 
 def get_args(argv):
@@ -159,13 +164,15 @@ if __name__ == '__main__':
         max_task = trainer.max_task
         if r == 0: 
             for mkey in metric_keys: 
+                #global accuracy
                 avg_metrics[mkey]['global'] = np.zeros((max_task,args.repeat))
                 if (not (mkey in global_only)):
+                    # per task accuracy
                     avg_metrics[mkey]['pt'] = np.zeros((max_task,max_task,args.repeat))
                     avg_metrics[mkey]['pt-local'] = np.zeros((max_task,max_task,args.repeat))
 
         # train model
-        avg_metrics = trainer.train(avg_metrics)  
+        avg_metrics = trainer.train(avg_metrics,repeat_idx=r)  
 
         # evaluate model
         avg_metrics = trainer.evaluate(avg_metrics)    

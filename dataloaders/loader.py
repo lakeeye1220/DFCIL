@@ -364,20 +364,21 @@ class iDataset(data.Dataset):
         print(np.unique(self.targets))
 
     # naive coreset appending
-    def append_coreset(self, only=False, interp=False):
-        len_core = len(self.coreset[0])
-        if self.train and (len_core > 0):
-            if only:
-                self.data, self.targets = self.coreset
-            else:
-                len_data = len(self.data)
-                sample_ind = np.random.choice(len_core, len_data)
-                if self.ic:
-                    self.data = np.concatenate([self.data, self.coreset[0]], axis=0)
-                    self.targets = np.concatenate([self.targets, self.coreset[1]], axis=0)
+    def append_coreset(self, only=False, interp=False,learner_name='none'):
+        if learner_name!='ABD_Coreset':
+            len_core = len(self.coreset[0])
+            if self.train and (len_core > 0):
+                if only:
+                    self.data, self.targets = self.coreset
                 else:
-                    self.data = np.concatenate([self.data, self.coreset[0][sample_ind]], axis=0)
-                    self.targets = np.concatenate([self.targets, self.coreset[1][sample_ind]], axis=0)
+                    len_data = len(self.data)
+                    sample_ind = np.random.choice(len_core, len_data)
+                    if self.ic:
+                        self.data = np.concatenate([self.data, self.coreset[0]], axis=0)
+                        self.targets = np.concatenate([self.targets, self.coreset[1]], axis=0)
+                    else:
+                        self.data = np.concatenate([self.data, self.coreset[0][sample_ind]], axis=0)
+                        self.targets = np.concatenate([self.targets, self.coreset[1][sample_ind]], axis=0)
 
     # naive coreset update
     def update_coreset(self, coreset_size, seen):
@@ -552,12 +553,13 @@ class iIMAGENET(iDataset):
     def load(self):
         self.dw = False
         self.data, self.targets = [], []
-        images_path = os.path.join(self.root, self.base_folder)
+        #images_path = os.path.join(self.root, self.base_folder)
+        images_path=self.root
         if self.train or self.validation:
             images_path = os.path.join(images_path, 'train')
             data_dict = get_data(images_path)
         else:
-            images_path = os.path.join(images_path, 'val')
+            images_path = os.path.join(images_path, 'val3')
             data_dict = get_data(images_path)
         y = 0
         for key in data_dict.keys():
@@ -565,6 +567,7 @@ class iIMAGENET(iDataset):
             self.data.extend([data_dict[key][i] for i in np.arange(0,num_y)])
             self.targets.extend([y for i in np.arange(0,num_y)])
             y += 1
+
 
 
     def __getitem__(self, index, simple = False):
@@ -620,7 +623,7 @@ class iTinyIMNET(iDataset):
         from os import path
         root = self.root
         FileNameEnd = 'JPEG'
-        train_dir = path.join(root, 'tiny-imagenet/tiny-imagenet-200/train')
+        train_dir = path.join(root, 'train')
         self.class_names = sorted(os.listdir(train_dir))
         self.names2index = {v: k for k, v in enumerate(self.class_names)}
         self.data = []
@@ -628,7 +631,7 @@ class iTinyIMNET(iDataset):
 
         if self.train:
             for label in self.class_names:
-                d = path.join(root, 'tiny-imagenet/tiny-imagenet-200/train', label)
+                d = path.join(root, 'train', label)
                 for directory, _, names in os.walk(d):
                     for name in names:
                         filename = path.join(directory, name)
@@ -636,11 +639,11 @@ class iTinyIMNET(iDataset):
                             self.data.append(filename)
                             self.targets.append(self.names2index[label])
         else:
-            val_dir = path.join(root, 'tiny-imagenet/tiny-imagenet-200/val')
-            with open(path.join(val_dir, 'val_annotations.txt'), 'r') as f:
+            val_dir = path.join(root, 'val_images_no_split')
+            with open(path.join(root,'val', 'val_annotations.txt'), 'r') as f:
                 infos = f.read().strip().split('\n')
                 infos = [info.strip().split('\t')[:2] for info in infos]
-                self.data = [path.join(val_dir, 'images', info[0])for info in infos]
+                self.data = [path.join(val_dir, info[0])for info in infos]
                 self.targets = [self.names2index[info[1]] for info in infos]
 
 

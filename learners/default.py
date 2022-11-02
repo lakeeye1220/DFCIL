@@ -6,6 +6,9 @@ import models
 from utils.metric import accuracy, AverageMeter, Timer
 import copy
 import numpy as np
+import os
+import matplotlib.pyplot as plt
+import tensorflow as tf
 
 class NormalNN(nn.Module):
     """
@@ -71,6 +74,59 @@ class NormalNN(nn.Module):
     ##########################################
     #           MODEL TRAINING               #
     ##########################################
+
+    def visualize_confusion_matrix(self, val_loader,file_path,task_num):
+        #plot the confusion matrix
+        y_true,y_pred=self.validation(val_loader,need_logits=True)
+        cm = tf.math.confusion_matrix(y_true, y_pred.argmax(dim=1))
+        if cm.shape[0]<self.config['num_classes']:
+            cm1 = np.pad(cm, ((0,self.config['num_classes']-cm.shape[0]),(0,self.config['num_classes']-cm.shape[1])), 'constant', constant_values=0)
+        else:
+            cm1=cm
+        
+        np.save(os.path.join(file_path,'{}task_confusion_matrix.npy'.format(task_num)), cm1)
+        plt.figure()
+        plt.matshow(cm1, cmap='viridis')
+        #plt.colorbar()
+        plt.savefig(os.path.join(file_path,'{}task_confusion_mat.pdf'.format(task_num)),bbox_inches='tight')
+        plt.close()
+    
+    def visualize_marginal_likelihood(self, val_loader,file_path,task_num):
+        y_true,y_pred=self.validation(val_loader,need_logits=True)
+        softened_y_pred=torch.softmax(y_pred[:,:self.valid_out_dim],dim=1)
+        classes=np.arange(self.valid_out_dim)
+        marginal_likelihood=softened_y_pred.mean(dim=0)
+        plt.figure()
+        plt.plot(classes,marginal_likelihood.detach().numpy())
+        plt.xlabel('Class Index')
+        plt.ylabel('Marginal Likelihood')
+        plt.xlim(0,self.valid_out_dim)
+        plt.savefig(os.path.join(file_path,'{}task_marginal_likelihood.pdf'.format(task_num)),bbox_inches='tight')
+        np.savetxt(os.path.join(file_path,'{}task_marginal_likelihood.csv'.format(task_num)), marginal_likelihood, delimiter=",", fmt='%.2f')
+        plt.close()
+
+    def visualize_weight(self,file_path,task_num):
+        #plot the L1-weight norm per each task 
+        class_norm=[]
+        if len(self.config['gpuid'])>1:
+            weight=self.model.module.last.weight
+            bias=self.model.module.last.bias.unsqueeze(-1)
+        else:
+            weight=self.model.last.weight
+            bias=self.model.last.bias.unsqueeze(-1)
+        weight=torch.cat((weight,bias),dim=1)
+        for i in range(self.valid_out_dim):
+            class_norm.append(torch.norm(weight[i]).item())
+
+        plt.figure()
+        classes=np.arange(self.valid_out_dim)
+        plt.scatter(classes,class_norm)
+        plt.xlabel('Class Index')
+        plt.ylabel('Weight Norm')
+        plt.xlim(0,weight.shape[0])
+        plt.savefig(os.path.join(file_path,'{}task_class_norm.pdf'.format(task_num)),bbox_inches='tight')
+        np.savetxt(os.path.join(file_path,'{}task_class_norm.csv'.format(task_num)), class_norm, delimiter=",", fmt='%.2f')
+        plt.close()
 
     def learn_batch(self, train_loader, train_dataset, model_save_dir, val_loader=None):
         
@@ -154,8 +210,8 @@ class NormalNN(nn.Module):
             train_dataset.update_coreset(self.memory_size, np.arange(self.last_valid_out_dim))
 
         # for eval
-        if self.previous_teacher is not None:
-            self.previous_previous_teacher = self.previous_teacher
+        # if self.previous_teacher is not None:
+        #     self.previous_previous_teacher = self.previous_teacher
 
         # new teacher
         teacher = Teacher(solver=self.model)
@@ -167,6 +223,7 @@ class NormalNN(nn.Module):
             return None
 
     def criterion(self, logits, targets, data_weights):
+        # calculate the LCE and FT losses with data_weighting
         loss_supervised = (self.criterion_fn(logits, targets.long()) * data_weights).mean()
         return loss_supervised 
 
@@ -181,7 +238,7 @@ class NormalNN(nn.Module):
         logits = self.forward(inputs)
         total_loss = self.criterion(logits, targets.long(), dw_cls)
 
-        # KD
+        # vanilla KD
         if target_scores is not None:
             if kd_index is None: kd_index = np.arange(len(logits))
             total_loss += self.mu * loss_fn_kd(logits[kd_index], target_scores[kd_index], dw_cls[kd_index], np.arange(self.last_valid_out_dim).tolist(), self.DTemp)
@@ -191,15 +248,17 @@ class NormalNN(nn.Module):
         self.optimizer.step()
         return total_loss.detach(), logits
 
-    def validation(self, dataloader, model=None, task_in = None,  verbal = True):
-
+    def validation(self, dataloader, model=None, task_in = None,  verbal = True, need_logits=False):
+        #evaluation the model performance, print the top-1 accuracy per each task
         if model is None:
             model = self.model
 
-        # This function doesn't distinguish tasks.
         batch_timer = Timer()
         acc = AverageMeter()
         batch_timer.tic()
+
+        y_true=[]
+        y_pred=[]
 
         orig_mode = model.training
         model.eval()
@@ -225,13 +284,19 @@ class NormalNN(nn.Module):
                     output = model.forward(input)[:, task_in]
                     acc = accumulate_acc(output, target-task_in[0], task, acc, topk=(self.top_k,))
             
+            if need_logits:
+                y_true.append(target.detach().cpu())
+                y_pred.append(output.detach().cpu())
         model.train(orig_mode)
 
+        if need_logits:
+            y_true=torch.cat(y_true, dim=0)
+            y_pred=torch.cat(y_pred, dim=0)
+            return y_true, y_pred
         if verbal:
             self.log(' * Val Acc {acc.avg:.3f}, Total time {time:.2f}'
                     .format(acc=acc, time=batch_timer.toc()))
         return acc.avg
-
 
     ##########################################
     #             MODEL UTILS                #
@@ -344,7 +409,7 @@ class NormalNN(nn.Module):
         return model
 
     def print_model(self):
-        self.log(self.model)
+        # self.log(self.model)
         self.log('#parameter of model:', self.count_parameter())
     
     def reset_model(self):
@@ -360,7 +425,7 @@ class NormalNN(nn.Module):
     
     def add_valid_output_dim(self, dim=0):
 
-        # This function is kind of ad-hoc, but it is the simplest way to support incremental class learning
+        # gradually increasing the classification head dimension
         self.log('Incremental class: Old valid output dimension:', self.valid_out_dim)
         self.valid_out_dim += dim
         self.log('Incremental class: New Valid output dimension:', self.valid_out_dim)
@@ -399,9 +464,9 @@ def accumulate_acc(output, target, task, meter, topk):
     return meter
 
 def loss_fn_kd(scores, target_scores, data_weights, allowed_predictions, T=2., soft_t = False):
-    """Compute knowledge-distillation (KD) loss given [scores] and [target_scores].
-    Both [scores] and [target_scores] should be tensors, although [target_scores] should be repackaged.
-    'Hyperparameter': temperature"""
+    #Compute knowledge-distillation (KD) loss given [scores] and [target_scores].
+    #Both [scores] and [target_scores] should be tensors, although [target_scores] should be repackaged.
+    #Hyperparameter: temperature
 
 
     log_scores_norm = F.log_softmax(scores[:, allowed_predictions] / T, dim=1)

@@ -36,7 +36,7 @@ class DeepInversionGenBN(NormalNN):
     ##########################################
 
     def learn_batch(self, train_loader, train_dataset, model_save_dir, val_loader=None):
-        
+        self.config['model_save_dir']=model_save_dir
         self.pre_steps()
 
         # try to load model
@@ -144,8 +144,13 @@ class DeepInversionGenBN(NormalNN):
         self.first_task = False
 
         # for eval
-        if self.previous_teacher is not None:
-            self.previous_previous_teacher = self.previous_teacher
+        # if self.previous_teacher is not None:
+        #     self.previous_previous_teacher = self.previous_teacher
+        
+        # reset generator
+        if self.config['init_generator']:
+            self.reset_generator()
+            self.generator_optimizer = Adam(params=self.generator.parameters(), lr=self.deep_inv_params[0])
         
         # new teacher
         if (self.out_dim == self.valid_out_dim): need_train = False
@@ -240,7 +245,13 @@ class DeepInversionGenBN(NormalNN):
     
     def reset_model(self):
         super(DeepInversionGenBN, self).reset_model()
-        self.generator.apply(weight_reset)
+        self.reset_generator()
+
+    def reset_generator(self):
+        if self.config['cgan']:
+            self.generator.apply(weight_reset,self.valid_out_dim)
+        else:
+            self.generator.apply(weight_reset)
 
     def count_parameter_gen(self):
         return sum(p.numel() for p in self.generator.parameters())

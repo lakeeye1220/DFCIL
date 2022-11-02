@@ -18,6 +18,7 @@ class Trainer:
         self.log_dir = args.log_dir
         self.batch_size = args.batch_size
         self.workers = args.workers
+        self.task_step_size=args.other_split_size
 
         # for generative models, pre-process data to be 0...1; otherwise, pre-process data to be zero mean, unit variance
         if args.learner_type == 'dgr':
@@ -38,25 +39,41 @@ class Trainer:
             Dataset = dataloaders.iCIFAR10
             num_classes = 10
             self.dataset_size = [32,32,3]
+            args.dataroot_dataset=os.path.join(args.dataroot, 'cifar10')
         elif args.dataset == 'CIFAR100':
             Dataset = dataloaders.iCIFAR100
             num_classes = 100
             self.dataset_size = [32,32,3]
+            args.dataroot_dataset=os.path.join(args.dataroot, 'cifar100')
         elif args.dataset == 'ImageNet':
             Dataset = dataloaders.iIMAGENET
             num_classes = 1000
             self.dataset_size = [224,224,3]
             self.top_k = 5
+            args.dataroot_dataset=os.path.join(args.dataroot, 'imagenet')
+        elif args.dataset == 'ImageNet50':
+            Dataset = dataloaders.iIMAGENET
+            num_classes = 50
+            self.dataset_size = [224,224,3]
+            self.top_k = 5
+            args.dataroot_dataset=os.path.join(args.dataroot, 'imagenet')
         elif args.dataset == 'TinyImageNet':
             Dataset = dataloaders.iTinyIMNET
             num_classes = 200
             self.dataset_size = [64,64,3]
+            args.dataroot_dataset=os.path.join(args.dataroot, 'tiny-imagenet')
+        elif args.dataset == 'TinyImageNet100':
+            Dataset = dataloaders.iTinyIMNET
+            num_classes = 100
+            self.dataset_size = [64,64,3]
+            args.dataroot_dataset=os.path.join(args.dataroot, 'tiny-imagenet')
         else:
             raise ValueError('Dataset not implemented!')
 
         # load tasks
         class_order = np.arange(num_classes).tolist()
         class_order_logits = np.arange(num_classes).tolist()
+        #shuffle the class order 
         if args.rand_split:
             print('=============================================')
             print('Shuffling....')
@@ -89,10 +106,10 @@ class Trainer:
         # datasets and dataloaders
         train_transform = dataloaders.utils.get_transform(dataset=args.dataset, phase='train', aug=args.train_aug, dgr=self.dgr)
         test_transform  = dataloaders.utils.get_transform(dataset=args.dataset, phase='test', aug=args.train_aug, dgr=self.dgr)
-        self.train_dataset = Dataset(args.dataroot, train=True, tasks=self.tasks,
+        self.train_dataset = Dataset(args.dataroot_dataset, train=True, tasks=self.tasks,
                             download_flag=True, transform=train_transform, 
                             seed=self.seed, validation=args.validation)
-        self.test_dataset  = Dataset(args.dataroot, train=False, tasks=self.tasks,
+        self.test_dataset  = Dataset(args.dataroot_dataset, train=False, tasks=self.tasks,
                                 download_flag=False, transform=test_transform, 
                                 seed=self.seed, validation=args.validation)
 
@@ -105,6 +122,7 @@ class Trainer:
 
         # Prepare the self.learner (model)
         self.learner_config = {'num_classes': num_classes,
+                        'dataset': args.dataset,
                         'lr': args.lr,
                         'momentum': args.momentum,
                         'weight_decay': args.weight_decay,
@@ -128,6 +146,9 @@ class Trainer:
                         'deep_inv_params': args.deep_inv_params,
                         'tasks': self.tasks_logits,
                         'top_k': self.top_k,
+                        'log_dir':self.log_dir,
+                        'init_generator':args.init_generator,
+                        'cgan':args.cgan,
                         }
         self.learner_type, self.learner_name = args.learner_type, args.learner_name
         self.learner = learners.__dict__[self.learner_type].__dict__[self.learner_name](self.learner_config)
@@ -146,13 +167,19 @@ class Trainer:
         else:
             return self.learner.validation(test_loader)
 
-    def train(self, avg_metrics):
+    def train(self, avg_metrics,repeat_idx):
     
         # temporary results saving
         temp_table = {}
         for mkey in self.metric_keys: temp_table[mkey] = []
         temp_dir = self.log_dir + '/temp/'
         if not os.path.exists(temp_dir): os.makedirs(temp_dir)
+        visualize_path= os.path.join(self.log_dir,'visualize_weight','repeat-{}'.format(repeat_idx))
+        if not os.path.exists(visualize_path): os.makedirs(visualize_path)
+        visualize_cm_path=os.path.join(self.log_dir,'visualize_confusion_matrix','repeat-{}'.format(repeat_idx))
+        if not os.path.exists(visualize_cm_path): os.makedirs(visualize_cm_path)
+        visualize_ml_path=os.path.join(self.log_dir,'visualize_marginal_likelihood','repeat-{}'.format(repeat_idx))
+        if not os.path.exists(visualize_ml_path): os.makedirs(visualize_ml_path)
 
         # for each task
         for i in range(self.max_task):
@@ -165,6 +192,9 @@ class Trainer:
             np.random.seed(self.seed*100 + i)
             torch.manual_seed(self.seed*100 + i)
             torch.cuda.manual_seed(self.seed*100 + i)
+            torch.random.manual_seed(self.seed*100 + i)
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
 
             # print name
             train_name = self.task_names[i]
@@ -187,7 +217,7 @@ class Trainer:
             self.learner.add_valid_output_dim(self.add_dim)
 
             # load dataset with memory
-            self.train_dataset.append_coreset(only=False)
+            self.train_dataset.append_coreset(only=False,learner_name=self.learner_name)
 
             # load dataloader
             train_loader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, drop_last=True, num_workers=int(self.workers))
@@ -204,6 +234,9 @@ class Trainer:
 
             # save model
             self.learner.save_model(model_save_dir)
+            self.learner.visualize_weight(visualize_path, self.current_t_index)
+            self.learner.visualize_confusion_matrix(test_loader,visualize_cm_path, self.current_t_index)
+            self.learner.visualize_marginal_likelihood(test_loader,visualize_ml_path, self.current_t_index)
             
             # evaluate acc
             acc_table = []
@@ -218,6 +251,12 @@ class Trainer:
                 np.savetxt(save_file, np.asarray(temp_table[mkey]), delimiter=",", fmt='%.2f')  
             if avg_train_time is not None: avg_metrics['time']['global'][i] = avg_train_time
             avg_metrics['mem']['global'][:] = self.learner.count_memory(self.dataset_size)
+            if (self.learner_config['dataset']== 'TinyImageNet100' and (self.current_t_index+1)*self.task_step_size==100):
+                break
+            elif self.learner_config['dataset']== 'ImageNet50' and ((self.current_t_index+1)*self.task_step_size==100):
+                break
+            else:
+                pass
 
         return avg_metrics 
     
@@ -280,6 +319,7 @@ class Trainer:
             for j in range(i+1):
                 val_name = self.task_names[j]
                 metric_table_local['acc'][val_name][self.task_names[i]] = self.task_eval(j, local=True)
+            
 
         # summarize metrics
         avg_metrics['acc'] = self.summarize_acc(avg_metrics['acc'], metric_table['acc'],  metric_table_local['acc'])
