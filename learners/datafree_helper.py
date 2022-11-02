@@ -141,7 +141,9 @@ class Teacher(nn.Module):
 
                 # content
                 outputs = self.solver(inputs)[:,:self.num_k]
-                loss = self.criterion(outputs / self.content_temp, torch.argmax(outputs, dim=1)) * self.content_weight
+                cnt_loss = self.criterion(outputs / self.content_temp, torch.argmax(outputs, dim=1)) * self.content_weight
+                with torch.no_grad():
+                    ce_loss = self.criterion(outputs,torch.argmax(outputs,dim=1))
 
                 # class balance
                 softmax_o_T = F.softmax(outputs, dim = 1).mean(dim = 0)
