@@ -299,7 +299,7 @@ class NormalNN(nn.Module):
         if verbal:
             self.log(' * Val Acc {acc.avg:.3f}, Total time {time:.2f}'
                     .format(acc=acc, time=batch_timer.toc()))
-        if task_num>-1 and self.config['wandb']:
+        if task_num>=0 and self.config['wandb']:
             wandb.log({'{}task_val_acc'.format(task_num): acc.avg}, step=self.epoch)
         return acc.avg
 
