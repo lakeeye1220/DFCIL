@@ -10,6 +10,7 @@ import numpy as np
 import yaml
 import random
 from trainer import Trainer
+import wandb
 
 def create_args():
     
@@ -69,7 +70,9 @@ def create_args():
     # TEST Args
     parser.add_argument('--init_generator', action='store_false', help="use reinit generator")
     parser.add_argument('--cgan', default=None, type=str, help="use cgan (disc, latent)")
-    
+    parser.add_argument('--wandb', action='store_false', help="use wandb")
+    parser.add_argument('--wandb_name', default=None, type=str, help="wandb name")
+
     
     return parser
 
@@ -142,6 +145,10 @@ if __name__ == '__main__':
 
         except:
             start_r = 0
+    
+    if args.wandb:
+        name= args.log_dir.split('/')[1] + '_' + args.log_dir.split('/')[-1] + args.wandb if args.wandb_name is not None else ''
+        wandb.init(project="dfcil", name=name, config=vars(args),entity='3neutronstar')
 
     # run trials
     for r in range(start_r, args.repeat):

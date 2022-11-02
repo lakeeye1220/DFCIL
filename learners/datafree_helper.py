@@ -28,8 +28,8 @@ class Teacher(nn.Module):
     def __init__(self, solver, generator, gen_opt, img_shape, iters, class_idx, deep_inv_params, train = True, config=None):
 
         super().__init__()
-        self.solver = solver
-        self.generator = generator
+        self.solver = solver #classifier
+        self.generator = generator #generator
         self.gen_opt = gen_opt
         self.solver.eval()
         self.generator.eval()
@@ -37,7 +37,7 @@ class Teacher(nn.Module):
         self.iters = iters
         self.config = config
 
-        # hyperparameters
+        # hyperparameters for image synthesis
         self.di_lr = deep_inv_params[0]
         self.r_feature_weight = deep_inv_params[1]
         self.di_var_scale = deep_inv_params[2]
@@ -49,7 +49,6 @@ class Teacher(nn.Module):
         self.class_idx = list(class_idx)
         self.num_k = len(self.class_idx)
 
-        # first time?
         self.first_time = train
 
         # set up criteria for optimization
@@ -79,7 +78,10 @@ class Teacher(nn.Module):
         # sample images
         self.generator.eval()
         with torch.no_grad():
-            x_i = self.generator.sample(size)
+            if self.config['cgan']:
+                x_i, y_i = self.generator.sample(size)
+            else:
+                x_i = self.generator.sample(size)
 
         # get predicted logit-scores
         with torch.no_grad():
@@ -87,7 +89,10 @@ class Teacher(nn.Module):
         y_hat = y_hat[:, self.class_idx]
 
         # get predicted class-labels (indexed according to each class' position in [self.class_idx]!)
-        _, y = torch.max(y_hat, dim=1)
+        if self.config['cgan']:
+            y=y_i
+        else:
+            _, y = torch.max(y_hat, dim=1)
 
         return (x_i, y, y_hat) if return_scores else (x_i, y)
 
@@ -125,42 +130,105 @@ class Teacher(nn.Module):
 
         self.generator.train()
         for epoch in tqdm(range(epochs)):
+            if self.config['cgan'] is None:
 
-            # sample from generator
-            inputs = self.generator.sample(bs)
+                # sample from generator
+                inputs = self.generator.sample(bs)
 
-            # forward with images
-            self.gen_opt.zero_grad()
-            self.solver.zero_grad()
+                # forward with images
+                self.gen_opt.zero_grad()
+                self.solver.zero_grad()
 
-            # content
-            outputs = self.solver(inputs)[:,:self.num_k]
-            loss = self.criterion(outputs / self.content_temp, torch.argmax(outputs, dim=1)) * self.content_weight
+                # content
+                outputs = self.solver(inputs)[:,:self.num_k]
+                loss = self.criterion(outputs / self.content_temp, torch.argmax(outputs, dim=1)) * self.content_weight
 
-            # class balance
-            softmax_o_T = F.softmax(outputs, dim = 1).mean(dim = 0)
-            loss += (1.0 + (softmax_o_T * torch.log(softmax_o_T) / math.log(self.num_k)).sum())
+                # class balance
+                softmax_o_T = F.softmax(outputs, dim = 1).mean(dim = 0)
+                bnc_loss= (1.0 + (softmax_o_T * torch.log(softmax_o_T) / math.log(self.num_k)).sum())
 
-            # R_feature loss
-            for mod in self.loss_r_feature_layers: 
-                loss_distr = mod.r_feature * self.r_feature_weight / len(self.loss_r_feature_layers)
-                if len(self.config['gpuid']) > 1:
-                    loss_distr = loss_distr.to(device=torch.device('cuda:'+str(self.config['gpuid'][0])))
-                loss = loss + loss_distr
+                # R_feature loss
+                loss_distrs=0
+                for mod in self.loss_r_feature_layers: 
+                    loss_distr = mod.r_feature * self.r_feature_weight / len(self.loss_r_feature_layers)
+                    if len(self.config['gpuid']) > 1:
+                        loss_distr = loss_distr.to(device=torch.device('cuda:'+str(self.config['gpuid'][0])))
+                    loss_distrs+=loss_distr
 
-            # image prior
-            inputs_smooth = self.smoothing(F.pad(inputs, (2, 2, 2, 2), mode='reflect'))
-            loss_var = self.mse_loss(inputs, inputs_smooth).mean()
-            loss = loss + self.di_var_scale * loss_var
+                # image prior
+                inputs_smooth = self.smoothing(F.pad(inputs, (2, 2, 2, 2), mode='reflect'))
+                loss_var = self.mse_loss(inputs, inputs_smooth).mean()
+                loss_var = self.di_var_scale * loss_var
 
-            # backward pass
-            loss.backward()
+                # backward pass - update the generator
+                loss=(cnt_loss + bnc_loss + loss_distrs + loss_var)
+                loss.backward()
+                self.gen_opt.step()
+                if epoch % 1000 == 0:
+                    print("Epoch: %d, Loss: %.3e, cnt_loss: %.3e (CE: %.3e), bnc_loss: %.3e, loss_distrs: %.3e, loss_var: %.3e" % (epoch, loss, cnt_loss,ce_loss, bnc_loss, loss_distrs, loss_var))
+            elif self.config['cgan'] == 'disc':
 
-            self.gen_opt.step()
+                # train generator
+                self.gen_opt.zero_grad()
+                inputs, y_i = self.generator.sample(bs)
+                out_pen = self.solver(inputs,pen=True)
+                outputs = self.solver.last(out_pen)[:,:self.num_k]
 
+                # discriminator loss measures
+                y_hat = self.discriminator(out_pen)
+                g_loss= F.mse_loss(y_hat, torch.ones_like(y_hat).cuda())
+                # content loss
+                cnt_loss = self.criterion(outputs / self.content_temp, y_i) * self.content_weight
+                with torch.no_grad():
+                    ce_loss=self.criterion(outputs, y_i).detach().clone()
+                # Statstics alignment
+                loss_distrs=0
+                for mod in self.loss_r_feature_layers: 
+                    loss_distr = mod.r_feature * self.r_feature_weight / len(self.loss_r_feature_layers)
+                    if len(self.config['gpuid']) > 1:
+                        loss_distr = loss_distr.to(device=torch.device('cuda:'+str(self.config['gpuid'][0])))
+                    loss_distrs+=loss_distr
+
+                # image prior
+                inputs_smooth = self.smoothing(F.pad(inputs, (2, 2, 2, 2), mode='reflect'))
+                loss_var = self.mse_loss(inputs, inputs_smooth).mean()
+                loss_var = self.di_var_scale * loss_var
+                loss=(cnt_loss + g_loss + loss_distrs + loss_var)
+                loss.backward(retain_graph=True)
+                self.gen_opt.step()
+
+                # train discriminator
+                self.discriminator_opt.zero_grad()
+                try:
+                    (x, y, task) = next(train_iter)
+                except:
+                    train_iter = iter(self.train_dataloader)
+                    (x, y, task) = next(train_iter)
+
+                x = x.cuda()
+                y = y.cuda()
+                out_real_pen = self.solver(x,pen=True)
+                y_real_hat = self.discriminator(out_real_pen)
+                d_real_loss = F.mse_loss(y_real_hat, torch.ones_like(y_real_hat).cuda())
+                out_fake_pen = self.solver(inputs.detach().clone(),pen=True)
+                y_fake_hat = self.discriminator(out_fake_pen)
+                d_fake_loss = F.mse_loss(y_fake_hat, torch.zeros_like(y_fake_hat).cuda())
+                d_loss = (d_real_loss + d_fake_loss) / 2
+                d_loss.backward()
+                self.discriminator_opt.step()
+                self.solver.zero_grad()
+                if epoch % 1000 == 0:
+                    print("Epoch: %d, g_loss: %.3e, cnt_loss: %.3e (CE: %.3e), d_loss: %.3e, loss_distrs: %.3e, loss_var: %.3e" % (epoch, loss, cnt_loss,ce_loss, d_loss, loss_distrs, loss_var))
         # clear cuda cache
         torch.cuda.empty_cache()
         self.generator.eval()
+        with torch.no_grad():
+            if self.config['cgan']:                
+                samples, y_i = self.generator.sample(self.num_k*10)
+            else:
+                samples = self.generator.sample(self.num_k*10)
+            grid=torchvision.utils.make_grid(samples, nrow=self.num_k, padding=1, normalize=True, range=None, scale_each=False, pad_value=0)
+            torchvision.utils.save_image(grid, os.path.join(self.config['model_save_dir'],'generated_images.png'.format(idx)), nrow=1, padding=0, normalize=False, range=None, scale_each=False, pad_value=0)
 
 class DeepInversionFeatureHook():
     '''

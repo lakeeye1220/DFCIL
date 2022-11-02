@@ -9,6 +9,7 @@ from .datafree_helper import Teacher
 from .default import NormalNN, weight_reset, accumulate_acc, loss_fn_kd
 import copy
 from torch.optim import Adam
+import wandb 
 
 class DeepInversionGenBN(NormalNN):
 
@@ -35,7 +36,7 @@ class DeepInversionGenBN(NormalNN):
     #           MODEL TRAINING               #
     ##########################################
 
-    def learn_batch(self, train_loader, train_dataset, model_save_dir, val_loader=None):
+    def learn_batch(self, train_loader, train_dataset, model_save_dir, val_loader=None,task_num=0):
         self.config['model_save_dir']=model_save_dir
         self.pre_steps()
 
@@ -60,7 +61,7 @@ class DeepInversionGenBN(NormalNN):
             # Evaluate the performance of current task
             self.log('Epoch:{epoch:.0f}/{total:.0f}'.format(epoch=0,total=self.config['schedule'][-1]))
             if val_loader is not None:
-                self.validation(val_loader)
+                self.validation(val_loader,task_num=-1)
 
             losses = [AverageMeter() for i in range(3)]
             acc = AverageMeter()
@@ -127,10 +128,12 @@ class DeepInversionGenBN(NormalNN):
                 self.log('Epoch:{epoch:.0f}/{total:.0f}'.format(epoch=self.epoch+1,total=self.config['schedule'][-1]))
                 self.log(' * Loss {loss.avg:.3f} | CE Loss {lossb.avg:.3f} | KD Loss {lossc.avg:.3f}'.format(loss=losses[0],lossb=losses[1],lossc=losses[2]))
                 self.log(' * Train Acc {acc.avg:.3f} | Train Acc Gen {accg.avg:.3f}'.format(acc=acc,accg=accg))
+                if self.config['wandb']:
+                    wandb.log({ '{}task Train Acc'.format(task_num): acc.avg, '{}task Train Acc Gen'.format(task_num): accg.avg, '{}task CE Loss'.format(task_num): losses[1].avg, '{}task KD Loss'.format(task_num): losses[2].avg, '{}task Loss'.format(task_num): losses[0].avg}, step=self.epoch)
 
                 # Evaluate the performance of current task
                 if val_loader is not None:
-                    self.validation(val_loader)
+                    self.validation(val_loader,task_num=task_num)
 
                 # reset
                 losses = [AverageMeter() for i in range(3)]
@@ -232,10 +235,14 @@ class DeepInversionGenBN(NormalNN):
         super(DeepInversionGenBN, self).load_model(filename)
 
     def create_generator(self):
+        print("Creating generator")
         cfg = self.config
 
         # Define the backbone (MLP, LeNet, VGG, ResNet ... etc) of model
-        generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']]()
+        if cfg['cgan'] is not None:
+            generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']](bn=False,cgan=True,num_classes=cfg['num_classes'])#,num_classes=self.valid_out_dim) # update 하면 self.valid_out_dim
+        else:
+            generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']]()
         return generator
 
     def print_model(self):
@@ -248,7 +255,7 @@ class DeepInversionGenBN(NormalNN):
         self.reset_generator()
 
     def reset_generator(self):
-        if self.config['cgan']:
+        if self.config['cgan'] is not None:
             self.generator.apply(weight_reset,self.valid_out_dim)
         else:
             self.generator.apply(weight_reset)

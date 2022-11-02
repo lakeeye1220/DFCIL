@@ -9,6 +9,7 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 import tensorflow as tf
+import wandb
 
 class NormalNN(nn.Module):
     """
@@ -128,7 +129,7 @@ class NormalNN(nn.Module):
         np.savetxt(os.path.join(file_path,'{}task_class_norm.csv'.format(task_num)), class_norm, delimiter=",", fmt='%.2f')
         plt.close()
 
-    def learn_batch(self, train_loader, train_dataset, model_save_dir, val_loader=None):
+    def learn_batch(self, train_loader, train_dataset, model_save_dir, val_loader=None, task_num=0):
         
         # try to load model
         need_train = True
@@ -151,7 +152,7 @@ class NormalNN(nn.Module):
             # Evaluate the performance of current task
             self.log('Epoch:{epoch:.0f}/{total:.0f}'.format(epoch=0,total=self.config['schedule'][-1]))
             if val_loader is not None:
-                self.validation(val_loader)
+                self.validation(val_loader,task_num=-1)
         
             losses = AverageMeter()
             acc = AverageMeter()
@@ -190,10 +191,12 @@ class NormalNN(nn.Module):
                 # eval update
                 self.log('Epoch:{epoch:.0f}/{total:.0f}'.format(epoch=self.epoch+1,total=self.config['schedule'][-1]))
                 self.log(' * Loss {loss.avg:.3f} | Train Acc {acc.avg:.3f}'.format(loss=losses,acc=acc))
+                if self.config['wandb']:
+                    wandb.log({ '{}task train_loss'.format(task_num):losses.avg, '{}task train_acc'.format(task_num):acc.avg},epoch=self.epoch)
 
                 # Evaluate the performance of current task
                 if val_loader is not None:
-                    self.validation(val_loader)
+                    self.validation(val_loader,task_num)
 
                 # reset
                 losses = AverageMeter()
@@ -248,7 +251,7 @@ class NormalNN(nn.Module):
         self.optimizer.step()
         return total_loss.detach(), logits
 
-    def validation(self, dataloader, model=None, task_in = None,  verbal = True, need_logits=False):
+    def validation(self, dataloader, model=None, task_in = None,  verbal = True, need_logits=False,task_num=0):
         #evaluation the model performance, print the top-1 accuracy per each task
         if model is None:
             model = self.model
@@ -296,6 +299,8 @@ class NormalNN(nn.Module):
         if verbal:
             self.log(' * Val Acc {acc.avg:.3f}, Total time {time:.2f}'
                     .format(acc=acc, time=batch_timer.toc()))
+        if task_num!=-1 and self.config['wandb']:
+            wandb.log({'{}task_val_acc'.format(task_num): acc.avg}, step=self.epoch)
         return acc.avg
 
     ##########################################

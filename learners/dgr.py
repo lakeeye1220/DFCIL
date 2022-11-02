@@ -29,7 +29,7 @@ class Generative_Replay(NormalNN):
     #           MODEL TRAINING               #
     ##########################################
 
-    def learn_batch(self, train_loader, train_dataset, model_save_dir, val_loader=None):
+    def learn_batch(self, train_loader, train_dataset, model_save_dir, val_loader=None,task_num=0):
         
         # try to load model
         need_train = True
@@ -50,7 +50,7 @@ class Generative_Replay(NormalNN):
             # Evaluate the performance of current task
             self.log('Epoch:{epoch:.0f}/{total:.0f}'.format(epoch=0,total=self.config['schedule'][-1]))
             if val_loader is not None:
-                self.validation(val_loader)
+                self.validation(val_loader,task_num=-1)
         
             losses = AverageMeter()
             acc = AverageMeter()
@@ -130,7 +130,7 @@ class Generative_Replay(NormalNN):
 
                 # Evaluate the performance of current task
                 if val_loader is not None:
-                    self.validation(val_loader)
+                    self.validation(val_loader,task_num=task_num)
 
                 # reset
                 losses = AverageMeter()

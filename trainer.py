@@ -149,6 +149,7 @@ class Trainer:
                         'log_dir':self.log_dir,
                         'init_generator':args.init_generator,
                         'cgan':args.cgan,
+                        'wandb':args.wandb,
                         }
         self.learner_type, self.learner_name = args.learner_type, args.learner_name
         self.learner = learners.__dict__[self.learner_type].__dict__[self.learner_name](self.learner_config)
@@ -182,32 +183,32 @@ class Trainer:
         if not os.path.exists(visualize_ml_path): os.makedirs(visualize_ml_path)
 
         # for each task
-        for i in range(self.max_task):
+        for task_num in range(self.max_task):
 
             # save current task index
-            self.current_t_index = i
+            self.current_t_index = task_num
 
             # set seeds
-            random.seed(self.seed*100 + i)
-            np.random.seed(self.seed*100 + i)
-            torch.manual_seed(self.seed*100 + i)
-            torch.cuda.manual_seed(self.seed*100 + i)
-            torch.random.manual_seed(self.seed*100 + i)
+            random.seed(self.seed*100 + task_num)
+            np.random.seed(self.seed*100 + task_num)
+            torch.manual_seed(self.seed*100 + task_num)
+            torch.cuda.manual_seed(self.seed*100 + task_num)
+            torch.random.manual_seed(self.seed*100 + task_num)
             torch.backends.cudnn.deterministic = True
             torch.backends.cudnn.benchmark = False
 
             # print name
-            train_name = self.task_names[i]
+            train_name = self.task_names[task_num]
             print('======================', train_name, '=======================')
 
             # load dataset for task
-            task = self.tasks_logits[i]
+            task = self.tasks_logits[task_num]
             if self.oracle_flag:
-                self.train_dataset.load_dataset(i, train=False)
+                self.train_dataset.load_dataset(task_num, train=False)
                 self.learner = learners.__dict__[self.learner_type].__dict__[self.learner_name](self.learner_config)
                 self.add_dim += len(task)
             else:
-                self.train_dataset.load_dataset(i, train=True)
+                self.train_dataset.load_dataset(task_num, train=True)
                 self.add_dim = len(task)
 
             # tell learner number of tasks we are doing
@@ -223,14 +224,14 @@ class Trainer:
             train_loader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, drop_last=True, num_workers=int(self.workers))
 
             # learn
-            self.test_dataset.load_dataset(i, train=False)
+            self.test_dataset.load_dataset(task_num, train=False)
             test_loader  = DataLoader(self.test_dataset, batch_size=self.batch_size, shuffle=False, drop_last=False, num_workers=self.workers)
-            if i == 0:
-                model_save_dir = self.model_first_dir + '/models/repeat-'+str(self.seed+1)+'/task-'+self.task_names[i]+'/'
+            if task_num == 0:
+                model_save_dir = self.model_first_dir + '/models/repeat-'+str(self.seed+1)+'/task-'+self.task_names[task_num]+'/'
             else:
-                model_save_dir = self.model_top_dir + '/models/repeat-'+str(self.seed+1)+'/task-'+self.task_names[i]+'/'
+                model_save_dir = self.model_top_dir + '/models/repeat-'+str(self.seed+1)+'/task-'+self.task_names[task_num]+'/'
             if not os.path.exists(model_save_dir): os.makedirs(model_save_dir)
-            avg_train_time = self.learner.learn_batch(train_loader, self.train_dataset, model_save_dir, test_loader)
+            avg_train_time = self.learner.learn_batch(train_loader, self.train_dataset, model_save_dir, test_loader, task_num)
 
             # save model
             self.learner.save_model(model_save_dir)
@@ -241,7 +242,7 @@ class Trainer:
             # evaluate acc
             acc_table = []
             self.reset_cluster_labels = True
-            for j in range(i+1):
+            for j in range(task_num+1):
                 acc_table.append(self.task_eval(j))
             temp_table['acc'].append(np.mean(np.asarray(acc_table)))
 
@@ -249,7 +250,7 @@ class Trainer:
             for mkey in self.metric_keys:
                 save_file = temp_dir + mkey + '.csv'
                 np.savetxt(save_file, np.asarray(temp_table[mkey]), delimiter=",", fmt='%.2f')  
-            if avg_train_time is not None: avg_metrics['time']['global'][i] = avg_train_time
+            if avg_train_time is not None: avg_metrics['time']['global'][task_num] = avg_train_time
             avg_metrics['mem']['global'][:] = self.learner.count_memory(self.dataset_size)
             if (self.learner_config['dataset']== 'TinyImageNet100' and (self.current_t_index+1)*self.task_step_size==100):
                 break

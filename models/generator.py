@@ -170,8 +170,71 @@ class GeneratorBig(nn.Module):
         X = self.forward(z)
         return X
 
-def CIFAR_GEN(bn = False):
-    return Generator(zdim=1000, in_channel=3, img_sz=32)
+
+class CDISCGenerator(nn.Module):
+    def __init__(self, zdim, in_channel, img_sz,num_classes=10):
+        super(CDISCGenerator, self).__init__()
+        self.z_dim = zdim
+        self.embeddings=nn.Embedding(num_classes,zdim)
+        self.init_size = img_sz // 4
+        self.l1 = nn.Sequential(nn.Linear(zdim, 128*self.init_size**2))
+
+        self.conv_blocks0 = nn.Sequential(
+            nn.BatchNorm2d(128),
+        )
+        self.conv_blocks1 = nn.Sequential(
+            nn.Conv2d(128, 128, 3, stride=1, padding=1),
+            nn.BatchNorm2d(128, 0.8),
+            nn.LeakyReLU(0.2, inplace=True),
+        )
+        self.conv_blocks2 = nn.Sequential(
+            nn.Conv2d(128, 64, 3, stride=1, padding=1),
+            nn.BatchNorm2d(64, 0.8),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(64, in_channel, 3, stride=1, padding=1),
+            nn.Tanh(),
+            nn.BatchNorm2d(in_channel, affine=False) 
+        )
+        self.num_classes=num_classes
+
+    def forward(self, z, c):
+
+        cls_z=self.embeddings(c)
+        z=z+cls_z
+        # z=torch.cat((z,cls_z),1)
+        out = self.l1(z)
+        out = out.view(out.shape[0], 128, self.init_size, self.init_size)
+        img = self.conv_blocks0(out)
+        img = nn.functional.interpolate(img,scale_factor=2)
+        img = self.conv_blocks1(img)
+        img = nn.functional.interpolate(img,scale_factor=2)
+        img = self.conv_blocks2(img)
+        return img
+    
+    def update_num_classes(self,num_classes):
+        self.num_classes=num_classes
+
+    def sample(self, size):
+        
+        c=torch.randint(0,self.num_classes,(size,))
+        # sample z
+        z = torch.randn(size, self.z_dim)
+        z = z.cuda()
+        c=c.cuda()
+        X = self.forward(z,c)
+        return X,c
+
+    def apply(self, fn, num_classes):
+        super().apply(fn)
+        self.embeddings=nn.Embedding(num_classes,self.z_dim//2)
+
+def CIFAR_GEN(bn = False, cgan=None, num_classes=10):
+    if cgan == 'disc':
+        return CDISCGenerator(zdim=1000, in_channel=3, img_sz=32, num_classes=num_classes)
+    elif cgan == 'latent':
+        return CLATENTGenerator(zdim=1000, in_channel=3, img_sz=32, num_classes=num_classes)
+    else:
+        return Generator(zdim=1000, in_channel=3, img_sz=32)
 
 def TINYIMNET_GEN(bn = False):
    return GeneratorMed(zdim=1000, in_channel=3, img_sz=64)
