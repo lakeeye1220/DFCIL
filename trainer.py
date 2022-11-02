@@ -164,9 +164,9 @@ class Trainer:
         self.test_dataset.load_dataset(t_index, train=True)
         test_loader  = DataLoader(self.test_dataset, batch_size=self.batch_size, shuffle=False, drop_last=False, num_workers=self.workers)
         if local:
-            return self.learner.validation(test_loader, task_in = self.tasks_logits[t_index])
+            return self.learner.validation(test_loader, task_in = self.tasks_logits[t_index],task_num=-1)
         else:
-            return self.learner.validation(test_loader)
+            return self.learner.validation(test_loader,task_num=-1)
 
     def train(self, avg_metrics,repeat_idx):
     
