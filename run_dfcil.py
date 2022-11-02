@@ -146,12 +146,16 @@ if __name__ == '__main__':
         except:
             start_r = 0
     
-    if args.wandb:
-        name= args.log_dir.split('/')[1] + '_' + args.log_dir.split('/')[-1] + args.wandb if args.wandb_name is not None else ''
-        wandb.init(project="dfcil", name=name, config=vars(args),entity='3neutronstar')
 
     # run trials
     for r in range(start_r, args.repeat):
+        if args.wandb:
+            name= args.log_dir.split('/')[1] + '_' + args.log_dir.split('/')[-1]
+            if args.wandb_name is not None:
+                name += args.wandb_name
+            name+='_repeat'+str(r+1)
+            print(name)
+            wandb.init(project="dfcil", name=name, config=vars(args),entity='3neutronstar')
 
         print('************************************')
         print('* STARTING TRIAL ' + str(r+1))
