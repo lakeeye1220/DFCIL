@@ -364,21 +364,20 @@ class iDataset(data.Dataset):
         print(np.unique(self.targets))
 
     # naive coreset appending
-    def append_coreset(self, only=False, interp=False,learner_name='none'):
-        if learner_name!='ABD_Coreset':
-            len_core = len(self.coreset[0])
-            if self.train and (len_core > 0):
-                if only:
-                    self.data, self.targets = self.coreset
+    def append_coreset(self, only=False, interp=False):
+        len_core = len(self.coreset[0])
+        if self.train and (len_core > 0):
+            if only:
+                self.data, self.targets = self.coreset
+            else:
+                len_data = len(self.data)
+                sample_ind = np.random.choice(len_core, len_data)
+                if self.ic:
+                    self.data = np.concatenate([self.data, self.coreset[0]], axis=0)
+                    self.targets = np.concatenate([self.targets, self.coreset[1]], axis=0)
                 else:
-                    len_data = len(self.data)
-                    sample_ind = np.random.choice(len_core, len_data)
-                    if self.ic:
-                        self.data = np.concatenate([self.data, self.coreset[0]], axis=0)
-                        self.targets = np.concatenate([self.targets, self.coreset[1]], axis=0)
-                    else:
-                        self.data = np.concatenate([self.data, self.coreset[0][sample_ind]], axis=0)
-                        self.targets = np.concatenate([self.targets, self.coreset[1][sample_ind]], axis=0)
+                    self.data = np.concatenate([self.data, self.coreset[0][sample_ind]], axis=0)
+                    self.targets = np.concatenate([self.targets, self.coreset[1][sample_ind]], axis=0)
 
     # naive coreset update
     def update_coreset(self, coreset_size, seen):
