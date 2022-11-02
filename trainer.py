@@ -218,7 +218,7 @@ class Trainer:
             self.learner.add_valid_output_dim(self.add_dim)
 
             # load dataset with memory
-            self.train_dataset.append_coreset(only=False,learner_name=self.learner_name)
+            self.train_dataset.append_coreset(only=False)#,learner_name=self.learner_name)
 
             # load dataloader
             train_loader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, drop_last=True, num_workers=int(self.workers))
