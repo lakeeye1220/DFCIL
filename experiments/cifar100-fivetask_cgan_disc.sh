@@ -2,7 +2,7 @@
 
 # process inputs
 DEFAULTGPU=0
-GPUID=0
+GPUID=1
 
 # benchmark settings
 DATE=ICCV2021_DISC

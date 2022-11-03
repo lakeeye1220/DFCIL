@@ -226,7 +226,8 @@ class CDISCGenerator(nn.Module):
 
     def apply(self, fn, num_classes):
         super().apply(fn)
-        self.embeddings=nn.Embedding(num_classes,self.z_dim)
+        print("NUM_CLASSES for embedding layer",num_classes)
+        self.embeddings=nn.Embedding(num_classes,self.z_dim).cuda()
 
 def CIFAR_GEN(bn = False, cgan=None, num_classes=10):
     if cgan == 'disc':

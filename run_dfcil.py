@@ -132,6 +132,7 @@ if __name__ == '__main__':
                                 avg_metrics[mkey][skey] = np.asarray(yaml_result['history'])
 
             # next repeat needed
+            print(avg_metrics)
             start_r = avg_metrics[metric_keys[0]][save_keys[0]].shape[-1]
 
             # extend if more repeats left
@@ -142,11 +143,9 @@ if __name__ == '__main__':
                     if (not (mkey in global_only)):
                         avg_metrics[mkey]['pt'] = np.append(avg_metrics[mkey]['pt'], np.zeros((max_task,max_task,args.repeat-start_r)), axis=-1)
                         avg_metrics[mkey]['pt-local'] = np.append(avg_metrics[mkey]['pt-local'], np.zeros((max_task,max_task,args.repeat-start_r)), axis=-1)
-
         except:
             start_r = 0
     
-
     # run trials
     for r in range(start_r, args.repeat):
         if args.wandb:
