@@ -135,7 +135,7 @@ class Teacher(nn.Module):
         save_images=[]
         
         # cgan setup
-        if self.config['cgan']:
+        if 'disc' in self.config['cgan']:
             self.generator.update_num_classes(self.num_k)
             if 'CIFAR' in self.config['dataset']:
                 n_dim=64
@@ -236,7 +236,7 @@ class Teacher(nn.Module):
             plot_save(distrs_loss_list, 'distrs_loss')
             plot_save(var_loss_list, 'var_loss')
 
-        elif self.config['cgan'] == 'disc':
+        elif 'disc' in self.config['cgan']:
             # loss list
             loss_list = []
             cnt_loss_list=[]
