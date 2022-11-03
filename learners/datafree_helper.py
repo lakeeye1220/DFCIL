@@ -132,7 +132,7 @@ class Teacher(nn.Module):
         torch.cuda.empty_cache()
 
         self.generator.train()
-
+        save_images=[]
         
         # cgan setup
         if self.config['cgan']:
@@ -216,6 +216,7 @@ class Teacher(nn.Module):
                 self.gen_opt.step()
                 if epoch % 1000 == 0:
                     print("Epoch: %d, Loss: %.3e, cnt_loss: %.3e (CE: %.3e), bnc_loss: %.3e, loss_distrs: %.3e, var_loss: %.3e" % (epoch, loss, cnt_loss,ce_loss, bnc_loss, loss_distrs, var_loss))
+                    save_images.append(inputs.detach().cpu())
                     if self.config['wandb']:
                         # save images (var: inputs)
                         table_data=[]
@@ -297,6 +298,7 @@ class Teacher(nn.Module):
                 self.solver.zero_grad()
                 if epoch % 1000 == 0:
                     print("Epoch: %d, g_loss: %.3e, cnt_loss: %.3e (CE: %.3e), d_loss: %.3e, loss_distrs: %.3e, var_loss: %.3e" % (epoch, loss, cnt_loss,ce_loss, d_loss, loss_distrs, var_loss))
+                    save_images.append(inputs.detach().cpu())
                     if self.config['wandb']:
                         # save images (var: inputs)
                         table_data=[]
@@ -315,6 +317,11 @@ class Teacher(nn.Module):
             plot_save(distrs_loss_list, 'distrs_loss')
             plot_save(var_loss_list, 'var_loss')
             plot_save(disc_loss_list, 'discriminator_loss')
+        # save images
+        save_images = torch.cat(save_images, dim=0)
+        grid=torchvision.utils.make_grid(save_images, nrow=bs, padding=1, normalize=True, range=None, scale_each=False, pad_value=0)
+        torchvision.utils.save_image(grid, os.path.join(self.config['model_save_dir'],'iter_generated_images.png'.format(idx)), nrow=1, padding=0, normalize=False, range=None, scale_each=False, pad_value=0)
+
         # clear cuda cache
         torch.cuda.empty_cache()
         self.generator.eval()
