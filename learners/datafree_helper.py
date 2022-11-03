@@ -149,7 +149,7 @@ class Teacher(nn.Module):
                 nn.Linear(256, 1),
                 nn.Sigmoid())
             self.discriminator.cuda()
-            self.discriminator_opt = torch.optim.Adam(self.discriminator.parameters(), lr=0.0002, betas=(0.5, 0.999))
+            self.discriminator_opt = torch.optim.Adam(self.discriminator.parameters(), lr=self.config['disc_lr'], betas=(0.5, 0.999))
             try:
                 train_iter = iter(self.train_dataloader)
             except:

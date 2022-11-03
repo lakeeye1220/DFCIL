@@ -150,6 +150,7 @@ class Trainer:
                         'init_generator':args.init_generator,
                         'cgan':args.cgan,
                         'wandb':args.wandb,
+                        'disc_lr':args.disc_lr,
                         }
         self.learner_type, self.learner_name = args.learner_type, args.learner_name
         self.learner = learners.__dict__[self.learner_type].__dict__[self.learner_name](self.learner_config)

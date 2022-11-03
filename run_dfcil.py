@@ -53,6 +53,7 @@ def create_args():
     parser.add_argument('--power_iters', type=int, default=10, help="backprop power iterations for producing images")
     parser.add_argument('--deep_inv_params', nargs="+", type=float, default=[-1],
                          help="learning rate, BN loss weight, variance prior weight, CE loss temp, CE loss weight")
+    parser.add_argument('--disc_lr', type=float, default=4e-4)
 
     # CL Args
     parser.add_argument('--first_split_size', type=int, default=2)
@@ -69,7 +70,7 @@ def create_args():
     
     # TEST Args
     parser.add_argument('--init_generator', action='store_false', help="use reinit generator")
-    parser.add_argument('--cgan', default=None, type=str, help="use cgan (disc, latent)")
+    parser.add_argument('--cgan', default=None, type=str, help="use cgan (disc, latent)",choices=['disc','disc_test','latent')
     parser.add_argument('--wandb', action='store_false', help="use wandb")
     parser.add_argument('--wandb_name', default=None, type=str, help="wandb name")
 
