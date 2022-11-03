@@ -250,7 +250,7 @@ class DeepInversionGenBN(NormalNN):
 
         # Define the backbone (MLP, LeNet, VGG, ResNet ... etc) of model
         if cfg['cgan'] is not None:
-            generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']](bn=False,cgan=True,num_classes=cfg['num_classes'])#,num_classes=self.valid_out_dim) # update 하면 self.valid_out_dim
+            generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']](bn=False,cgan=self.config['cgan'],num_classes=cfg['num_classes'])#,num_classes=self.valid_out_dim) # update 하면 self.valid_out_dim
         else:
             generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']]()
         return generator
