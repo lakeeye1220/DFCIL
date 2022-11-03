@@ -90,6 +90,10 @@ class NormalNN(nn.Module):
         plt.matshow(cm1, cmap='viridis')
         #plt.colorbar()
         plt.savefig(os.path.join(file_path,'{}task_confusion_mat.pdf'.format(task_num)),bbox_inches='tight')
+        if self.config['wandb']:
+            wandb.log({'{}task_confusion_matrix'.format(task_num): wandb.Image(plt)},commit=False)
+        plt.clf()
+        plt.cla()
         plt.close()
     
     def visualize_marginal_likelihood(self, val_loader,file_path,task_num):
@@ -104,6 +108,10 @@ class NormalNN(nn.Module):
         plt.xlim(0,self.valid_out_dim)
         plt.savefig(os.path.join(file_path,'{}task_marginal_likelihood.pdf'.format(task_num)),bbox_inches='tight')
         np.savetxt(os.path.join(file_path,'{}task_marginal_likelihood.csv'.format(task_num)), marginal_likelihood, delimiter=",", fmt='%.2f')
+        if self.config['wandb']:
+            wandb.log({'{}task_marginal_likelihood'.format(task_num): wandb.Image(plt)},commit=False)
+        plt.clf()
+        plt.cla()
         plt.close()
 
     def visualize_weight(self,file_path,task_num):
@@ -127,6 +135,10 @@ class NormalNN(nn.Module):
         plt.xlim(0,weight.shape[0])
         plt.savefig(os.path.join(file_path,'{}task_class_norm.pdf'.format(task_num)),bbox_inches='tight')
         np.savetxt(os.path.join(file_path,'{}task_class_norm.csv'.format(task_num)), class_norm, delimiter=",", fmt='%.2f')
+        if self.config['wandb']:
+            wandb.log({'{}task_class_norm'.format(task_num): wandb.Image(plt)},commit=False)
+        plt.clf()
+        plt.cla()
         plt.close()
 
     def learn_batch(self, train_loader, train_dataset, model_save_dir, val_loader=None, task_num=0):
