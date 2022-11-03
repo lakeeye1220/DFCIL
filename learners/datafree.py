@@ -32,6 +32,9 @@ class DeepInversionGenBN(NormalNN):
         if self.gpu:
             self.cuda_gen()
         
+        if self.config['wandb']:
+            wandb.watch(self.model, log='all')
+        
     ##########################################
     #           MODEL TRAINING               #
     ##########################################
@@ -39,6 +42,11 @@ class DeepInversionGenBN(NormalNN):
     def learn_batch(self, train_loader, train_dataset, model_save_dir, val_loader=None,task_num=0):
         self.config['model_save_dir']=model_save_dir
         self.pre_steps()
+        # cgan generator training
+        if self.config['cgan'] and self.inversion_replay:
+            self.previous_teacher.train_dataloader = train_loader
+            self.sample(self.previous_teacher, self.batch_size, self.device, return_scores=False)
+
 
         # try to load model
         need_train = True
@@ -129,7 +137,7 @@ class DeepInversionGenBN(NormalNN):
                 self.log(' * Loss {loss.avg:.3f} | CE Loss {lossb.avg:.3f} | KD Loss {lossc.avg:.3f}'.format(loss=losses[0],lossb=losses[1],lossc=losses[2]))
                 self.log(' * Train Acc {acc.avg:.3f} | Train Acc Gen {accg.avg:.3f}'.format(acc=acc,accg=accg))
                 if self.config['wandb']:
-                    wandb.log({ '{}task Train Acc'.format(task_num): acc.avg, '{}task Train Acc Gen'.format(task_num): accg.avg, '{}task CE Loss'.format(task_num): losses[1].avg, '{}task KD Loss'.format(task_num): losses[2].avg, '{}task Loss'.format(task_num): losses[0].avg}, step=self.epoch)
+                    wandb.log({ '{}task Train Acc'.format(task_num): acc.avg, '{}task Train Acc Gen'.format(task_num): accg.avg, '{}task CE Loss'.format(task_num): losses[1].avg, '{}task KD Loss'.format(task_num): losses[2].avg, '{}task Loss'.format(task_num): losses[0].avg}, step=self.epoch+self.config['schedule'][-1]*task_num)
 
                 # Evaluate the performance of current task
                 if val_loader is not None:
@@ -157,8 +165,10 @@ class DeepInversionGenBN(NormalNN):
         
         # new teacher
         if (self.out_dim == self.valid_out_dim): need_train = False
-        self.previous_teacher = Teacher(solver=copy.deepcopy(self.model), generator=self.generator, gen_opt = self.generator_optimizer, img_shape = (-1, train_dataset.nch,train_dataset.im_size, train_dataset.im_size), iters = self.power_iters, deep_inv_params = self.deep_inv_params, class_idx = np.arange(self.valid_out_dim), train = need_train, config = self.config)
-        self.sample(self.previous_teacher, self.batch_size, self.device, return_scores=False)
+        self.previous_teacher = Teacher(solver=copy.deepcopy(self.model), generator=self.generator, gen_opt = self.generator_optimizer, img_shape = (-1, train_dataset.nch,train_dataset.im_size, train_dataset.im_size), iters = self.power_iters, deep_inv_params = self.deep_inv_params, class_idx = np.arange(self.valid_out_dim), train = need_train, task_num=task_num, config = self.config)
+
+        if not self.config['cgan']:
+            self.sample(self.previous_teacher, self.batch_size, self.device, return_scores=False)
         if len(self.config['gpuid']) > 1:
             self.previous_linear = copy.deepcopy(self.model.module.last)
         else:

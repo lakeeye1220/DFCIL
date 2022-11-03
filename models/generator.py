@@ -200,7 +200,7 @@ class CDISCGenerator(nn.Module):
     def forward(self, z, c):
 
         cls_z=self.embeddings(c)
-        z=z+cls_z
+        z=z*0.05+cls_z
         # z=torch.cat((z,cls_z),1)
         out = self.l1(z)
         out = out.view(out.shape[0], 128, self.init_size, self.init_size)

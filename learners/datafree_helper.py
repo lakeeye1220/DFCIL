@@ -5,7 +5,9 @@ import math
 from tqdm import tqdm
 import torchvision
 import os
-
+import wandb
+import matplotlib.pyplot as plt
+from utils.metric import AverageMeter
 """
 Some content adapted from the following:
 @article{fang2019datafree,
@@ -25,7 +27,7 @@ Some content adapted from the following:
 
 class Teacher(nn.Module):
 
-    def __init__(self, solver, generator, gen_opt, img_shape, iters, class_idx, deep_inv_params, train = True, config=None):
+    def __init__(self, solver, generator, gen_opt, img_shape, iters, class_idx, deep_inv_params, train = True, task_num=-1, config=None):
 
         super().__init__()
         self.solver = solver #classifier
@@ -129,8 +131,53 @@ class Teacher(nn.Module):
         torch.cuda.empty_cache()
 
         self.generator.train()
-        for epoch in tqdm(range(epochs)):
-            if self.config['cgan'] is None:
+
+        
+        # cgan setup
+        if self.config['cgan']:
+            self.generator.update_num_classes(self.num_k)
+            if 'CIFAR' in self.config['dataset']:
+                n_dim=64
+            else:
+                n_dim=512
+            self.discriminator=nn.Sequential(
+                nn.Linear(n_dim, 512),
+                nn.LeakyReLU(0.2),
+                nn.Linear(512, 256),
+                nn.LeakyReLU(0.2),
+                nn.Linear(256, 1),
+                nn.Sigmoid())
+            self.discriminator.cuda()
+            self.discriminator_opt = torch.optim.Adam(self.discriminator.parameters(), lr=0.0002, betas=(0.5, 0.999))
+            try:
+                train_iter = iter(self.train_dataloader)
+            except:
+                raise NotImplementedError("No train dataloader provided for cgan")
+            if self.config['wandb']:
+                wandb.watch(self.discriminator, log='all')
+        if self.config['wandb']:
+            wandb.watch(self.generator, log='all')
+
+        def plot_save(lists, name):
+            plt.plot(lists)
+            plt.ylabel('{}task_'+name)
+            plt.xlabel('step')
+            plt.savefig(os.path.join(self.config['model_save_dir'],'{}.png'.format(name)))
+            plt.close()
+            plt.clf()
+            plt.cla()
+            if self.config['wandb']: # plot with wandb
+                wandb.Image(os.path.join(self.config['model_save_dir'],'{}.png'.format(name)), caption='{}task_'+name)
+        
+        # training generator
+        if self.config['cgan'] is None:
+            # lists for storing losses
+            loss_list = []
+            cnt_loss_list=[]
+            bnc_loss_list=[]
+            distrs_loss_list=[]
+            var_loss_list=[]
+            for epoch in tqdm(range(epochs)):
 
                 # sample from generator
                 inputs = self.generator.sample(bs)
@@ -159,16 +206,37 @@ class Teacher(nn.Module):
 
                 # image prior
                 inputs_smooth = self.smoothing(F.pad(inputs, (2, 2, 2, 2), mode='reflect'))
-                loss_var = self.mse_loss(inputs, inputs_smooth).mean()
-                loss_var = self.di_var_scale * loss_var
+                var_loss = self.mse_loss(inputs, inputs_smooth).mean()
+                var_loss = self.di_var_scale * var_loss
 
                 # backward pass - update the generator
-                loss=(cnt_loss + bnc_loss + loss_distrs + loss_var)
+                loss=(cnt_loss + bnc_loss + loss_distrs + var_loss)
                 loss.backward()
                 self.gen_opt.step()
                 if epoch % 1000 == 0:
-                    print("Epoch: %d, Loss: %.3e, cnt_loss: %.3e (CE: %.3e), bnc_loss: %.3e, loss_distrs: %.3e, loss_var: %.3e" % (epoch, loss, cnt_loss,ce_loss, bnc_loss, loss_distrs, loss_var))
-            elif self.config['cgan'] == 'disc':
+                    print("Epoch: %d, Loss: %.3e, cnt_loss: %.3e (CE: %.3e), bnc_loss: %.3e, loss_distrs: %.3e, var_loss: %.3e" % (epoch, loss, cnt_loss,ce_loss, bnc_loss, loss_distrs, var_loss))
+                loss_list.append(loss.item())
+                cnt_loss_list.append(cnt_loss.item())
+                bnc_loss_list.append(bnc_loss.item())
+                distrs_loss_list.append(loss_distrs.item())
+                var_loss_list.append(var_loss.item())
+
+            plot_save(loss_list, 'loss')
+            plot_save(cnt_loss_list, 'cnt_loss')
+            plot_save(bnc_loss_list, 'bnc_loss')
+            plot_save(distrs_loss_list, 'distrs_loss')
+            plot_save(var_loss_list, 'var_loss')
+
+        elif self.config['cgan'] == 'disc':
+            # loss list
+            loss_list = []
+            cnt_loss_list=[]
+            # bnc_loss_list=[]
+            distrs_loss_list=[]
+            var_loss_list=[]
+            disc_loss_list=[]
+
+            for epoch in tqdm(range(epochs)):
 
                 # train generator
                 self.gen_opt.zero_grad()
@@ -193,9 +261,9 @@ class Teacher(nn.Module):
 
                 # image prior
                 inputs_smooth = self.smoothing(F.pad(inputs, (2, 2, 2, 2), mode='reflect'))
-                loss_var = self.mse_loss(inputs, inputs_smooth).mean()
-                loss_var = self.di_var_scale * loss_var
-                loss=(cnt_loss + g_loss + loss_distrs + loss_var)
+                var_loss = self.mse_loss(inputs, inputs_smooth).mean()
+                var_loss = self.di_var_scale * var_loss
+                loss=(cnt_loss + g_loss + loss_distrs + var_loss)
                 loss.backward(retain_graph=True)
                 self.gen_opt.step()
 
@@ -220,7 +288,19 @@ class Teacher(nn.Module):
                 self.discriminator_opt.step()
                 self.solver.zero_grad()
                 if epoch % 1000 == 0:
-                    print("Epoch: %d, g_loss: %.3e, cnt_loss: %.3e (CE: %.3e), d_loss: %.3e, loss_distrs: %.3e, loss_var: %.3e" % (epoch, loss, cnt_loss,ce_loss, d_loss, loss_distrs, loss_var))
+                    print("Epoch: %d, g_loss: %.3e, cnt_loss: %.3e (CE: %.3e), d_loss: %.3e, loss_distrs: %.3e, var_loss: %.3e" % (epoch, loss, cnt_loss,ce_loss, d_loss, loss_distrs, var_loss))
+                loss_list.append(loss.item())
+                cnt_loss_list.append(cnt_loss.item())
+                # bnc_loss_list.append(bnc_loss.item())
+                disc_loss_list.append(d_loss.item())
+                distrs_loss_list.append(loss_distrs.item())
+                var_loss_list.append(var_loss.item())
+            plot_save(loss_list, 'generator_loss')
+            plot_save(cnt_loss_list, 'cnt_loss')
+            # plot_save(bnc_loss_list, 'bnc_loss')
+            plot_save(distrs_loss_list, 'distrs_loss')
+            plot_save(var_loss_list, 'var_loss')
+            plot_save(disc_loss_list, 'discriminator_loss')
         # clear cuda cache
         torch.cuda.empty_cache()
         self.generator.eval()
