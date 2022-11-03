@@ -70,7 +70,7 @@ def create_args():
     
     # TEST Args
     parser.add_argument('--init_generator', action='store_false', help="use reinit generator")
-    parser.add_argument('--cgan', default=None, type=str, help="use cgan (disc, latent)",choices=['disc','disc_test','latent')
+    parser.add_argument('--cgan', default=None, type=str, help="use cgan (disc, latent)",choices=['disc','disc_test','latent'])
     parser.add_argument('--wandb', action='store_false', help="use wandb")
     parser.add_argument('--wandb_name', default=None, type=str, help="wandb name")
 
