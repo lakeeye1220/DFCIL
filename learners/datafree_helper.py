@@ -81,8 +81,10 @@ class Teacher(nn.Module):
         # sample images
         self.generator.eval()
         with torch.no_grad():
-            if self.config['cgan']:
+            if 'disc' in self.config['cgan']:
                 x_i, y_i = self.generator.sample(size)
+            elif 'latent' == self.config['cgan']:
+                x_y, y_i, z = self.generator.sample(size, self.solver)
             else:
                 x_i = self.generator.sample(size)
 
@@ -386,8 +388,10 @@ class Teacher(nn.Module):
         torch.cuda.empty_cache()
         self.generator.eval()
         with torch.no_grad():
-            if self.config['cgan']:                
+            if 'disc' in self.config['cgan']:                
                 samples, y_i = self.generator.sample(self.num_k*10)
+            elif self.config['cgan']=='latent':
+                samples, y_i, z = self.generator.sample(self.num_k*10, self.solver)
             else:
                 samples = self.generator.sample(self.num_k*10)
             grid=torchvision.utils.make_grid(samples, nrow=self.num_k, padding=1, normalize=True, range=None, scale_each=False, pad_value=0)

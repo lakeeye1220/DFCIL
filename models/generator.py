@@ -229,11 +229,73 @@ class CDISCGenerator(nn.Module):
         print("NUM_CLASSES for embedding layer",num_classes)
         self.embeddings=nn.Embedding(num_classes,self.z_dim).cuda()
 
+# latent based CGAN
+class CLATENTGenerator(nn.Module):
+    def __init__(self, zdim, in_channel, img_sz,num_classes=10):
+        super(CLATENTGenerator, self).__init__()
+        self.z_dim = zdim
+        self.init_size = img_sz // 4
+        self.l1 = nn.Sequential(nn.Linear(zdim, 128*self.init_size**2))
+
+        self.conv_blocks0 = nn.Sequential(
+            nn.BatchNorm2d(128),
+        )
+        self.conv_blocks1 = nn.Sequential(
+            nn.Conv2d(128, 128, 3, stride=1, padding=1),
+            nn.BatchNorm2d(128, 0.8),
+            nn.LeakyReLU(0.2, inplace=True),
+        )
+        self.conv_blocks2 = nn.Sequential(
+            nn.Conv2d(128, 64, 3, stride=1, padding=1),
+            nn.BatchNorm2d(64, 0.8),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(64, in_channel, 3, stride=1, padding=1),
+            nn.Tanh(),
+            nn.BatchNorm2d(in_channel, affine=False) 
+        )
+        self.num_classes=num_classes
+
+        # perclass
+        self.perclass_mean=nn.Parameter(torch.ones(num_classes).view(-1,1))
+        self.perclass_std=nn.Parameter(torch.ones(num_classes).view(-1,1))
+
+    def update_num_classes(self,num_classes):
+        self.num_classes=num_classes
+        self.perclass_mean=nn.Parameter(torch.ones(num_classes).cuda().view(-1,1))
+        self.perclass_std=nn.Parameter(torch.ones(num_classes).cuda().view(-1,1))
+
+    def forward(self, z):
+        out = self.l1(z)
+        out = out.view(out.shape[0], 128, self.init_size, self.init_size)
+        img = self.conv_blocks0(out)
+        img = nn.functional.interpolate(img,scale_factor=2)
+        img = self.conv_blocks1(img)
+        img = nn.functional.interpolate(img,scale_factor=2)
+        img = self.conv_blocks2(img)
+        return img
+    
+
+    def sample(self, size, model):
+        # sample z
+        z = torch.randn(size, model.last.weight.shape[1]).cuda()
+        # sample class
+        class_index=torch.randint(0,self.num_classes,(size,),dtype=torch.long).cuda()
+        # sample perclass
+        z = z * self.perclass_std[class_index] + self.perclass_mean[class_index]
+        with torch.no_grad():
+            y=model.last(z)[:,:self.num_classes].argmax(dim=1)
+        z = torch.cat((z,torch.randn(size,self.z_dim-z.shape[1]).cuda()),dim=1)
+        X = self.forward(z)
+        return X, y, z
+
+    def apply(self, fn, num_classes):
+        super().apply(fn)
+
 def CIFAR_GEN(bn = False, cgan=None, num_classes=10):
     if cgan == 'disc':
-        return CDISCGenerator(zdim=1000, in_channel=3, img_sz=32, num_classes=num_classes)
+        return CDISCGenerator(zdim=64, in_channel=3, img_sz=32, num_classes=num_classes)
     elif cgan == 'latent':
-        return CLATENTGenerator(zdim=1000, in_channel=3, img_sz=32, num_classes=num_classes)
+        return CLATENTGenerator(zdim=64, in_channel=3, img_sz=32, num_classes=num_classes)
     else:
         return Generator(zdim=1000, in_channel=3, img_sz=32)
 
