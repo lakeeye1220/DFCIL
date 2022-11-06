@@ -271,8 +271,11 @@ class DeepInversionGenBN(NormalNN):
         self.reset_generator()
 
     def reset_generator(self):
-        if self.config['cgan'] is not None:
-            self.generator.apply(weight_reset,self.valid_out_dim)
+        if self.config['cgan']:
+            if 'latent' in self.config['cgan']:
+                self.generator.apply(weight_reset)
+            else:
+                self.generator.apply(weight_reset,self.valid_out_dim)
         else:
             self.generator.apply(weight_reset)
 
@@ -368,7 +371,7 @@ class AlwaysBeDreaming(DeepInversionGenBN):
             loss_class = self.criterion(logits[class_idx], targets[class_idx].long(), dw_cls[class_idx])
 
         if self.config['supcon']:
-            loss_class = (1-self.config['supcon_weight'])* loss_class + self.config['supcon_weight'] * self.supcon_loss(logits_nopooled, targets)
+            loss_class = (1-self.config['supcon_weight'])*loss_class + self.config['supcon_weight'] * self.supcon_loss(F.normalize(logits_nopooled,dim=1), targets)
 
         # KD
         if target_scores is not None:
