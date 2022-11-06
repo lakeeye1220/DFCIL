@@ -312,7 +312,7 @@ class NormalNN(nn.Module):
             self.log(' * Val Acc {acc.avg:.3f}, Total time {time:.2f}'
                     .format(acc=acc, time=batch_timer.toc()))
         if task_num>=0 and self.config['wandb']:
-            wandb.log({'{}task_val_acc'.format(task_num): acc.avg}, step=self.epoch)
+            wandb.log({'{}task_val_acc'.format(task_num): acc.avg}, step=task_num*self.config['schedule'][-1]+self.epoch,commit=True)
         return acc.avg
 
     ##########################################
