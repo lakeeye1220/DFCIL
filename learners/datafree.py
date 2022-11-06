@@ -343,7 +343,7 @@ class AlwaysBeDreaming(DeepInversionGenBN):
         dw_cls = mappings[targets.long()]
 
         # forward pass
-        logits_pen = self.model.forward(x=inputs, pen=True)
+        logits_pen,logits_nopooled = self.model.forward(x=inputs, middle=True)
         if len(self.config['gpuid']) > 1:
             logits = self.model.module.last(logits_pen)
         else:
@@ -368,7 +368,7 @@ class AlwaysBeDreaming(DeepInversionGenBN):
             loss_class = self.criterion(logits[class_idx], targets[class_idx].long(), dw_cls[class_idx])
 
         if self.config['supcon']:
-            loss_class = (1-self.config['supcon_weight'])* loss_class + self.config['supcon_weight'] * self.supcon_loss(logits_pen, targets)
+            loss_class = (1-self.config['supcon_weight'])* loss_class + self.config['supcon_weight'] * self.supcon_loss(logits_nopooled, targets)
 
         # KD
         if target_scores is not None:

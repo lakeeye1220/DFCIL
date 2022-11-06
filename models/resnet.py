@@ -96,13 +96,15 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def forward(self, x, pen=False):
+    def forward(self, x, pen=False,middle=False):
         out = F.relu(self.bn1(self.conv1(x)))
         out = self.layer1(out)
         out = self.layer2(out)
-        out = self.layer3(out)
-        out = F.avg_pool2d(out, out.size()[3])
+        out_nopooled = self.layer3(out)
+        out = F.avg_pool2d(out_nopooled, out_nopooled.size()[3])
         out = out.view(out.size(0), -1)
+        if middle:
+            return out,out_nopooled
         if pen:
             return out
         else:
