@@ -151,6 +151,9 @@ class Trainer:
                         'cgan':args.cgan,
                         'wandb':args.wandb,
                         'disc_lr':args.disc_lr,
+                        'supcon':args.supcon,
+                        'supcon_temp':args.supcon_temp,
+                        'supcon_weight':args.supcon_weight,
                         }
         self.learner_type, self.learner_name = args.learner_type, args.learner_name
         self.learner = learners.__dict__[self.learner_type].__dict__[self.learner_name](self.learner_config)

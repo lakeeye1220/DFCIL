@@ -315,6 +315,68 @@ class Teacher(nn.Module):
             plot_save(distrs_loss_list, 'distrs_loss')
             plot_save(var_loss_list, 'var_loss')
             plot_save(disc_loss_list, 'discriminator_loss')
+
+        if self.config['cgan']=='latent':
+            # loss list
+            loss_list = []
+            cnt_loss_list=[]
+            mse_loss_list=[]
+            uni_loss_list=[]
+            distrs_loss_list=[]
+            
+            # train generator
+            inputs, y_i, z = self.generator.sample(bs, self.solver)
+            out_pen = self.solver(inputs,pen=True)
+            outputs = self.solver.last(out_pen)[:,:self.num_k]
+            self.gen_opt.zero_grad()
+            self.solver.zero_grad()
+
+            # mse with out_pen and z
+            loss_mse = self.mse_loss(out_pen, z[:,:out_pen.shape[1]]).mean()
+
+            with torch.no_grad():
+                ce_loss=self.criterion(outputs, y_i).detach().clone()
+
+
+            # content loss
+            cnt_loss = self.criterion(outputs / self.content_temp, y_i) * self.content_weight
+
+            # uniform loss
+            softmax_o_T = F.softmax(outputs, dim = 1).mean(dim = 0)
+            uni_loss= (1.0 + (softmax_o_T * torch.log(softmax_o_T) / math.log(self.num_k)).sum())
+
+            # Statstics alignment
+            loss_distrs=0
+            for mod in self.loss_r_feature_layers: 
+                loss_distr = mod.r_feature * self.r_feature_weight / len(self.loss_r_feature_layers)
+                if len(self.config['gpuid']) > 1:
+                    loss_distr = loss_distr.to(device=torch.device('cuda:'+str(self.config['gpuid'][0])))
+                loss_distrs+=loss_distr
+            loss= (cnt_loss+loss_mse+loss_distrs+uni_loss)
+
+            # # image prior
+            # inputs_smooth = self.smoothing(F.pad(inputs, (2, 2, 2, 2), mode='reflect'))
+            # loss_var = self.mse_loss(inputs, inputs_smooth).mean()
+            # loss_var = self.di_var_scale * loss_var
+            # loss=(cnt_loss + loss_distrs + loss_var)
+            self.gen_opt.zero_grad()
+            loss.backward()
+            self.gen_opt.step()
+            if epoch % 1000 == 0:
+                print(f"Epoch: {epoch:5d}, Loss: {loss:.3e} CNT_loss: {cnt_loss:.3e} (CE: {ce_loss:.3e}) MSE_loss: {loss_mse:.3e} loss_distrs: {loss_distrs:.3e} loss_uni: {uni_loss:3e}")
+                save_images.append(inputs.detach().cpu())
+                loss_list.append(loss.item())
+                cnt_loss_list.append(cnt_loss.item())
+                mse_loss_list.append(loss_mse.item())
+                uni_loss_list.append(uni_loss.item())
+                distrs_loss_list.append(loss_distrs.item())
+            plot_save(loss_list, 'generator_loss')
+            plot_save(cnt_loss_list, 'cnt_loss')
+            plot_save(mse_loss_list, 'mse_loss')
+            plot_save(uni_loss_list, 'uni_loss')
+            plot_save(distrs_loss_list, 'distrs_loss')
+            
+
         # save images
         save_images = torch.cat(save_images, dim=0)
         grid=torchvision.utils.make_grid(save_images, nrow=bs, padding=1, normalize=True, range=None, scale_each=False, pad_value=0)

@@ -74,6 +74,9 @@ def create_args():
     parser.add_argument('--wandb', action='store_false', help="use wandb")
     parser.add_argument('--wandb_name', default=None, type=str, help="wandb name")
 
+    parser.add_argument('--supcon', action='store_true', help="use supcon")
+    parser.add_argument('--supcon_temp', type=float, default=0.1, help="temperature for supcon")
+    parser.add_argument('--supcon_weight', type=float, default=0.3, help="weight for supcon")
     
     return parser
 

@@ -2,6 +2,7 @@ from __future__ import print_function
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+from learners.supcontrast import SupConLoss
 import models
 from utils.metric import AverageMeter, Timer
 import numpy as np
@@ -327,6 +328,8 @@ class AlwaysBeDreaming(DeepInversionGenBN):
     def __init__(self, learner_config):
         super(AlwaysBeDreaming, self).__init__(learner_config)
         self.kl_loss = nn.KLDivLoss(reduction='batchmean').cuda()
+        if self.config['supcon']:
+            self.supcon_loss = SupConLoss(temperature=self.config['supcon_temp']).cuda()
 
     def update_model(self, inputs, targets, target_scores = None, dw_force = None, kd_index = None):
         
@@ -363,6 +366,9 @@ class AlwaysBeDreaming(DeepInversionGenBN):
             
         else:
             loss_class = self.criterion(logits[class_idx], targets[class_idx].long(), dw_cls[class_idx])
+
+        if self.config['supcon']:
+            loss_class = (1-self.config['supcon_weight'])* loss_class + self.config['supcon_weight'] * self.supcon_loss(logits_pen, targets)
 
         # KD
         if target_scores is not None:
