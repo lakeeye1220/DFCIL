@@ -44,7 +44,7 @@ class DeepInversionGenBN(NormalNN):
         self.config['model_save_dir']=model_save_dir
         self.pre_steps()
         # cgan generator training
-        if 'disc' in self.config['cgan'] and self.inversion_replay:
+        if self.config['cgan'] and 'disc' in self.config['cgan'] and self.inversion_replay:
             if self.config['cgan']=='disc':
                 self.previous_teacher.train_dataloader = train_loader
             elif self.config['cgan']=='disc_test':
