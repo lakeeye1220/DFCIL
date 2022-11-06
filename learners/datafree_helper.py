@@ -297,12 +297,12 @@ class Teacher(nn.Module):
                 if epoch % 1000 == 0:
                     print("Epoch: %d, g_loss: %.3e, cnt_loss: %.3e (CE: %.3e), d_loss: %.3e, loss_distrs: %.3e, var_loss: %.3e" % (epoch, loss, cnt_loss,ce_loss, d_loss, loss_distrs, var_loss))
                     save_images.append(inputs.detach().cpu())
-                    if self.config['wandb']:
-                        # save images (var: inputs)
-                        table_data=[]
-                        for i in range(len(inputs)):
-                            table_data.append([i, wandb.Image(inputs[i]),outputs[i],torch.argmax(outputs[i])])
-                        wandb.log({"{}task {}iter images".format(self.task_num,epoch): wandb.Table(data=table_data, columns=["idx", "image", "logits", "label"])},commit=False)
+                    #if self.config['wandb']:
+                    #    # save images (var: inputs)
+                    #    table_data=[]
+                    #    for i in range(len(inputs)):
+                    #        table_data.append([i, wandb.Image(inputs[i]),outputs[i],torch.argmax(outputs[i])])
+                    #    #wandb.log({"{}task {}iter images".format(self.task_num, epoch): wandb.Table(data=table_data, columns=["idx", "image", "logits", "label"])},commit=True)
                 loss_list.append(loss.item())
                 cnt_loss_list.append(cnt_loss.item())
                 # bnc_loss_list.append(bnc_loss.item())
