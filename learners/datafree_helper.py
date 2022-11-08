@@ -368,6 +368,7 @@ class Teacher(nn.Module):
                 if epoch % 1000 == 0:
                     print(f"Epoch: {epoch:5d}, Loss: {loss:.3e} CNT_loss: {cnt_loss:.3e} (CE: {ce_loss:.3e}) MSE_loss: {loss_mse:.3e} loss_distrs: {loss_distrs:.3e} loss_uni: {uni_loss:3e}")
                     save_images.append(inputs.detach().cpu())
+                    ys.append(y_i.detach().cpu())
                     loss_list.append(loss.item())
                     cnt_loss_list.append(cnt_loss.item())
                     mse_loss_list.append(loss_mse.item())
@@ -395,6 +396,10 @@ class Teacher(nn.Module):
                 samples, y_i, z = self.generator.sample(self.num_k*10, self.solver)
             else:
                 samples = self.generator.sample(self.num_k*10)
+            logits = self.solver(samples)
+            logits = logits[:,:self.num_k]
+            argsorted_logits=torch.argsort(logits, dim=1, descending=True)
+            samples=samples[argsorted_logits]
             grid=torchvision.utils.make_grid(samples, nrow=self.num_k, padding=1, normalize=True, range=None, scale_each=False, pad_value=0)
             torchvision.utils.save_image(grid, os.path.join(self.config['model_save_dir'],'generated_images.png'.format(idx)), nrow=1, padding=0, normalize=False, range=None, scale_each=False, pad_value=0)
             if self.config['wandb']:
