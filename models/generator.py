@@ -213,6 +213,7 @@ class CDISCGenerator(nn.Module):
     
     def update_num_classes(self,num_classes):
         self.num_classes=num_classes
+        self.embeddings=nn.Embedding(num_classes,self.z_dim).cuda()
 
     def sample(self, size):
         
@@ -223,11 +224,6 @@ class CDISCGenerator(nn.Module):
         c=c.cuda()
         X = self.forward(z,c)
         return X,c
-
-    def apply(self, fn, num_classes):
-        super().apply(fn)
-        print("NUM_CLASSES for embedding layer",num_classes)
-        self.embeddings=nn.Embedding(num_classes,self.z_dim).cuda()
 
 # latent based CGAN
 class CLATENTGenerator(nn.Module):
@@ -288,11 +284,8 @@ class CLATENTGenerator(nn.Module):
         X = self.forward(z)
         return X, y, z
 
-    def apply(self, fn, num_classes):
-        super().apply(fn)
-
 def CIFAR_GEN(bn = False, cgan=None, num_classes=10):
-    if cgan == 'disc':
+    if cgan is not None and 'disc' in cgan:
         return CDISCGenerator(zdim=64, in_channel=3, img_sz=32, num_classes=num_classes)
     elif cgan == 'latent':
         return CLATENTGenerator(zdim=64, in_channel=3, img_sz=32, num_classes=num_classes)

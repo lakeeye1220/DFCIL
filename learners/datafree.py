@@ -271,13 +271,7 @@ class DeepInversionGenBN(NormalNN):
         self.reset_generator()
 
     def reset_generator(self):
-        if self.config['cgan']:
-            if 'latent' in self.config['cgan']:
-                self.generator.apply(weight_reset)
-            else:
-                self.generator.apply(weight_reset,self.valid_out_dim)
-        else:
-            self.generator.apply(weight_reset)
+        self.generator.apply(weight_reset)
 
     def count_parameter_gen(self):
         return sum(p.numel() for p in self.generator.parameters())
