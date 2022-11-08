@@ -292,8 +292,10 @@ class Trainer:
         return {'global': avg_acc_all,'pt': avg_acc_pt,'pt-local': avg_acc_pt_local}
 
     def evaluate(self, avg_metrics):
-
-        self.learner = learners.__dict__[self.learner_type].__dict__[self.learner_name](self.learner_config)
+        try:
+            self.learner = learners.__dict__[self.learner_type].__dict__[self.learner_name](self.learner_config)
+        except:
+            pass
 
         # store results
         metric_table = {}
