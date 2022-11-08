@@ -161,14 +161,14 @@ class Teacher(nn.Module):
 
         def plot_save(lists, name):
             plt.plot(lists)
-            plt.ylabel('{}task_'+name)
+            plt.ylabel('{}task_'.format(self.task_num)+name)
             plt.xlabel('step')
             plt.savefig(os.path.join(self.config['model_save_dir'],'{}.png'.format(name)))
             plt.close()
             plt.clf()
             plt.cla()
             if self.config['wandb']: # plot with wandb
-                wandb.Image(os.path.join(self.config['model_save_dir'],'{}.png'.format(name)), caption='{}task_'+name)
+                wandb.Image(os.path.join(self.config['model_save_dir'],'{}.png'.format(name)), caption='{}task_'.format(self.task_num)+name)
         
         # training generator
         if self.config['cgan'] is None:
