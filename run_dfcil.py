@@ -186,7 +186,10 @@ if __name__ == '__main__':
                     avg_metrics[mkey]['pt-local'] = np.zeros((max_task,max_task,args.repeat))
 
         # train model
-        avg_metrics = trainer.train(avg_metrics,repeat_idx=r)  
+        avg_metrics = trainer.train(avg_metrics,repeat_idx=r)
+
+        if args.wandb:
+            wandb.finish()
 
         # evaluate model
         avg_metrics = trainer.evaluate(avg_metrics)    

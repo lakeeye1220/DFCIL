@@ -253,12 +253,21 @@ class CLATENTGenerator(nn.Module):
 
         # perclass
         self.perclass_mean=nn.Parameter(torch.ones(num_classes).view(-1,1))
+        self.perclass_mean.requires_grad=True
+        self.register_parameter('perclass_mean',self.perclass_mean)
+
         self.perclass_std=nn.Parameter(torch.ones(num_classes).view(-1,1))
+        self.perclass_std.requires_grad=True
+        self.register_parameter('perclass_std',self.perclass_std)
 
     def update_num_classes(self,num_classes):
         self.num_classes=num_classes
         self.perclass_mean=nn.Parameter(torch.ones(num_classes).cuda().view(-1,1))
+        self.perclass_mean.requires_grad=True
+        self.register_parameter('perclass_mean',self.perclass_mean)
         self.perclass_std=nn.Parameter(torch.ones(num_classes).cuda().view(-1,1))
+        self.perclass_std.requires_grad=True
+        self.register_parameter('perclass_std',self.perclass_std)
 
     def forward(self, z):
         out = self.l1(z)

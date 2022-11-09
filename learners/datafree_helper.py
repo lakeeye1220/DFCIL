@@ -130,6 +130,9 @@ class Teacher(nn.Module):
         return y_hat
 
     def get_images(self, bs=256, epochs=1000, idx=-1):
+        print("Start learning teacher")
+        # print(self.generator.parameters())
+        # print(self.gen_opt.param_groups)
 
         # clear cuda cache
         torch.cuda.empty_cache()
@@ -390,6 +393,7 @@ class Teacher(nn.Module):
         # clear cuda cache
         torch.cuda.empty_cache()
         self.generator.eval()
+        self.gen_opt.zero_grad(set_to_none=True)
         with torch.no_grad():
             if self.config['cgan']:
                 if 'disc' in self.config['cgan']:                
@@ -398,9 +402,10 @@ class Teacher(nn.Module):
                     samples, y_i, z = self.generator.sample(self.num_k*10, self.solver)
             else:
                 samples = self.generator.sample(self.num_k*10)
-            logits = self.solver(samples)
-            logits = logits[:,:self.num_k]
-            argsorted_logits=torch.argsort(logits, dim=1, descending=True)
+                logits = self.solver(samples)
+                logits = logits[:,:self.num_k]
+                y_i = logits.argmax(dim=1)
+            argsorted_logits=torch.argsort(y_i, dim=1, descending=True)
             samples=samples[argsorted_logits]
             grid=torchvision.utils.make_grid(samples, nrow=self.num_k, padding=1, normalize=True, range=None, scale_each=False, pad_value=0)
             torchvision.utils.save_image(grid, os.path.join(self.config['model_save_dir'],'generated_images.png'.format(idx)), nrow=1, padding=0, normalize=False, range=None, scale_each=False, pad_value=0)
