@@ -190,6 +190,7 @@ if __name__ == '__main__':
 
         if args.wandb:
             wandb.finish()
+            trainer.learner_config['wandb']=False
 
         # evaluate model
         avg_metrics = trainer.evaluate(avg_metrics)    
