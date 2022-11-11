@@ -2,12 +2,12 @@
 
 # process inputs
 DEFAULTGPU=0
-GPUID=0
+GPUID=2
 
 # benchmark settings
-DATE=AAAI2023
+DATE=ISCF_pseudoLabel_test
 SPLIT=20
-OUTDIR=outputs/${DATE}-test/DFCIL-fivetask/CIFAR100
+OUTDIR=outputs/${DATE}/DFCIL-fivetask/CIFAR100
 
 ###############################################################
 
@@ -22,8 +22,8 @@ MAXTASK=-1
 
 # hard coded inputs
 REPEAT=3
-SCHEDULE="1 2 3 4"
-PI=2
+SCHEDULE="100 150 200 250"
+PI=10000
 MODELNAME=resnet32
 BS=128
 WD=0.0002

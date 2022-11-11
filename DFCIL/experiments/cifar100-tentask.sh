@@ -6,7 +6,7 @@ DEFAULTGPU=0
 #GPUID=${2:-$DEFAULTDR}
 GPUID=3
 # benchmark settings
-DATE=ISCF_cgan_DIimage
+DATE=ISCF_prototype_recon_c1e2
 SPLIT=10
 OUTDIR=outputs/${DATE}/DFCIL-tentask/CIFAR100
 
@@ -43,6 +43,6 @@ python3 -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPU
     --mu 5e-2 --memory 0 --model_name $MODELNAME --model_type resnet \
     --learner_type datafree --learner_name ISCF \
     --gen_model_name CIFAR_GEN --gen_model_type generator \
-    --beta 1 --power_iters $PI --deep_inv_params 1e-3 5e1 1e-3 1e3 1 \
+    --beta 1 --power_iters $PI --deep_inv_params 1e-3 5e1 1e-3 1e2 1 \
     --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/iscf \
-    --sp_mu 100 --weq_mu 1 --cgan
+    --sp_mu 100 --weq_mu 1 --prototype

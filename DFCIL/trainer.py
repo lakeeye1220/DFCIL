@@ -8,7 +8,6 @@ from torch.utils.data import DataLoader
 import learners
 
 class Trainer:
-
     def __init__(self, args, seed, metric_keys, save_keys):
 
         # process inputs
@@ -151,7 +150,12 @@ class Trainer:
                         'adversarial':args.adversarial,
                         'confusion':args.confusion,
                         'reparam':args.reparam,
-                        'diag':args.diag
+                        'diag':args.diag,
+                        'ema':args.ema,
+                        'gen_v2':args.generator_ver2,
+                        'hyper_norm':args.hyper_norm,
+                        'largeMarginLoss':args.largeMarginLoss,
+                        'prototype':args.prototype
                         }
         self.learner_type, self.learner_name = args.learner_type, args.learner_name
         self.learner = learners.__dict__[self.learner_type].__dict__[self.learner_name](self.learner_config)
@@ -185,6 +189,11 @@ class Trainer:
         if not os.path.exists(visualize_class_path): os.makedirs(visualize_class_path)
         visualize_class_path2=os.path.join(self.log_dir,'accuracy and total images per class')
         if not os.path.exists(visualize_class_path2): os.makedirs(visualize_class_path2)
+
+        pseudolabel_path= os.path.join(self.log_dir,'pseudo_label')
+        if not os.path.exists(pseudolabel_path): os.makedirs(pseudolabel_path)
+
+        
 
 
         # for each task
@@ -243,6 +252,7 @@ class Trainer:
             self.learner.save_model(model_save_dir)
             self.learner.visualize_weight(visualize_path, self.current_t_index)
             self.learner.visualize_confusion_matrix(test_loader,visualize_cm_path, self.current_t_index)
+            self.learner.save_pseudo_label(test_loader,pseudolabel_path,self.current_t_index)
             #if self.learner_config['lastbs_img']:
             self.learner.plot_per_class_accuracy(train_loader, self.train_dataset, test_loader, self.test_dataset, 100, visualize_class_path, self.current_t_index, None,device = 'cuda')
             #else: #false - total image plot
