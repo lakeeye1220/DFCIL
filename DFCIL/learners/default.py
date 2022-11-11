@@ -9,6 +9,9 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 import tensorflow as tf
+from pytorch_metric_learning import losses
+import csv
+
 class NormalNN(nn.Module):
     """
     consider citing the benchmarking environment this was built on top of
@@ -92,6 +95,15 @@ class NormalNN(nn.Module):
         #plt.colorbar()
         plt.savefig(os.path.join(file_path,'{}task_confusion_mat.pdf'.format(task_num)),bbox_inches='tight')
         plt.close()
+
+    def save_pseudo_label(self,val_loader,file_path,task_num):
+        target_ul_list,target_ul_pl_list,target_ul_confidence_list =self.validation(val_loader,pseudo_label=True)
+        with open(file_path+"/"+str(task_num)+"_th_target_confidence.csv",'w') as f:
+            headers=["target","pseudo label","max prob"]
+            writer = csv.writer(f)
+            writer.writerow(headers)
+            writer.writerows(zip(target_ul_list,target_ul_pl_list,target_ul_confidence_list))
+
 
     def visualize_weight(self,file_path,task_num):
         #plot the L1-weight norm per each task 
@@ -318,9 +330,16 @@ class NormalNN(nn.Module):
         except:
             return None
 
-    def criterion(self, logits, targets, data_weights):
+    def criterion(self,logits, targets, data_weights):
         # calculate the LCE and FT losses with data_weighting
         loss_supervised = (self.criterion_fn(logits, targets.long()) * data_weights).mean()
+        return loss_supervised 
+
+    def LMS_criterion(self, num_classes, logits, targets, data_weights):
+        # calculate the LCE and FT losses with data_weighting
+        #loss_supervised = (self.criterion_fn(logits, targets.long()) * data_weights).mean()
+        criteria = losses.LargeMarginSoftmaxLoss(num_classes=num_classes,embedding_size=logits.shape[1],margin=4,scale=1)
+        loss_supervised = criteria(logits,targets)
         return loss_supervised 
 
     def update_model(self, inputs, targets, target_scores = None, dw_force = None, kd_index = None):
@@ -344,7 +363,7 @@ class NormalNN(nn.Module):
         self.optimizer.step()
         return total_loss.detach(), logits
 
-    def validation(self, dataloader, model=None, task_in = None,  verbal = True, confusion_mat=False):
+    def validation(self, dataloader, model=None, task_in = None,  verbal = True, confusion_mat=False,pseudo_label=False):
         #evaluation the model performance, print the top-1 accuracy per each task
         if model is None:
             model = self.model
@@ -382,16 +401,30 @@ class NormalNN(nn.Module):
             if confusion_mat:
                 y_true.append(target.detach().cpu())
                 y_pred.append(output.argmax(dim=1).detach().cpu())
-        model.train(orig_mode)
+
+
+            if pseudo_label:
+                if i == 0:
+                    soft_pseudo_label = torch.softmax(output.detach() / 1.0, dim=-1)
+                    max_probs, hard_pseudo_label = torch.max(soft_pseudo_label, dim=-1)
+                    target_ul_list = target.tolist()
+                    target_ul_pl_list = hard_pseudo_label.tolist()
+                    target_ul_confidence_list = max_probs.tolist()
 
         if confusion_mat:
             y_true=torch.cat(y_true, dim=0)
             y_pred=torch.cat(y_pred, dim=0)
             cm = tf.math.confusion_matrix(y_true, y_pred)
             return cm
+
+        if pseudo_label:
+            return target_ul_list,target_ul_pl_list,target_ul_confidence_list
+
         if verbal:
             self.log(' * Val Acc {acc.avg:.3f}, Total time {time:.2f}'
                     .format(acc=acc, time=batch_timer.toc()))
+
+        
         return acc.avg
 
     ##########################################

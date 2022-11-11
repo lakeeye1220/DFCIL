@@ -11,6 +11,8 @@ import copy
 from torch.optim import Adam
 from learners.sp import SP
 import numpy as np
+from torch_ema import ExponentialMovingAverage
+from ema_pytorch import EMA
 
 
 class ISCF(NormalNN):
@@ -22,10 +24,11 @@ class ISCF(NormalNN):
         self.device = 'cuda' if self.gpu else 'cpu'
         self.power_iters = self.config['power_iters']
         self.deep_inv_params = self.config['deep_inv_params']
-        self.kd_criterion = nn.MSELoss(reduction="none")
+        self.mse_criterion = nn.MSELoss(reduction="none")
         self.dataset=self.config['dataset']
         self.fakegt_idx = self.config['fakegt_idx']
         self.acc_fakegt_idx = self.config['acc_fakegt_idx']
+        self.prototype = []
 
         #reparameterization
         if self.config['reparam']:
@@ -41,15 +44,31 @@ class ISCF(NormalNN):
         if self.config['reparam']:
             #params = list(self.v)+list(self.m)
             self.generator_optimizer = Adam(params=self.generator.parameters(), lr=self.deep_inv_params[0])
-            self.reparam_optimizer = Adam(params=[self.m]+[self.v], lr=0.01)
+            self.reparam_optimizer = Adam(params=[self.m]+[self.v], lr=0.001)
         else:
             self.generator_optimizer = Adam(params = self.generator.parameters(),lr=self.deep_inv_params[0])
         self.beta = self.config['beta']
+
+        if self.config['ema']:
+            #self.ema_model = ExponentialMovingAverage(self.model.parameters(),decay=0.995,use_num_updates=True) #use_num_updates option True로 줘야하는지 말아야하는지, 또 ema는 learning rate가 작아야 좋은게 아닌지
+            #self.ema_model.to('cuda')
+          
+            self.ema_model =EMA(self.model,beta = 0.9999,              # exponential moving average factor
+                update_after_step = 100,    # only after this number of .update() calls will it start updating
+                update_every = 10,          # how often to actually update, to save on compute (updates every 10th .update() call)
+                )
+            print("define the ema model!")
+
+            self.ema_model.to('cuda')
+
+        else:
+            self.ema_model=None
 
 
         # repeat call for generator network
         if self.gpu:
             self.cuda_gen()
+
         
         #SPKD loss definition
         self.md_criterion = SP(reduction='none')
@@ -76,6 +95,7 @@ class ISCF(NormalNN):
                 self.log('Optimizer is reset!')
                 self.init_optimizer()
 
+
             # data weighting
             self.data_weighting(train_dataset)
 
@@ -85,7 +105,7 @@ class ISCF(NormalNN):
                 self.validation(val_loader)
 
             #compute the 5 losses of ISCF frameworks - LCE(local CE) + SPKD(Intermediate K.D) + LKD(Logit KD) + FT(Finetuning) + WEQ(Weight equalizer)
-            losses = [AverageMeter() for i in range(6)]
+            losses = [AverageMeter() for i in range(7)]
             acc = AverageMeter()
             accg = AverageMeter()
             batch_time = AverageMeter()
@@ -101,7 +121,6 @@ class ISCF(NormalNN):
                     self.log('LR:', param_group['lr'])
                 batch_timer.tic()
                 for i, (x, y, task)  in enumerate(train_loader):
-
                     # verify in train mode
                     self.model.train()
 
@@ -145,7 +164,7 @@ class ISCF(NormalNN):
                         dw_cls = None
 
                     # model update
-                    loss, loss_class, loss_kd,loss_middle,loss_balancing, loss_diag, output= self.update_model(x_com, y_com, x_replay,y_hat_com, dw_force = dw_cls, kd_index = np.arange(len(x), len(x_com)))
+                    loss, loss_class, loss_kd,loss_middle,loss_balancing, loss_diag,emb_reg, output= self.update_model(x_com, y_com, x_replay,y_hat_com, dw_force = dw_cls, kd_index = np.arange(len(x), len(x_com)))
 
                     # measure elapsed time
                     batch_time.update(batch_timer.toc()) 
@@ -160,11 +179,12 @@ class ISCF(NormalNN):
                     losses[3].update(loss_middle,  y_com.size(0))
                     losses[4].update(loss_balancing,  y_com.size(0))
                     losses[5].update(loss_diag, y_com.size(0))
+                    losses[6].update(emb_reg,y_com.size(0))
                     batch_timer.tic()
 
                 # eval update
                 self.log('Epoch:{epoch:.0f}/{total:.0f}'.format(epoch=self.epoch+1,total=self.config['schedule'][-1]))
-                self.log(' * Loss {loss.avg:.4e} | CE Loss {lossb.avg:.4e} | KD Loss {lossc.avg:.4e} | SP Loss {lossd.avg:.4e} | WEQ Reg {losse.avg:.4e} | Diag Loss {lossf.avg:.4e}'.format(loss=losses[0],lossb=losses[1],lossc=losses[2],lossd=losses[3],losse=losses[4], lossf =  losses[5]))
+                self.log(' * Loss {loss.avg:.4e} | CE Loss {lossb.avg:.4e} | KD Loss {lossc.avg:.4e} | SP Loss {lossd.avg:.4e} | WEQ Reg {losse.avg:.4e} | Diag Loss {lossf.avg:.4e} | Emb Reg {lossg.avg:.4e}'.format(loss=losses[0],lossb=losses[1],lossc=losses[2],lossd=losses[3],losse=losses[4], lossf = losses[5], lossg=losses[6]))
                 self.log(' * Train Acc {acc.avg:.3f} | Train Acc Gen {accg.avg:.3f}'.format(acc=acc,accg=accg))
 
                 # Evaluate the performance of current task
@@ -172,7 +192,7 @@ class ISCF(NormalNN):
                     self.validation(val_loader)
 
                 # reset
-                losses = [AverageMeter() for i in range(6)]
+                losses = [AverageMeter() for i in range(7)]
                 acc = AverageMeter()
                 accg = AverageMeter()
 
@@ -185,20 +205,55 @@ class ISCF(NormalNN):
         # for eval
         if self.previous_teacher is not None:
             self.previous_previous_teacher = self.previous_teacher
+
+        if self.config['ema'] and self.previous_teacher is not None:
+            #self.model.train()
+            #self.ema_model.copy_to(self.model.parameters())
+            #self.ema_model.copy_to(self.previous_teacher.solver.parameters())
+            print("self.model now contains the averaged weights!! and EMA model accuracy is below : ")
+            self.previous_teacher.solver = copy.deepcopy(self.ema_model)
+            self.validation(val_loader)
+
+                #self.ema_accuracies.append(ema_accuracy.item())
+                #print('Before EMA accuracy:%.3f, After EMA accuracy:%.3f' % (accuracy,ema_accuracy))
+                #pd.DataFrame(self.ema_accuracies).to_csv(self.filename+"/EMA_top1_acc.csv",header=False,index=False)
         
         # define the new model - current model 
         if (self.out_dim == self.valid_out_dim) or (self.dataset== 'TinyImageNet100' and self.valid_out_dim==100): need_train = False
-        
+        #prototype 넘겨주는 부분
+        if self.config['prototype']:
+            self.prototype.clear()
+            for i, (x, y, task)  in enumerate(train_loader):
+                if self.gpu:
+                    x =x.cuda()
+                    y = y.cuda()
+                # data replay
+                if self.inversion_replay:
+                    x_replay, y_replay, y_replay_hat = self.sample(self.previous_teacher, self.batch_size, self.device)
+                else:
+                    x_replay = None
+                    y_replay = None
+                    #print("len of self.fake_idx datafree.py 98", len(self.fakegt_idx))
+
+                if self.inversion_replay:
+                    x_com, y_com = self.combine_data(((x, y),(x_replay, y_replay)))
+                else:
+                    x_com, y_com = x, y
+                with torch.no_grad():
+                    logits_x_com=self.model(x_com)
+                    #print("logits x com shape : ",logits_x_com.shape)
+                self.prototype.append(logits_x_com)
+
         if self.previous_teacher is not None:
             if self.config['reparam']:
-                self.previous_teacher = Teacher(solver=copy.deepcopy(self.model), previous_teacher = self.previous_previous_teacher, generator=self.generator,gen_opt = self.generator_optimizer,disc_opt=self.optimizer, reparam_opt = self.reparam_optimizer,m = self.m, v = self.v, img_shape = (-1, train_dataset.nch,train_dataset.im_size, train_dataset.im_size), iters = self.power_iters, deep_inv_params = self.deep_inv_params, class_idx = np.arange(self.valid_out_dim), train = need_train, config = self.config) 
+                self.previous_teacher = Teacher(solver=copy.deepcopy(self.model), previous_teacher = self.previous_previous_teacher, generator=self.generator,gen_opt = self.generator_optimizer,proto=self.prototype,disc_opt=self.optimizer, reparam_opt = self.reparam_optimizer,m = self.m, v = self.v, img_shape = (-1, train_dataset.nch,train_dataset.im_size, train_dataset.im_size), iters = self.power_iters, deep_inv_params = self.deep_inv_params, class_idx = np.arange(self.valid_out_dim), train = need_train, config = self.config) 
             else:
-                self.previous_teacher = Teacher(solver=copy.deepcopy(self.model), previous_teacher =self.previous_previous_teacher, generator=self.generator, gen_opt = self.generator_optimizer,disc_opt=self.optimizer,reparam_opt = None ,m=None,v=None, img_shape = (-1, train_dataset.nch,train_dataset.im_size, train_dataset.im_size), iters = self.power_iters, deep_inv_params = self.deep_inv_params, class_idx = np.arange(self.valid_out_dim), train = need_train, config = self.config)
+                self.previous_teacher = Teacher(solver=copy.deepcopy(self.model), previous_teacher =self.previous_previous_teacher, generator=self.generator, gen_opt = self.generator_optimizer,proto=self.prototype,disc_opt=self.optimizer,reparam_opt = None ,m=None,v=None, img_shape = (-1, train_dataset.nch,train_dataset.im_size, train_dataset.im_size), iters = self.power_iters, deep_inv_params = self.deep_inv_params, class_idx = np.arange(self.valid_out_dim), train = need_train, config = self.config)
         else:
             if self.config['reparam']:
-                self.previous_teacher = Teacher(solver=copy.deepcopy(self.model), previous_teacher = None, generator=self.generator,gen_opt = self.generator_optimizer,disc_opt=self.optimizer, reparam_opt = self.reparam_optimizer,m = self.m, v = self.v, img_shape = (-1, train_dataset.nch,train_dataset.im_size, train_dataset.im_size), iters = self.power_iters, deep_inv_params = self.deep_inv_params, class_idx = np.arange(self.valid_out_dim), train = need_train, config = self.config) 
+                self.previous_teacher = Teacher(solver=copy.deepcopy(self.model), previous_teacher = None, generator=self.generator,gen_opt = self.generator_optimizer,proto=self.prototype,disc_opt=self.optimizer, reparam_opt = self.reparam_optimizer,m = self.m, v = self.v, img_shape = (-1, train_dataset.nch,train_dataset.im_size, train_dataset.im_size), iters = self.power_iters, deep_inv_params = self.deep_inv_params, class_idx = np.arange(self.valid_out_dim), train = need_train, config = self.config) 
             else:
-                self.previous_teacher = Teacher(solver=copy.deepcopy(self.model), previous_teacher = None, generator=self.generator,gen_opt = self.generator_optimizer,disc_opt=self.optimizer, reparam_opt = None,m=None,v=None ,img_shape = (-1, train_dataset.nch,train_dataset.im_size, train_dataset.im_size), iters = self.power_iters, deep_inv_params = self.deep_inv_params, class_idx = np.arange(self.valid_out_dim), train = need_train, config = self.config)
+                self.previous_teacher = Teacher(solver=copy.deepcopy(self.model), previous_teacher = None, generator=self.generator,gen_opt = self.generator_optimizer,proto=self.prototype,disc_opt=self.optimizer, reparam_opt = None,m=None,v=None ,img_shape = (-1, train_dataset.nch,train_dataset.im_size, train_dataset.im_size), iters = self.power_iters, deep_inv_params = self.deep_inv_params, class_idx = np.arange(self.valid_out_dim), train = need_train, config = self.config)
         
         self.sample(self.previous_teacher, self.batch_size, self.device, return_scores=False)
         if len(self.config['gpuid']) > 1:
@@ -251,9 +306,6 @@ class ISCF(NormalNN):
 
             self.m = torch.from_numpy(m_np).cuda()
             self.v = torch.from_numpy(v_np).cuda()
-
-            #print("datafree.py 249.py self. m ",self.m)
-            #print("datafree.py 249 self. v ",self.v)
 
     def create_generator(self):
         cfg = self.config
@@ -319,23 +371,39 @@ class ISCF(NormalNN):
         else:
             logits = self.model.last(logits_pen)
 
+        if self.config['largeMarginLoss']:
+            logits_lms = self.model(inputs, lsm=True,target=targets)
+            print("logits_lms shape :",logits_lms.shape)
+
         #print("datafree.py 259 logits : ",logits)
         
         # classification 
         class_idx = np.arange(self.batch_size) # real
         if self.inversion_replay:
             # local classification - LCE loss: the logit dimension is from last_valid_out_dim to valid_out_dim
-            loss_class = self.criterion(logits[class_idx,self.last_valid_out_dim:self.valid_out_dim], (targets[class_idx]-self.last_valid_out_dim).long(), dw_cls[class_idx]) 
+            if self.config['largeMarginLoss']:
+                loss_class = self.criterion(logits_lms[class_idx,self.last_valid_out_dim:self.valid_out_dim], (targets[class_idx]-self.last_valid_out_dim).long(), dw_cls[class_idx]) 
+            else:
+                loss_class = self.criterion(logits[class_idx,self.last_valid_out_dim:self.valid_out_dim], (targets[class_idx]-self.last_valid_out_dim).long(), dw_cls[class_idx]) 
             #print("index logits : ",logits[class_idx,self.last_valid_out_dim:self.valid_out_dim])
             # ft classification  
             if len(self.config['gpuid']) > 1:
-                loss_class += self.criterion(self.model.module.last(logits_pen.detach()), targets.long(), dw_cls)
+                if self.config['largeMarginLoss']:
+                    loss_class += self.criterion(logits_lms[:self.last_valid_out_dim], targets.long(), dw_cls) 
+                else:
+                    loss_class += self.criterion(self.model.module.last(logits_pen.detach()), targets.long(), dw_cls)
             else:
-                loss_class += self.criterion(self.model.last(logits_pen.detach()), targets.long(), dw_cls)
+                if self.config['largeMarginLoss']:
+                    loss_class += self.criterion(logits_lms[:self.last_valid_out_dim], targets.long(), dw_cls)
+                else:
+                    loss_class += self.criterion(self.model.last(logits_pen.detach()), targets.long(), dw_cls)
         
         #first task local classification when we do not use any synthetic data     
         else:
-            loss_class = self.criterion(logits[class_idx], targets[class_idx].long(), dw_cls[class_idx])
+            if self.config['largeMarginLoss']:
+                loss_class = self.criterion(logits_lms[class_idx], targets[class_idx].long(), dw_cls[class_idx])
+            else:
+                loss_class = self.criterion(logits[class_idx], targets[class_idx].long(), dw_cls[class_idx])
 
 
         #SPKD - Intermediate KD
@@ -389,6 +457,26 @@ class ISCF(NormalNN):
         else:
             weq_regularizer=torch.zeros((1,),requires_grad=True).cuda()
 
+        if self.config['hyper_norm']:
+            cur_weights=self.model.last.weight[:self.valid_out_dim,:]
+            cur_bias=self.model.last.bias[:self.valid_out_dim].unsqueeze(-1)
+            #cur_params=torch.cat([cur_weights,cur_bias],dim=1)
+            #l2_norm = torch.norm(cur_weights,2)
+            #emb_regularizer = self.mse_criterion(l2_norm,torch.ones((1,)).to(self.device)) + l2_norm
+            emb_regularizer = self.mse_criterion(torch.sum(F.normalize(cur_weights,p=2,dim=1)),torch.ones((1,)).to(self.device))*0.001
+            #embedding = self.model.forward(inputs,pen=True)
+            #emb_regularizer = self.mse_criterion(torch.sum(F.normalize(embedding,p=2,dim=1)),torch.ones((1,)).to(self.device)) *0.0001
+            #if self.previous_teacher:
+                #emb_regularizer = self.mse_criterion(torch.sum(F.normalize(prev_embedding,p=2,dim=1)),torch.ones((1,)).to(self.device))+self.mse_criterion(torch.sum(F.normalize(embedding,p=2,dim=1)),torch.ones((1,)).to(self.device)) *0.001 #current embedding 1 
+                #with torch.no_grad():
+                #    prev_embedding = self.previous_teacher.solver.forward(inputs,pen=True)
+                #emb_regularizer += nn.CosineEmbeddingLoss()(F.normalize(embedding,p=2,dim=1),F.normalize(prev_embedding,p=2,dim=1),torch.ones(inputs.shape[0]).to(self.device))
+            #print("embed reg:",emb_regularizer)
+        else:
+            emb_regularizer=torch.zeros((1,),requires_grad=True).cuda()
+            
+            
+
         if self.config['diag']:
             if self.previous_teacher:
                 with torch.no_grad():
@@ -414,11 +502,14 @@ class ISCF(NormalNN):
 
 
         # calculate the 5 losses - LCE + SPKD + LKD + FT + WEQ, loss_class include the LCE and FT losses
-        total_loss = loss_class + loss_lkd + loss_sp + weq_regularizer + 0.5*loss_diag
+        total_loss = loss_class + loss_lkd + loss_sp + weq_regularizer + emb_regularizer
 
         self.optimizer.zero_grad()
         total_loss.backward()
         # step
         self.optimizer.step()
-
-        return total_loss.detach(), loss_class.detach(), loss_lkd.detach(), loss_sp.detach(), weq_regularizer.detach(), loss_diag.detach(),logits
+        if self.config['ema'] and self.previous_teacher is not None:
+            #self.ema_model.update(self.model.parameters())
+            #self.ema_model.update(self.model.parameters())
+            self.ema_model.update()
+        return total_loss.detach(), loss_class.detach(), loss_lkd.detach(), loss_sp.detach(), weq_regularizer.detach(), loss_diag.detach(), emb_regularizer.detach(),logits

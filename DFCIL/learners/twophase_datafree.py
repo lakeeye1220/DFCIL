@@ -337,7 +337,7 @@ class ISCF(NormalNN):
         # forward pass
         logits_pen,m = self.model.forward(inputs, middle=True)
 
-        if len(self.config['gpuid']) > 1:
+        if len(self.config['gpuid']) > 1: 
             logits = self.model.module.last(logits_pen)
         else:
             logits = self.model.last(logits_pen)

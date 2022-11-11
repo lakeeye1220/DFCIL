@@ -6,9 +6,10 @@ from tqdm import tqdm
 import torchvision.utils as vutils
 import os
 import collections
+import random
 
 class Teacher(nn.Module):
-    def __init__(self, solver,previous_teacher, generator,  gen_opt, disc_opt, reparam_opt, m,v,img_shape, iters, class_idx, deep_inv_params, train = True, config=None):
+    def __init__(self, solver,previous_teacher, generator,  gen_opt, proto, disc_opt, reparam_opt, m,v,img_shape, iters, class_idx, deep_inv_params, train = True, config=None):
         super().__init__()
         self.solver = solver #classifier
         self.previous_teacher = previous_teacher
@@ -39,16 +40,19 @@ class Teacher(nn.Module):
         self.class_idx = list(class_idx)
         self.num_k = len(self.class_idx)
 
-        self.first_time = train
+        self.first_time = True
 
         # set up criteria for optimization
         self.criterion = nn.CrossEntropyLoss()
+        self.kl_loss = nn.KLDivLoss(reduction='batchmean').cuda()
         self.bceloss = nn.BCELoss()
         self.mse_loss = nn.MSELoss(reduction="none").cuda()
         self.smoothing = Gaussiansmoothing(3,5,1).cuda()
 
         # Create hooks for feature statistics catching
         loss_r_feature_layers = []
+        self.proto = proto
+        
         if self.config['cgan']:
             for module in self.solver.modules():
                 #if isinstance(module, nn.BatchNorm2d) or isinstance(module, nn.BatchNorm1d):
@@ -70,19 +74,19 @@ class Teacher(nn.Module):
         # train if first time
         self.generator.train()
         if self.first_time:
-            self.first_time = False
             if self.config['cgan']:
                 self.original_get_images(bs=size, epochs=self.iters, idx=-1)
-            else:
+            if self.config['prototype']:
                 self.get_images(bs=size, epochs=self.iters, idx=-1)
-        
+            if self.config['gen_v2']:
+                self.get_images(bs=size,epochs=self.iters,)
+            self.first_time = False
         # sample images
         self.generator.eval()
         with torch.no_grad():
             if self.config['cgan']:
                 x_i,_ = self.generator.sample(self.config, self.num_k, size)
             else:
-                
                 x_i = self.generator.sample(self.config, self.num_k, size,self.v,self.m)
                 
         # get predicted logit-scores
@@ -141,7 +145,6 @@ class Teacher(nn.Module):
         if self.config['reparam']:
             self.reparam_opt.state = collections.defaultdict(dict)
 
-
         self.generator.train()
 
         for epoch in tqdm(range(epochs)):
@@ -149,10 +152,22 @@ class Teacher(nn.Module):
             #if self.config['cgan']==False:
             #    inputs = self.generator.sample(self.config,self.num_k,bs)
                 #inputs,_,_ = self.generator.sample(self.config,self.num_k,bs)
-            if self.config['cgan']:
-                inputs,fake_targets = self.generator.sample(self.config,self.num_k,bs)
+            if self.previous_teacher is None:
+                if self.config['cgan']:
+                    inputs,fake_targets = self.generator.sample(self.config,self.num_k,bs)
+                else:
+                    inputs = self.generator.sample(self.config,self.num_k,bs,self.v,self.m)
+                    #print("first time : ",inputs.shape)
             else:
-                inputs = self.generator.sample(self.config,self.num_k,bs,self.v,self.m)
+                if self.config['cgan']:
+                    inputs,fake_targets = self.generator.sample(self.config,self.num_k,bs)
+                elif self.config['prototype']:
+                    inputs = self.generator.sample(self.config,self.num_k,bs*2,self.v,self.m)
+                    #print("second upper time : ",inputs.shape)
+                else:
+                    inputs = self.generator.sample(self.config,self.num_k,bs,self.v,self.m)
+                #print("inputs : ",inputs.shape)
+            
 
             # forward with images
             self.gen_opt.zero_grad()
@@ -161,12 +176,31 @@ class Teacher(nn.Module):
             self.solver.zero_grad()
 
             # data conetent loss
+            if self.config['gen_v2']:
+                #_,gm = self.solver.forward(inputs,middle=True)[:,:self.num_k]
+                _,gm = self.solver.forward(inputs,middle=True)
+                g3,g2,g1=gm
+                inputs = self.generator.sample(self.config,self.num_k,bs,None,None,g1,g2,g3)
+
             outputs = self.solver(inputs)[:,:self.num_k]
             loss = self.criterion(outputs / self.content_temp, torch.argmax(outputs, dim=1)) * self.content_weight
+            loss_cnt = loss.detach()
 
-            # class balance
+                
             softmax_o_T = F.softmax(outputs, dim = 1).mean(dim = 0)
-            loss += (1.0 + (softmax_o_T * torch.log(softmax_o_T) / math.log(self.num_k)).sum())
+            loss_ie= (1.0 + (softmax_o_T * torch.log(softmax_o_T) / math.log(self.num_k)).sum())
+            loss = loss+ loss_ie
+
+            if self.config['prototype']:
+                proto_logits = random.choice(self.proto)
+                #M = 0.5*(outputs+proto_logits[:,:self.num_k].detach())
+                #print("outputs.shape ",outputs.shape)
+                #print("proto type logit : ",proto_logits.shape)
+                #loss_recon = 0.5*self.kl_loss(torch.log(outputs),M)+0.5*self.kl_loss(proto_logits[:,:self.num_k],M)
+                loss_recon = self.kl_loss(torch.log(F.softmax(outputs,dim=1)),F.softmax(proto_logits[:,:self.num_k],dim=1).detach())
+                loss = loss + loss_recon
+                if epoch % 1000==0:
+                    print("reconstruction loss", loss_recon.item())
 
             # Statstics alignment
             for mod in self.loss_r_feature_layers: 
@@ -232,9 +266,9 @@ class Teacher(nn.Module):
                     #print('Train Epoch: {} [{}/{} ({:.0f}%)]\tD_Loss: {:.6f}'.format(
                     #    epoch, epoch, epochs, 100*float(epoch)/float(epochs), loss_D.item()))
             
-            #if epoch % 1 == 0:
-                #print('Train Epoch: {} [{}/{} ({:.0f}%)]\tG_Loss: {:.6f} S_loss: {:.6f}'.format(
-                    #epoch, epoch, epochs, 100*float(epoch)/float(epochs), loss_G.item(), loss_D.item()))
+            if epoch % 1000 == 0:
+                print('Train Epoch: {} [{}/{} ({:.0f}%)]\ttotal_Loss: {:.4f} cnt_loss: {:.4f} ie_Loss: {:.4f} bn_loss: {:.4f} smooth_Loss: {:.4f}'.format(
+                    epoch, epoch, epochs, 100*float(epoch)/float(epochs), loss.item(), loss_cnt, loss_ie.item(), loss_distr.item(), loss_var.item()))
                 #print('Train Epoch: {} [{}/{} ({:.0f}%)]\tG_Loss: {:.6f}'.format(
                     #epoch, epoch, epochs, 100*float(epoch)/float(epochs), loss_G.item()))
                 
