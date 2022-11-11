@@ -295,9 +295,9 @@ class CLATENTGenerator(nn.Module):
 
 def CIFAR_GEN(bn = False, cgan=None, num_classes=10):
     if cgan is not None and 'disc' in cgan:
-        return CDISCGenerator(zdim=64, in_channel=3, img_sz=32, num_classes=num_classes)
+        return CDISCGenerator(zdim=1000, in_channel=3, img_sz=32, num_classes=num_classes)
     elif cgan == 'latent':
-        return CLATENTGenerator(zdim=64, in_channel=3, img_sz=32, num_classes=num_classes)
+        return CLATENTGenerator(zdim=1000, in_channel=3, img_sz=32, num_classes=num_classes)
     else:
         return Generator(zdim=1000, in_channel=3, img_sz=32)
 

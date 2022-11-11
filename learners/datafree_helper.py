@@ -350,8 +350,9 @@ class Teacher(nn.Module):
                 cnt_loss = self.criterion(outputs / self.content_temp, y_i) * self.content_weight
 
                 # uniform loss
-                softmax_o_T = F.softmax(outputs, dim = 1).mean(dim = 0)
-                uni_loss= (1.0 + (softmax_o_T * torch.log(softmax_o_T) / math.log(self.num_k)).sum())
+                # softmax_o_T = F.softmax(outputs, dim = 1).mean(dim = 0)
+                # uni_loss= (1.0 + (softmax_o_T * torch.log(softmax_o_T) / math.log(self.num_k)).sum())
+                uni_loss=torch.tensor(0,dtype=torch.float).view(-1).to(cnt_loss.device)
 
                 # Statstics alignment
                 loss_distrs=0
@@ -371,7 +372,7 @@ class Teacher(nn.Module):
                 loss.backward()
                 self.gen_opt.step()
                 if epoch % 1000 == 0:
-                    print(f"Epoch: {epoch:5d}, Loss: {loss:.3e} CNT_loss: {cnt_loss:.3e} (CE: {ce_loss:.3e}) MSE_loss: {loss_mse:.3e} loss_distrs: {loss_distrs:.3e} loss_uni: {uni_loss:3e}")
+                    print(f"Epoch: {epoch:5d}, Loss: {loss:.3e} CNT_loss: {cnt_loss:.3e} (CE: {ce_loss:.3e}) MSE_loss: {loss_mse:.3e} loss_distrs: {loss_distrs:.3e}")
                     save_images.append(inputs.detach().cpu())
             loss_list.append(loss.item())
             cnt_loss_list.append(cnt_loss.item())
@@ -405,7 +406,7 @@ class Teacher(nn.Module):
                 logits = self.solver(samples)
                 logits = logits[:,:self.num_k]
                 y_i = logits.argmax(dim=1)
-            argsorted_logits=torch.argsort(y_i, dim=1, descending=True)
+            argsorted_logits=torch.argsort(y_i, dim=0, descending=True)
             samples=samples[argsorted_logits]
             grid=torchvision.utils.make_grid(samples, nrow=self.num_k, padding=1, normalize=True, range=None, scale_each=False, pad_value=0)
             torchvision.utils.save_image(grid, os.path.join(self.config['model_save_dir'],'generated_images.png'.format(idx)), nrow=1, padding=0, normalize=False, range=None, scale_each=False, pad_value=0)

@@ -23,6 +23,7 @@ class DeepInversionGenBN(NormalNN):
         self.power_iters = self.config['power_iters']
         self.deep_inv_params = self.config['deep_inv_params']
         self.kd_criterion = nn.MSELoss(reduction="none")
+        self.pass_watch=False
 
         # gen parameters
         self.generator = self.create_generator()
@@ -257,7 +258,8 @@ class DeepInversionGenBN(NormalNN):
             generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']](bn=False,cgan=self.config['cgan'],num_classes=cfg['num_classes'])#,num_classes=self.valid_out_dim) # update 하면 self.valid_out_dim
         else:
             generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']]()
-        if self.config['wandb']:
+        if self.config['wandb'] and not self.pass_watch:
+            self.pass_watch=True
             wandb.watch(generator, log='all', idx=2)
         return generator
 
