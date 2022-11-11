@@ -82,6 +82,11 @@ def create_args():
     parser.add_argument('--confusion', default=False, action='store_true',help ='confusion matrix loss')
     parser.add_argument('--reparam', default=False, action='store_true',help ='latent reparameterization')
     parser.add_argument('--diag',default=False, action='store_true',help ='BalowTwins loss diagonal term')
+    parser.add_argument('--ema',default=False,action='store_true',help='old model = ema model')
+    parser.add_argument('--generator_ver2', default=False, action='store_true',help='feature map based')
+    parser.add_argument('--hyper_norm',default=False,action='store_true',help='feature map based')
+    parser.add_argument('--largeMarginLoss',default=False,action='store_true',help='large margin cross entropy loss')
+    parser.add_argument('--prototype',default=False,action='store_true',help='left the prototype for synthesizing the images')
     return parser
 
 def get_args(argv):
@@ -170,7 +175,6 @@ if __name__ == '__main__':
 
         # set up a trainer
         trainer = Trainer(args, seed, metric_keys, save_keys)
-
         # init total run metrics storage
         max_task = trainer.max_task
         if r == 0: 
