@@ -160,8 +160,6 @@ class Teacher(nn.Module):
                 train_iter = iter(self.train_dataloader)
             except:
                 raise NotImplementedError("No train dataloader provided for cgan")
-            if self.config['wandb']:
-                wandb.watch(self.discriminator, log='all', idx=2)
 
         def plot_save(lists, name):
             plt.plot(lists)

@@ -34,9 +34,6 @@ class DeepInversionGenBN(NormalNN):
         if self.gpu:
             self.cuda_gen()
         
-        if self.config['wandb']:
-            wandb.watch(self.model, log='all',idx=0)
-        
     ##########################################
     #           MODEL TRAINING               #
     ##########################################
@@ -57,7 +54,7 @@ class DeepInversionGenBN(NormalNN):
         need_train = True
         if not self.overwrite:
             try:
-                self.load_model(model_save_dir)
+                self.load_model(model_save_dir,num_class=self.config['first_split_size']+task_num*self.config['other_split_size'])
                 need_train = False
             except:
                 pass
@@ -242,7 +239,13 @@ class DeepInversionGenBN(NormalNN):
         torch.save(model_state, filename + 'generator.pth')
         super(DeepInversionGenBN, self).save_model(filename)
 
-    def load_model(self, filename):
+    def load_model(self, filename, num_class=None):
+        if num_class is not None:
+            cfg = self.config
+            if cfg['cgan'] is not None:
+                self.generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']](bn=False,cgan=self.config['cgan'],num_classes=num_class)#,num_classes=self.valid_out_dim) # update 하면 self.valid_out_dim
+            else:
+                self.generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']]()
         self.generator.load_state_dict(torch.load(filename + 'generator.pth'))
         if self.gpu:
             self.generator = self.generator.cuda()
@@ -258,9 +261,6 @@ class DeepInversionGenBN(NormalNN):
             generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']](bn=False,cgan=self.config['cgan'],num_classes=cfg['num_classes'])#,num_classes=self.valid_out_dim) # update 하면 self.valid_out_dim
         else:
             generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']]()
-        if self.config['wandb'] and not self.pass_watch:
-            self.pass_watch=True
-            wandb.watch(generator, log='all', idx=2)
         return generator
 
     def print_model(self):
