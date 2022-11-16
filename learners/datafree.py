@@ -11,6 +11,7 @@ from .default import NormalNN, weight_reset, accumulate_acc, loss_fn_kd
 import copy
 from torch.optim import Adam
 import wandb 
+from learners.wgan.resnet import Generator
 
 class DeepInversionGenBN(NormalNN):
 
@@ -27,7 +28,19 @@ class DeepInversionGenBN(NormalNN):
 
         # gen parameters
         self.generator = self.create_generator()
-        self.generator_optimizer = Adam(params=self.generator.parameters(), lr=self.deep_inv_params[0])
+        self.cuda_gen()
+        if self.config['cgan']=='wgan':
+            beta1=0.5
+            beta2=0.999
+            betas_g = [beta1, beta2]
+            eps_ = 1e-6
+            self.generator_optimizer = torch.optim.Adam(params=self.generator.parameters(),
+                                                                lr=0.0002,
+                                                                betas=betas_g,
+                                                                weight_decay=0.0,
+                                                                eps=eps_)
+        else:
+            self.generator_optimizer = Adam(params=self.generator.parameters(), lr=self.deep_inv_params[0])
         self.beta = self.config['beta']
 
         # repeat call for generator network
@@ -42,10 +55,12 @@ class DeepInversionGenBN(NormalNN):
         self.config['model_save_dir']=model_save_dir
         self.pre_steps()
         # cgan generator training
-        if self.config['cgan'] and 'disc' in self.config['cgan'] and self.inversion_replay:
+        if self.config['cgan'] and ('disc' in self.config['cgan'] or 'wgan'==self.config['cgan']) and self.inversion_replay:
             if self.config['cgan']=='disc':
                 self.previous_teacher.train_dataloader = train_loader
             elif self.config['cgan']=='disc_test':
+                self.previous_teacher.train_dataloader = val_loader
+            elif self.config['cgan']=='wgan':
                 self.previous_teacher.train_dataloader = val_loader
             self.sample(self.previous_teacher, self.batch_size, self.device, return_scores=False)
 
@@ -163,7 +178,18 @@ class DeepInversionGenBN(NormalNN):
         # reset generator
         if self.config['init_generator']:
             self.reset_generator()
-            self.generator_optimizer = Adam(params=self.generator.parameters(), lr=self.deep_inv_params[0])
+            if self.config['cgan'] != 'wgan':
+                self.generator_optimizer = Adam(params=self.generator.parameters(), lr=self.deep_inv_params[0])
+            else:
+                beta1=0.5
+                beta2=0.999
+                betas_g = [beta1, beta2]
+                eps_ = 1e-6
+                self.generator_optimizer = torch.optim.Adam(params=self.generator.parameters(),
+                                                                lr=0.0002,
+                                                                betas=betas_g,
+                                                                weight_decay=0.0,
+                                                                eps=eps_)
         
         # new teacher
         if (self.out_dim == self.valid_out_dim): need_train = False
@@ -244,6 +270,8 @@ class DeepInversionGenBN(NormalNN):
             cfg = self.config
             if cfg['cgan'] is not None:
                 self.generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']](bn=False,cgan=self.config['cgan'],num_classes=num_class)#,num_classes=self.valid_out_dim) # update 하면 self.valid_out_dim
+            elif cfg['cgan']=='wgan':
+                self.generator = Generator(128,"N/A",32,64,False,["N/A"],"W/O",self.config['num_classes'],"ortho","N/A",False)
             else:
                 self.generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']]()
         self.generator.load_state_dict(torch.load(filename + 'generator.pth'))
@@ -258,7 +286,10 @@ class DeepInversionGenBN(NormalNN):
 
         # Define the backbone (MLP, LeNet, VGG, ResNet ... etc) of model
         if cfg['cgan'] is not None:
-            generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']](bn=False,cgan=self.config['cgan'],num_classes=cfg['num_classes'])#,num_classes=self.valid_out_dim) # update 하면 self.valid_out_dim
+            if cfg['cgan']!='wgan':
+                generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']](bn=False,cgan=self.config['cgan'],num_classes=cfg['num_classes'])#,num_classes=self.valid_out_dim) # update 하면 self.valid_out_dim
+            else:
+                generator = Generator(128,"N/A",32,64,False,["N/A"],"W/O",cfg['num_classes'],"ortho","N/A",False)
         else:
             generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']]()
         return generator
@@ -269,8 +300,11 @@ class DeepInversionGenBN(NormalNN):
         self.log('#parameter of generator:', self.count_parameter_gen())
     
     def reset_model(self):
-        super(DeepInversionGenBN, self).reset_model()
-        self.reset_generator()
+        if self.config['cgan']!='wgan':
+            super(DeepInversionGenBN, self).reset_model()
+            self.reset_generator()
+        else:
+            self.generator = Generator(128,"N/A",32,64,False,["N/A"],"W/O",self.config['num_classes'],"ortho","N/A",False).cuda()
 
     def reset_generator(self):
         self.generator.apply(weight_reset)

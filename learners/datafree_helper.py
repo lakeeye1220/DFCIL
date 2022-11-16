@@ -7,6 +7,7 @@ import torchvision
 import os
 import wandb
 import matplotlib.pyplot as plt
+from learners.wgan.utils import cal_grad_penalty, d_vanilla, g_vanilla, sample_normal
 from utils.metric import AverageMeter
 """
 Some content adapted from the following:
@@ -86,6 +87,11 @@ class Teacher(nn.Module):
                     x_i, y_i = self.generator.sample(size)
                 elif 'latent' == self.config['cgan']:
                     x_i, y_i, z = self.generator.sample(size, self.solver)
+                elif 'wgan' == self.config['cgan']:
+                    zs = sample_normal(batch_size=size, z_dim=128, truncation_factor=-1, device='cuda')
+                    y_fake = torch.randint(low=0, high=self.num_k, size=(size, ), dtype=torch.long, device='cuda')
+                    x_i = self.generator(zs,y_fake)
+                    y_i= torch.argmax(self.solver(x_i)[:,:self.num_k],dim=1)
             else:
                 x_i = self.generator.sample(size)
 
@@ -160,6 +166,19 @@ class Teacher(nn.Module):
                 train_iter = iter(self.train_dataloader)
             except:
                 raise NotImplementedError("No train dataloader provided for cgan")
+        elif self.config['cgan'] and 'wgan' == self.config['cgan']:
+            from learners.wgan.resnet import Discriminator
+            self.discriminator = Discriminator(32,64,False,False,["N/A"],"W/O","W/O","N/A",False,self.num_k,"ortho","N/A",False)
+            self.discriminator.cuda()
+            beta1=0.5
+            beta2=0.999
+            betas_g = [beta1, beta2]
+            eps_ = 1e-6
+            self.discriminator_opt = torch.optim.Adam(params=self.discriminator.parameters(),
+                                                            lr=0.0002,
+                                                            betas=betas_g,
+                                                            weight_decay=0.0,
+                                                            eps=eps_)
 
         def plot_save(lists, name):
             plt.plot(lists)
@@ -321,7 +340,7 @@ class Teacher(nn.Module):
             plot_save(var_loss_list, 'var_loss')
             plot_save(disc_loss_list, 'discriminator_loss')
 
-        if self.config['cgan']=='latent':
+        elif self.config['cgan']=='latent':
             # loss list
             loss_list = []
             cnt_loss_list=[]
@@ -372,17 +391,69 @@ class Teacher(nn.Module):
                 if epoch % 1000 == 0:
                     print(f"Epoch: {epoch:5d}, Loss: {loss:.3e} CNT_loss: {cnt_loss:.3e} (CE: {ce_loss:.3e}) MSE_loss: {loss_mse:.3e} loss_distrs: {loss_distrs:.3e}")
                     save_images.append(inputs.detach().cpu())
-            loss_list.append(loss.item())
-            cnt_loss_list.append(cnt_loss.item())
-            mse_loss_list.append(loss_mse.item())
-            uni_loss_list.append(uni_loss.item())
-            distrs_loss_list.append(loss_distrs.item())
+                loss_list.append(loss.item())
+                cnt_loss_list.append(cnt_loss.item())
+                mse_loss_list.append(loss_mse.item())
+                uni_loss_list.append(uni_loss.item())
+                distrs_loss_list.append(loss_distrs.item())
             plot_save(loss_list, 'generator_loss')
             plot_save(cnt_loss_list, 'cnt_loss')
             plot_save(mse_loss_list, 'mse_loss')
             plot_save(uni_loss_list, 'uni_loss')
             plot_save(distrs_loss_list, 'distrs_loss')
             
+        elif self.config['cgan']=='wgan':
+            self.generator.train()
+            self.discriminator.train()
+            for epoch in tqdm(range(epochs)):
+                # get real image
+                try:
+                    (real_images, real_labels, task) = next(train_iter)
+                except:
+                    train_iter = iter(self.train_dataloader)
+                    (real_images, real_labels, task) = next(train_iter)
+                real_images = real_images.cuda()
+                real_labels = real_labels.cuda()
+                # train discriminator
+                self.generator.eval()
+                self.discriminator.train()
+                for step_index in range(5): # d_updates_per_step
+                    # train discriminator
+                    self.discriminator_opt.zero_grad()
+                    zs = sample_normal(batch_size=bs, z_dim=128, truncation_factor=-1, device='cuda')
+                    y_fake = torch.randint(low=0, high=self.num_k, size=(bs, ), dtype=torch.long, device='cuda')
+                    fake_images = self.generator(zs,y_fake)
+                    real_dict = self.discriminator(real_images, real_labels)
+                    with torch.no_grad():
+                        fake_labels= torch.argmax(self.solver(fake_images)[:,:self.num_k],dim=1)
+                    fake_dict = self.discriminator(fake_images, fake_labels, adc_fake=False)
+                    dis_loss = d_vanilla(real_dict["adv_output"], fake_dict["adv_output"], DDP=self.DDP)
+
+                    gp_loss = cal_grad_penalty(real_images=real_images,
+                                                        real_labels=real_labels,
+                                                        fake_images=fake_images,
+                                                        discriminator=self.discriminator,
+                                                        device='cuda')
+                    dis_acml_loss=dis_loss + 1.0 * gp_loss
+                    dis_acml_loss.backward()
+                    self.discriminator_opt.step()
+                
+                # train generator
+                self.gen_opt.zero_grad()
+                self.discriminator.eval()
+                self.generator.train()
+                
+                zs = sample_normal(batch_size=bs, z_dim=128, truncation_factor=-1, device='cuda')
+                y_fake = torch.randint(low=0, high=self.num_k, size=(bs, ), dtype=torch.long, device='cuda')
+                fake_images = self.generator(zs,y_fake)
+                fake_labels= torch.argmax(self.solver(fake_images)[:,:self.num_k],dim=1)
+                fake_dict = self.discriminator(fake_images, fake_labels)
+                gen_acml_loss = g_vanilla(fake_dict["adv_output"], DDP=self.DDP)
+                gen_acml_loss.backward()
+                self.gen_opt.step()
+                if epoch % 1000 == 0:
+                    print(f"Epoch: {epoch:5d}, G Loss: {gen_acml_loss:.3e} D gp_loss:{gp_loss:.3e} D Loss: {dis_loss:.3e}")
+                    save_images.append(fake_images.detach().cpu())
 
         # save images
         save_images = torch.cat(save_images, dim=0)
@@ -399,6 +470,12 @@ class Teacher(nn.Module):
                     samples, y_i = self.generator.sample(self.num_k*10)
                 elif self.config['cgan']=='latent':
                     samples, y_i, z = self.generator.sample(self.num_k*10, self.solver)
+                elif self.config['cgan']=='wgan':
+                    zs = sample_normal(batch_size=self.num_k*10, z_dim=128, truncation_factor=-1, device='cuda')
+                    y_fake = torch.randint(low=0, high=self.num_k, size=(self.num_k*10, ), dtype=torch.long, device='cuda')
+                    samples = self.generator(zs,y_fake)
+                    y_i= torch.argmax(self.solver(samples)[:,:self.num_k],dim=1)
+                    
             else:
                 samples = self.generator.sample(self.num_k*10)
                 logits = self.solver(samples)
