@@ -72,7 +72,7 @@ class DeepInversionGenBN(NormalNN):
                                         download_flag=False, transform=self.config['train_transform'], 
                                         seed=0, validation=False)
                 test_dataset.load_dataset(task_num, train=False)
-                test_loader  = DataLoader(test_dataset, batch_size=64, shuffle=False, drop_last=False, num_workers=self.workers)
+                test_loader  = DataLoader(test_dataset, batch_size=64, shuffle=False, drop_last=False, num_workers=2)
                 self.previous_teacher.train_dataloader = test_loader
             self.sample(self.previous_teacher, self.batch_size, self.device, return_scores=False)
 
@@ -336,8 +336,8 @@ class DeepInversionGenBN(NormalNN):
 
 class DeepInversionLWF(DeepInversionGenBN):
 
-    def __init__(self, learner_config):
-        super(DeepInversionLWF, self).__init__(learner_config)
+    def __init__(self, learner_config,dataset_class=None):
+        super(DeepInversionLWF, self).__init__(learner_config,dataset_class)
         self.kl_loss = nn.KLDivLoss(reduction='batchmean').cuda()
 
     def update_model(self, inputs, targets, target_scores = None, dw_force = None, kd_index = None):
@@ -370,8 +370,8 @@ class DeepInversionLWF(DeepInversionGenBN):
 
 class AlwaysBeDreaming(DeepInversionGenBN):
 
-    def __init__(self, learner_config):
-        super(AlwaysBeDreaming, self).__init__(learner_config)
+    def __init__(self, learner_config,dataset_class=None):
+        super(AlwaysBeDreaming, self).__init__(learner_config,dataset_class)
         self.kl_loss = nn.KLDivLoss(reduction='batchmean').cuda()
         if self.config['supcon']:
             self.supcon_loss = SupConLoss(temperature=self.config['supcon_temp']).cuda()
