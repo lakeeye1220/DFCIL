@@ -7,7 +7,7 @@ import torchvision
 import os
 import wandb
 import matplotlib.pyplot as plt
-from learners.wgan.utils import cal_grad_penalty, d_vanilla, g_vanilla, sample_normal
+from learners.wgan.utils import cal_grad_penalty, d_wasserstein, g_wasserstein, sample_normal
 from utils.metric import AverageMeter
 """
 Some content adapted from the following:
@@ -428,14 +428,14 @@ class Teacher(nn.Module):
                     with torch.no_grad():
                         fake_labels= torch.argmax(self.solver(fake_images)[:,:self.num_k],dim=1)
                     fake_dict = self.discriminator(fake_images, fake_labels, adc_fake=False)
-                    dis_loss = d_vanilla(real_dict["adv_output"], fake_dict["adv_output"])
+                    dis_loss = d_wasserstein(real_dict["adv_output"], fake_dict["adv_output"])
 
                     gp_loss = cal_grad_penalty(real_images=real_images,
                                                         real_labels=real_labels,
                                                         fake_images=fake_images,
                                                         discriminator=self.discriminator,
                                                         device='cuda')
-                    dis_acml_loss=dis_loss + 1.0 * gp_loss
+                    dis_acml_loss=dis_loss + 10.0 * gp_loss
                     dis_acml_loss.backward()
                     self.discriminator_opt.step()
                 
@@ -449,7 +449,7 @@ class Teacher(nn.Module):
                 fake_images = self.generator(zs,y_fake)
                 fake_labels= torch.argmax(self.solver(fake_images)[:,:self.num_k],dim=1)
                 fake_dict = self.discriminator(fake_images, fake_labels)
-                gen_acml_loss = g_vanilla(fake_dict["adv_output"])
+                gen_acml_loss = g_wasserstein(fake_dict["adv_output"])
                 gen_acml_loss.backward()
                 self.gen_opt.step()
                 if epoch % 1000 == 0:

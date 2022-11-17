@@ -49,3 +49,10 @@ def d_vanilla(d_logit_real, d_logit_fake, DDP=None):
     return d_loss
 def g_vanilla(d_logit_fake, DDP=None):
     return torch.mean(F.softplus(-d_logit_fake))
+
+
+def g_wasserstein(d_logit_fake, DDP=None):
+    return -torch.mean(d_logit_fake)
+
+def d_wasserstein(d_logit_real, d_logit_fake, DDP=None):
+        return torch.mean(d_logit_fake - d_logit_real)
