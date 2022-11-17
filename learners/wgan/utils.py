@@ -1,6 +1,7 @@
 import torch
 from torch import autograd
 from scipy.stats import truncnorm
+import torch.nn.functional as F
 
 def truncated_normal(size, threshold=1.):
     values = truncnorm.rvs(-threshold, threshold, size=size)
@@ -26,7 +27,7 @@ def cal_deriv(inputs, outputs, device):
                         only_inputs=True)[0]
     return grads
 
-    
+
 def cal_grad_penalty(real_images, real_labels, fake_images, discriminator, device):
     batch_size, c, h, w = real_images.shape
     alpha = torch.rand(batch_size, 1)
@@ -43,8 +44,8 @@ def cal_grad_penalty(real_images, real_labels, fake_images, discriminator, devic
 
     grad_penalty = ((grads.norm(2, dim=1) - 1)**2).mean() + interpolates[:,0,0,0].mean()*0
     return grad_penalty
-def d_vanilla(d_logit_real, d_logit_fake, DDP):
+def d_vanilla(d_logit_real, d_logit_fake, DDP=None):
     d_loss = torch.mean(F.softplus(-d_logit_real)) + torch.mean(F.softplus(d_logit_fake))
     return d_loss
-def g_vanilla(d_logit_fake, DDP):
+def g_vanilla(d_logit_fake, DDP=None):
     return torch.mean(F.softplus(-d_logit_fake))

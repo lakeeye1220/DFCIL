@@ -427,7 +427,7 @@ class Teacher(nn.Module):
                     with torch.no_grad():
                         fake_labels= torch.argmax(self.solver(fake_images)[:,:self.num_k],dim=1)
                     fake_dict = self.discriminator(fake_images, fake_labels, adc_fake=False)
-                    dis_loss = d_vanilla(real_dict["adv_output"], fake_dict["adv_output"], DDP=self.DDP)
+                    dis_loss = d_vanilla(real_dict["adv_output"], fake_dict["adv_output"])
 
                     gp_loss = cal_grad_penalty(real_images=real_images,
                                                         real_labels=real_labels,
@@ -448,7 +448,7 @@ class Teacher(nn.Module):
                 fake_images = self.generator(zs,y_fake)
                 fake_labels= torch.argmax(self.solver(fake_images)[:,:self.num_k],dim=1)
                 fake_dict = self.discriminator(fake_images, fake_labels)
-                gen_acml_loss = g_vanilla(fake_dict["adv_output"], DDP=self.DDP)
+                gen_acml_loss = g_vanilla(fake_dict["adv_output"])
                 gen_acml_loss.backward()
                 self.gen_opt.step()
                 if epoch % 1000 == 0:

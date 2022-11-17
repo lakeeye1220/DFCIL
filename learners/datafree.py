@@ -268,10 +268,10 @@ class DeepInversionGenBN(NormalNN):
     def load_model(self, filename, num_class=None):
         if num_class is not None:
             cfg = self.config
-            if cfg['cgan'] is not None:
-                self.generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']](bn=False,cgan=self.config['cgan'],num_classes=num_class)#,num_classes=self.valid_out_dim) # update 하면 self.valid_out_dim
-            elif cfg['cgan']=='wgan':
+            if cfg['cgan']=='wgan':
                 self.generator = Generator(128,"N/A",32,64,False,["N/A"],"W/O",self.config['num_classes'],"ortho","N/A",False)
+            elif cfg['cgan'] is not None:
+                self.generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']](bn=False,cgan=self.config['cgan'],num_classes=num_class)#,num_classes=self.valid_out_dim) # update 하면 self.valid_out_dim
             else:
                 self.generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']]()
         self.generator.load_state_dict(torch.load(filename + 'generator.pth'))
