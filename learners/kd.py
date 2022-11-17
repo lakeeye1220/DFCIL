@@ -10,8 +10,8 @@ import copy
 
 class LWF(NormalNN):
 
-    def __init__(self, learner_config):
-        super(LWF, self).__init__(learner_config)
+    def __init__(self, learner_config, dataset_class=None):
+        super(LWF, self).__init__(learner_config,dataset_class)
         self.previous_teacher = None
         self.replay = False
         self.past_tasks = []

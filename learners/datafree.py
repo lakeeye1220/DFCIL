@@ -12,11 +12,12 @@ import copy
 from torch.optim import Adam
 import wandb 
 from learners.wgan.resnet import Generator
+from torch.utils.data.dataloader import DataLoader
 
 class DeepInversionGenBN(NormalNN):
 
-    def __init__(self, learner_config):
-        super(DeepInversionGenBN, self).__init__(learner_config)
+    def __init__(self, learner_config, dataset_class = None):
+        super(DeepInversionGenBN, self).__init__(learner_config, dataset_class)
         self.inversion_replay = False
         self.previous_teacher = None
         self.dw = self.config['DW']
@@ -25,6 +26,7 @@ class DeepInversionGenBN(NormalNN):
         self.deep_inv_params = self.config['deep_inv_params']
         self.kd_criterion = nn.MSELoss(reduction="none")
         self.pass_watch=False
+        self.dataset_class=dataset_class
 
         # gen parameters
         self.generator = self.create_generator()
@@ -59,9 +61,19 @@ class DeepInversionGenBN(NormalNN):
             if self.config['cgan']=='disc':
                 self.previous_teacher.train_dataloader = train_loader
             elif self.config['cgan']=='disc_test':
-                self.previous_teacher.train_dataloader = val_loader
+                test_dataset  = self.dataset_class(self.config['dataroot_dataset'], train=False, tasks=self.tasks,
+                                        download_flag=False, transform=self.config['train_transform'], 
+                                        seed=self.seed, validation=False)
+                test_dataset.load_dataset(task_num, train=False)
+                test_loader  = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False, drop_last=False, num_workers=self.workers)
+                self.previous_teacher.train_dataloader = test_loader
             elif self.config['cgan']=='wgan':
-                self.previous_teacher.train_dataloader = val_loader
+                test_dataset  = self.dataset_class(self.config['dataroot_dataset'], train=False, tasks=self.tasks,
+                                        download_flag=False, transform=self.config['train_transform'], 
+                                        seed=0, validation=False)
+                test_dataset.load_dataset(task_num, train=False)
+                test_loader  = DataLoader(test_dataset, batch_size=64, shuffle=False, drop_last=False, num_workers=self.workers)
+                self.previous_teacher.train_dataloader = test_loader
             self.sample(self.previous_teacher, self.batch_size, self.device, return_scores=False)
 
 

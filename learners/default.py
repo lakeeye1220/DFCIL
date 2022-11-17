@@ -22,7 +22,7 @@ class NormalNN(nn.Module):
         year={2018}
     }
     """
-    def __init__(self, learner_config):
+    def __init__(self, learner_config, dataset_class=None):
 
         super(NormalNN, self).__init__()
         self.log = print

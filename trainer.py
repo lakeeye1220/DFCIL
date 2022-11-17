@@ -154,9 +154,11 @@ class Trainer:
                         'supcon':args.supcon,
                         'supcon_temp':args.supcon_temp,
                         'supcon_weight':args.supcon_weight,
+                        'dataroot_dataset':args.dataroot_dataset,
+                        'train_transform':train_transform,
                         }
         self.learner_type, self.learner_name = args.learner_type, args.learner_name
-        self.learner = learners.__dict__[self.learner_type].__dict__[self.learner_name](self.learner_config)
+        self.learner = learners.__dict__[self.learner_type].__dict__[self.learner_name](self.learner_config,Dataset)
         self.learner.print_model()
 
     def task_eval(self, t_index, local=False):

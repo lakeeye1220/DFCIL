@@ -10,8 +10,9 @@ import numpy as np
 
 class Generative_Replay(NormalNN):
 
-    def __init__(self, learner_config):
-        super(Generative_Replay, self).__init__(learner_config)
+    def __init__(self, learner_config, dataset_class=None):
+
+        super(Generative_Replay, self).__init__(learner_config,dataset_class)
         self.generator = self.create_generator()
         self.generative_replay = False
         self.previous_scholar = None

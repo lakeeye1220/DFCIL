@@ -405,6 +405,7 @@ class Teacher(nn.Module):
         elif self.config['cgan']=='wgan':
             self.generator.train()
             self.discriminator.train()
+            wgan_bsz=64
             for epoch in tqdm(range(epochs)):
                 # get real image
                 try:
@@ -420,8 +421,8 @@ class Teacher(nn.Module):
                 for step_index in range(5): # d_updates_per_step
                     # train discriminator
                     self.discriminator_opt.zero_grad()
-                    zs = sample_normal(batch_size=bs, z_dim=128, truncation_factor=-1, device='cuda')
-                    y_fake = torch.randint(low=0, high=self.num_k, size=(bs, ), dtype=torch.long, device='cuda')
+                    zs = sample_normal(batch_size=wgan_bsz, z_dim=128, truncation_factor=-1, device='cuda')
+                    y_fake = torch.randint(low=0, high=self.num_k, size=(wgan_bsz, ), dtype=torch.long, device='cuda')
                     fake_images = self.generator(zs,y_fake)
                     real_dict = self.discriminator(real_images, real_labels)
                     with torch.no_grad():
@@ -443,8 +444,8 @@ class Teacher(nn.Module):
                 self.discriminator.eval()
                 self.generator.train()
                 
-                zs = sample_normal(batch_size=bs, z_dim=128, truncation_factor=-1, device='cuda')
-                y_fake = torch.randint(low=0, high=self.num_k, size=(bs, ), dtype=torch.long, device='cuda')
+                zs = sample_normal(batch_size=wgan_bsz, z_dim=128, truncation_factor=-1, device='cuda')
+                y_fake = torch.randint(low=0, high=self.num_k, size=(wgan_bsz, ), dtype=torch.long, device='cuda')
                 fake_images = self.generator(zs,y_fake)
                 fake_labels= torch.argmax(self.solver(fake_images)[:,:self.num_k],dim=1)
                 fake_dict = self.discriminator(fake_images, fake_labels)
