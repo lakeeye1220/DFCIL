@@ -72,7 +72,7 @@ class DeepInversionGenBN(NormalNN):
                                         download_flag=False, transform=self.config['train_transform'], 
                                         seed=0, validation=False)
                 test_dataset.load_dataset(task_num, train=False)
-                test_loader  = DataLoader(test_dataset, batch_size=64, shuffle=False, drop_last=False, num_workers=2)
+                test_loader  = DataLoader(test_dataset, batch_size=64, shuffle=False, drop_last=True, num_workers=2)
                 self.previous_teacher.train_dataloader = test_loader
             self.sample(self.previous_teacher, self.batch_size, self.device, return_scores=False)
 
