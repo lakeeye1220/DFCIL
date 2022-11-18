@@ -408,17 +408,17 @@ class Teacher(nn.Module):
             wgan_bsz=64
             for epoch in tqdm(range(epochs)):
                 # get real image
-                try:
-                    (real_images, real_labels, task) = next(train_iter)
-                except:
-                    train_iter = iter(self.train_dataloader)
-                    (real_images, real_labels, task) = next(train_iter)
-                real_images = real_images.cuda()
-                real_labels = real_labels.cuda()
                 # train discriminator
                 self.generator.eval()
                 self.discriminator.train()
                 for step_index in range(5): # d_updates_per_step
+                    try:
+                        (real_images, real_labels, task) = next(train_iter)
+                    except:
+                        train_iter = iter(self.train_dataloader)
+                        (real_images, real_labels, task) = next(train_iter)
+                    real_images = real_images.cuda()
+                    real_labels = real_labels.cuda()
                     # train discriminator
                     self.discriminator_opt.zero_grad()
                     zs = sample_normal(batch_size=wgan_bsz, z_dim=128, truncation_factor=-1, device='cuda')
