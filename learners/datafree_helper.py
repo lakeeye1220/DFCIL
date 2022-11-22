@@ -409,8 +409,10 @@ class Teacher(nn.Module):
             for epoch in tqdm(range(epochs)):
                 # get real image
                 # train discriminator
-                self.generator.eval()
-                self.discriminator.train()
+                for p in self.discriminator.parameters():
+                    p.requires_grad = True
+                for p in self.generator.parameters():
+                    p.requires_grad = False
                 for step_index in range(5): # d_updates_per_step
                     try:
                         (real_images, real_labels, task) = next(train_iter)
@@ -439,10 +441,12 @@ class Teacher(nn.Module):
                     dis_acml_loss.backward()
                     self.discriminator_opt.step()
                 
+                for p in self.discriminator.parameters():
+                    p.requires_grad = False
+                for p in self.generator.parameters():
+                    p.requires_grad = True
                 # train generator
                 self.gen_opt.zero_grad()
-                self.discriminator.eval()
-                self.generator.train()
                 
                 zs = sample_normal(batch_size=wgan_bsz, z_dim=128, truncation_factor=-1, device='cuda')
                 y_fake = torch.randint(low=0, high=self.num_k, size=(wgan_bsz, ), dtype=torch.long, device='cuda')
@@ -452,9 +456,11 @@ class Teacher(nn.Module):
                 gen_acml_loss = g_wasserstein(fake_dict["adv_output"])
                 gen_acml_loss.backward()
                 self.gen_opt.step()
+                self.discriminator_opt.zero_grad()
                 if epoch % 1000 == 0:
                     print(f"Epoch: {epoch:5d}, G Loss: {gen_acml_loss:.3e} D gp_loss:{gp_loss:.3e} D Loss: {dis_loss:.3e}")
                     save_images.append(fake_images.detach().cpu())
+                
 
         # save images
         save_images = torch.cat(save_images, dim=0)
@@ -464,6 +470,7 @@ class Teacher(nn.Module):
         # clear cuda cache
         torch.cuda.empty_cache()
         self.generator.eval()
+        self.discriminator.eval()
         self.gen_opt.zero_grad(set_to_none=True)
         with torch.no_grad():
             if self.config['cgan']:
