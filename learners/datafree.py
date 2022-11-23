@@ -62,14 +62,14 @@ class DeepInversionGenBN(NormalNN):
                 self.previous_teacher.train_dataloader = train_loader
             elif self.config['cgan']=='disc_test':
                 test_dataset  = self.dataset_class(self.config['dataroot_dataset'], train=False, tasks=self.tasks,
-                                        download_flag=False, transform=self.config['train_transform'], 
+                                        download_flag=False, transform=self.config['gan_transform'], 
                                         seed=self.seed, validation=False)
                 test_dataset.load_dataset(task_num, train=False)
                 test_loader  = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False, drop_last=False, num_workers=self.workers)
                 self.previous_teacher.train_dataloader = test_loader
             elif self.config['cgan']=='wgan':
                 test_dataset  = self.dataset_class(self.config['dataroot_dataset'], train=False, tasks=self.tasks,
-                                        download_flag=False, transform=self.config['train_transform'], 
+                                        download_flag=False, transform=self.config['gan_transform'], 
                                         seed=0, validation=False)
                 test_dataset.load_dataset(task_num, train=False)
                 test_loader  = DataLoader(test_dataset, batch_size=64, shuffle=False, drop_last=True, num_workers=2)

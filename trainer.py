@@ -105,6 +105,7 @@ class Trainer:
 
         # datasets and dataloaders
         train_transform = dataloaders.utils.get_transform(dataset=args.dataset, phase='train', aug=args.train_aug, dgr=self.dgr)
+        gan_transform = dataloaders.utils.get_transform(dataset=args.dataset, phase='train', aug=args.train_aug, dgr=self.dgr, gan=True)
         test_transform  = dataloaders.utils.get_transform(dataset=args.dataset, phase='test', aug=args.train_aug, dgr=self.dgr)
         self.train_dataset = Dataset(args.dataroot_dataset, train=True, tasks=self.tasks,
                             download_flag=True, transform=train_transform, 
@@ -155,7 +156,7 @@ class Trainer:
                         'supcon_temp':args.supcon_temp,
                         'supcon_weight':args.supcon_weight,
                         'dataroot_dataset':args.dataroot_dataset,
-                        'train_transform':train_transform,
+                        'train_transform':gan_transform,
                         }
         self.learner_type, self.learner_name = args.learner_type, args.learner_name
         self.learner = learners.__dict__[self.learner_type].__dict__[self.learner_name](self.learner_config,Dataset)

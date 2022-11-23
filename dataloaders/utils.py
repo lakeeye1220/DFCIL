@@ -26,7 +26,7 @@ dataset_stats = {
                 }
 
 # transformations
-def get_transform(dataset='cifar100', phase='test', aug=True, dgr=False):
+def get_transform(dataset='cifar100', phase='test', aug=True, dgr=False,gan=False):
     transform_list = []
 
     # get crop size
@@ -45,19 +45,36 @@ def get_transform(dataset='cifar100', phase='test', aug=True, dgr=False):
 
     if phase == 'train' and aug:
         if dataset in ['ImageNet','ImageNet50']:
-            transform_list.extend([
-                transforms.RandomResizedCrop(224),
-                transforms.RandomHorizontalFlip(),
-                transforms.ToTensor(),
-                transforms.Normalize(dset_mean, dset_std),
-                                ])
+            if gan:
+                transform_list.extend([
+                    transforms.Resize(256),
+                    transforms.CenterCrop(224),
+                    transforms.RandomHorizontalFlip(),
+                    transforms.ToTensor(),
+                    transforms.Normalize(dset_mean, dset_std),
+                                    ])
+            else:
+                transform_list.extend([
+                    transforms.RandomResizedCrop(224),
+                    transforms.RandomHorizontalFlip(),
+                    transforms.ToTensor(),
+                    transforms.Normalize(dset_mean, dset_std),
+                                    ])
         else:
-            transform_list.extend([
-                transforms.ColorJitter(brightness=63/255, contrast=0.8),
-                transforms.RandomHorizontalFlip(p=0.5),
-                transforms.RandomCrop(crop_size, padding=4),
-                transforms.ToTensor(),
-                transforms.Normalize(dset_mean, dset_std),
+            if gan:
+                transform_list.extend([
+                    transforms.ColorJitter(brightness=63/255, contrast=0.8),
+                    transforms.RandomHorizontalFlip(p=0.5),
+                    transforms.ToTensor(),
+                    transforms.Normalize(dset_mean, dset_std),
+                                ])
+            else:
+                transform_list.extend([
+                    transforms.ColorJitter(brightness=63/255, contrast=0.8),
+                    transforms.RandomHorizontalFlip(p=0.5),
+                    transforms.RandomCrop(crop_size, padding=4),
+                    transforms.ToTensor(),
+                    transforms.Normalize(dset_mean, dset_std),
                                 ])
     else:
         if dataset in ['ImageNet','ImageNet50']:
