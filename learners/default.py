@@ -6,6 +6,13 @@ import models
 from utils.metric import accuracy, AverageMeter, Timer
 import copy
 import numpy as np
+import os
+import matplotlib.pyplot as plt
+import tensorflow as tf
+from pytorch_metric_learning import losses
+import csv
+import random
+import torchvision.utils as vutils
 
 class NormalNN(nn.Module):
     """
@@ -31,6 +38,8 @@ class NormalNN(nn.Module):
         self.previous_teacher = None
         self.tasks = learner_config['tasks']
         self.top_k = learner_config['top_k']
+        self.fakegt_idx = learner_config['fakegt_idx']
+        self.gt_idx = learner_config['gt_idx']
 
         # replay memory parameters
         self.memory_size = self.config['memory']
@@ -71,6 +80,121 @@ class NormalNN(nn.Module):
     ##########################################
     #           MODEL TRAINING               #
     ##########################################
+
+    def visualize_confusion_matrix(self, val_loader,file_path,task_num):
+        #plot the confusion matrix
+        cm=self.validation(val_loader,confusion_mat=True)
+        if cm.shape[0]<self.config['num_classes']:
+            cm1 = np.pad(cm, ((0,self.config['num_classes']-cm.shape[0]),(0,self.config['num_classes']-cm.shape[1])), 'constant', constant_values=0)
+        else:
+            cm1=cm
+        
+        np.save(os.path.join(file_path,'{}task_confusion_matrix.npy'.format(task_num)), cm1)
+        plt.figure()
+        plt.matshow(cm1, cmap='viridis')
+        #plt.colorbar()
+        plt.savefig(os.path.join(file_path,'{}task_confusion_mat.pdf'.format(task_num)),bbox_inches='tight')
+        plt.close()
+
+    def save_pseudo_label(self,val_loader,file_path,task_num):
+        target_ul_list,target_ul_pl_list,target_ul_confidence_list =self.validation(val_loader,pseudo_label=True)
+        with open(file_path+"/"+str(task_num)+"_th_target_confidence.csv",'w') as f:
+            headers=["target","pseudo label","max prob"]
+            writer = csv.writer(f)
+            writer.writerow(headers)
+            writer.writerows(zip(target_ul_list,target_ul_pl_list,target_ul_confidence_list))
+
+
+    def visualize_weight(self,file_path,task_num):
+        #plot the L1-weight norm per each task 
+        class_norm=[]
+        if len(self.config['gpuid'])>1:
+            weight=self.model.module.last.weight
+            bias=self.model.module.last.bias.unsqueeze(-1)
+        else:
+            weight=self.model.last.weight
+            bias=self.model.last.bias.unsqueeze(-1)
+        weight=torch.cat((weight,bias),dim=1)
+        for i in range(self.valid_out_dim):
+            class_norm.append(torch.norm(weight[i]).item())
+
+        plt.figure()
+        classes=np.arange(self.valid_out_dim)
+        plt.scatter(classes,class_norm)
+        plt.xlabel('Class Index')
+        plt.ylabel('Weight Norm')
+        plt.xlim(0,weight.shape[0])
+        plt.savefig(os.path.join(file_path,'{}task_class_norm.pdf'.format(task_num)),bbox_inches='tight')
+        np.savetxt(os.path.join(file_path,'{}task_class_norm.csv'.format(task_num)), class_norm, delimiter=",", fmt='%.2f')
+
+
+    def plot_per_class_accuracy(self, trnloader=None, train_data=None,valloader=None, test_data=None, nClasses=100, file_path=None, task_num=0,num_seen=None, device = 'cuda'):
+        fakegt_idx = sum(self.fakegt_idx,[]) #29995
+        #print("self.fake_idx : ",fakegt_idx)
+        gt_idx = sum(self.gt_idx,[]) #100
+        print("real length : ",len(gt_idx),"fake length : ",len(fakegt_idx))
+        subsets = {target: torch.utils.data.Subset(test_data, (np.array(test_data.targets)==target).nonzero()[0]) for target in gt_idx[:self.valid_out_dim]}
+        testloader = {target: torch.utils.data.DataLoader(subset,batch_size=100) for target, subset in subsets.items()}
+        result_dict = {}
+
+        for key in list(testloader.keys()):
+            class_acc = 0.0
+            for idx, (input, target, task) in enumerate(testloader[key]):
+                if self.gpu:
+                    with torch.no_grad():
+                        input = input.cuda()
+                        target = target.cuda()
+                output = self.model.forward(input)[:, :self.valid_out_dim]
+                class_acc += accuracy(output, target,topk=(self.top_k,))
+            result_dict[key] = class_acc
+        #print(result_dict)
+       
+        if num_seen is None:
+            labels = [int(train_data[i][1]) for i in range(len(train_data))] + [i for i in fakegt_idx]
+            labels = np.asarray(labels, dtype=np.int64)
+            print("total lengh of labels : ",labels.shape)
+            num_seen = np.asarray([len(labels[labels==k]) for k in range(self.valid_out_dim)], dtype=np.int64)
+
+        print("num_seen : ",num_seen)
+
+        plt.figure(figsize=(15,4), dpi=64, facecolor='w', edgecolor='k')
+        plt.xticks(list(range(self.config['num_classes'])), [str(i) for i in range(self.config['num_classes'])], rotation=90, fontsize=8);  # Set text labels.
+        plt.title('#images and accuracy per class', fontsize=20)
+        ax1 = plt.gca()    
+        ax2=ax1.twinx()
+        #print("v : ", [v for k,v in result_dict.items()])
+        ax1.bar(list(range(self.config['num_classes'])), [v for k,v in result_dict.items()]+[0]*(self.config['num_classes']-self.valid_out_dim), alpha=0.7, width=1,linewidth=2,color='tab:blue')
+        #for idx,label in enumerate(result_dict):
+        #    print("label : ",result_dict[label])
+        #    ax1.bar(label, result_dict[label], alpha=0.7, width=1,color='tab:blue')
+        ax1.set_ylabel('accuracy', fontsize=16, color='tab:blue')
+        ax1.tick_params(axis='y', labelcolor='tab:blue', labelsize=16)
+
+        ax2.set_ylabel('#images', fontsize=16, color='r')
+        ax2.plot(num_seen, linewidth=4, color='r')
+        ax2.tick_params(axis='y', labelcolor='r', labelsize=16)
+    
+        ax1.legend(prop={'size': 14})
+
+        plt.savefig(os.path.join(file_path,'{}task_imgs_per_class.pdf'.format(task_num)),bbox_inches='tight')
+        np.savetxt(os.path.join(file_path,'{}task_imgs_per_class.csv'.format(task_num)),num_seen, delimiter=",", fmt='%.2f')   
+        #np.savetxt(os.path.join(file_path,'{}task_acc_per_class.csv'.format(task_num)),[v for k,v in result_dict.items()], delimiter=",", fmt='%.2f')   
+        plt.close()
+
+    def visualize_sample(self,file_path,task_num):
+        #fix_pick = int(self.batch_size/self.out_dim)
+        #cls_idx_list = [i for i in range(self.out_dim)]*fix_pick
+        #rand_pick = self.batch_size%self.out_dim
+        #rand_picked_cls = random.sample(range(self.out_dim),rand_pick)
+        #targets = cls_idx_list+rand_picked_cls
+        ##fake_targets = torch.LongTensor(targets).to('cuda')
+        with torch.no_grad():
+            x_i,_ = self.previous_teacher.sample(self.batch_size,'cuda')
+        vutils.save_image(x_i.data.clone(),
+                '{}/generator_{}.png'.format(file_path,task_num),
+                normalize=True, scale_each=True, nrow=10)
+
+
 
     def learn_batch(self, train_loader, train_dataset, model_save_dir, val_loader=None):
         
@@ -191,7 +315,7 @@ class NormalNN(nn.Module):
         self.optimizer.step()
         return total_loss.detach(), logits
 
-    def validation(self, dataloader, model=None, task_in = None,  verbal = True):
+    def validation(self, dataloader, model=None, task_in = None,  verbal = True, confusion_mat=False):
 
         if model is None:
             model = self.model
@@ -200,6 +324,9 @@ class NormalNN(nn.Module):
         batch_timer = Timer()
         acc = AverageMeter()
         batch_timer.tic()
+
+        y_true=[]
+        y_pred=[]
 
         orig_mode = model.training
         model.eval()
@@ -224,12 +351,23 @@ class NormalNN(nn.Module):
                 if len(target) > 1:
                     output = model.forward(input)[:, task_in]
                     acc = accumulate_acc(output, target-task_in[0], task, acc, topk=(self.top_k,))
+
+            if confusion_mat:
+                y_true.append(target.detach().cpu())
+                y_pred.append(output.argmax(dim=1).detach().cpu())
+
+        if confusion_mat:
+            y_true=torch.cat(y_true, dim=0)
+            y_pred=torch.cat(y_pred, dim=0)
+            cm = tf.math.confusion_matrix(y_true, y_pred)
+            return cm
             
         model.train(orig_mode)
 
         if verbal:
             self.log(' * Val Acc {acc.avg:.3f}, Total time {time:.2f}'
                     .format(acc=acc, time=batch_timer.toc()))
+
         return acc.avg
 
 
@@ -239,7 +377,6 @@ class NormalNN(nn.Module):
 
     # data weighting
     def data_weighting(self, dataset, num_seen=None):
-
         if dataset.dw:
             # count number of examples in dataset per class
             self.log('*************************\n\n\n')
@@ -391,7 +528,13 @@ class NormalNN(nn.Module):
         pass
 
 def weight_reset(m):
-    if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
+    if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear) or isinstance(m,nn.BatchNorm2d):
+        #print("reset ! :",m)
+        m.reset_parameters()
+
+def bn_reset(m):
+    if isinstance(m,nn.BatchNorm2d):
+        print("reset ! :",m)
         m.reset_parameters()
 
 def accumulate_acc(output, target, task, meter, topk):

@@ -2,10 +2,10 @@
 
 # process inputs
 DEFAULTGPU=0
-GPUID=${1:-$DEFAULTGPU}
+GPUID=1
 
 # benchmark settings
-DATE=ICCV2021
+DATE=NoCE_reinitG_prototype_ABD_DI_BN3_CE1_PRT3
 SPLIT=20
 OUTDIR=outputs/${DATE}/DFCIL-fivetask/CIFAR100
 
@@ -42,8 +42,8 @@ python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUI
     --mu 1e-1 --memory 0 --model_name $MODELNAME --model_type resnet \
     --learner_type datafree --learner_name AlwaysBeDreaming \
     --gen_model_name CIFAR_GEN --gen_model_type generator \
-    --beta 1 --power_iters $PI --deep_inv_params 1e-3 5e1 1e-3 1e3 1 \
-    --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/abd
+    --beta 1 --power_iters $PI --deep_inv_params 1e-3 3 1e-3 1e3 1 \
+    --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/abd --prototype --logit_proto
 
 #########################
 #    BASELINES  OURS    #

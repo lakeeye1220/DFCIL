@@ -2,6 +2,12 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 import math
+from tqdm import tqdm
+import os
+import collections
+import random
+import numpy as np
+from .default import weight_reset
 
 """
 Some content adapted from the following:
@@ -21,11 +27,10 @@ Some content adapted from the following:
 """
 
 class Teacher(nn.Module):
-
-    def __init__(self, solver, generator, gen_opt, img_shape, iters, class_idx, deep_inv_params, train = True, config=None):
-
+    def __init__(self, solver,prototype, generator, gen_opt, img_shape, iters, class_idx, deep_inv_params, train = True, config=None):
         super().__init__()
         self.solver = solver
+        self.prototype = prototype
         self.generator = generator
         self.gen_opt = gen_opt
         self.solver.eval()
@@ -58,25 +63,32 @@ class Teacher(nn.Module):
         loss_r_feature_layers = []
         for module in self.solver.modules():
             if isinstance(module, nn.BatchNorm2d) or isinstance(module, nn.BatchNorm1d):
-                loss_r_feature_layers.append(DeepInversionFeatureHook(module, 0, self.r_feature_weight))
+                loss_r_feature_layers.append(original_DeepInversionFeatureHook(module))
         self.loss_r_feature_layers = loss_r_feature_layers
 
 
     def sample(self, size, device, return_scores=False):
-        
         # make sure solver is eval mode
         self.solver.eval()
-
         # train if first time
         self.generator.train()
         if self.first_time:
             self.first_time = False
-            self.get_images(bs=size, epochs=self.iters, idx=-1)
+            #self.get_images(bs=size, epochs=self.iters, idx=-1)
+            self.generator.apply(weight_reset)
+            #self.init_generator()
+            self.original_get_images(bs=size,epochs=self.iters,idx=-1)
         
         # sample images
         self.generator.eval()
+        fix_pick = int(size/self.num_k)
+        cls_idx_list = [i for i in self.class_idx]*fix_pick
+        rand_pick = size%self.num_k
+        rand_picked_cls = random.sample(self.class_idx,rand_pick)
+        targets = cls_idx_list+rand_picked_cls
+        fake_targets = torch.LongTensor(targets).to(device)
         with torch.no_grad():
-            x_i = self.generator.sample(size)
+            x_i = self.generator.sample(self.config,size,fake_targets)
 
         # get predicted logit-scores
         with torch.no_grad():
@@ -85,8 +97,7 @@ class Teacher(nn.Module):
 
         # get predicted class-labels (indexed according to each class' position in [self.class_idx]!)
         _, y = torch.max(y_hat, dim=1)
-
-        return (x_i, y, y_hat) if return_scores else (x_i, y)
+        return (x_i,y, y_hat) if return_scores else (x_i, y)
 
     def generate_scores(self, x, allowed_predictions=None, return_label=False):
 
@@ -105,7 +116,6 @@ class Teacher(nn.Module):
 
 
     def generate_scores_pen(self, x):
-
         # make sure solver is eval mode
         self.solver.eval()
 
@@ -114,6 +124,94 @@ class Teacher(nn.Module):
             y_hat = self.solver.forward(x=x, pen=True)
 
         return y_hat
+
+
+    def init_generator(self):
+        for module in self.generator.modules():
+            print(module)
+            if isinstance(module, nn.BatchNorm2d):
+                nn.init.normal_(module.weight.data, 1.0, 0.02)
+                nn.init.constant_(module.bias.data, 0.0)
+            elif isinstance(module, nn.Conv2d):
+                nn.init.kaiming_normal_(module.weight.data)
+                if module.bias is not None:
+                    nn.init.constant_(module.bias.data, 0.0)
+            elif isinstance(module, nn.ConvTranspose2d):
+                nn.init.normal_(module.weight.data, 0.0, 0.02)
+
+
+    def original_get_images(self, bs=256, epochs=1000, idx=-1):
+        torch.cuda.empty_cache()
+        var_scale = 6.0e-3
+        l2_coeff = 1.5e-5
+        
+        fix_pick = int(bs/self.num_k)
+        cls_idx_list = [i for i in self.class_idx]*fix_pick
+        rand_pick = bs%self.num_k
+        rand_picked_cls = random.sample(self.class_idx,rand_pick)
+        targets = cls_idx_list+rand_picked_cls
+        fake_targets = torch.LongTensor(targets)
+        
+        self.generator.train()
+        for epoch in tqdm(range(epochs)):
+            #fake_targets = torch.LongTensor([self.class_idx[epoch%len(self.class_idx)]]*bs)
+            #print("fake_targets : ",fake_targets)
+            self.gen_opt.zero_grad()
+            self.solver.zero_grad()
+
+            inputs_jit = self.generator.sample(self.config,bs,fake_targets)
+            inputs_jit = inputs_jit.cuda()
+            outputs = self.solver(inputs_jit)[:,:self.num_k]
+            embedding_out = self.solver(inputs_jit,pen=True)
+            #print("outputs  : ",torch.argmax(outputs,dim=1))
+            #loss = self.criterion(outputs, torch.argmax(outputs, dim=1))
+            fake_targets = fake_targets.cuda()
+            #loss = self.criterion(outputs,fake_targets)*self.content_weight
+            #loss_ce = loss.detach()
+            loss = 0.0
+            if self.config['prototype']:
+                outputs_np = outputs.cpu().detach().numpy()
+                embedding_np = embedding_out.cpu().detach().numpy()
+                
+                for label in range(self.num_k):
+                    if self.config['logit_proto']:
+                        loss_proto = F.mse_loss(torch.from_numpy(outputs_np[np.array(fake_targets.cpu())==label]).mean(axis=0),torch.from_numpy(self.prototype[label]))
+                    else:
+                        loss_proto = F.mse_loss(torch.from_numpy(embedding_np[np.array(fake_targets.cpu())==label]).mean(axis=0),torch.from_numpy(self.prototype[label])) 
+                    loss += loss_proto*3.0
+                '''
+                if self.config['logit_proto']:
+                    loss_proto = F.mse_loss(torch.from_numpy(outputs_np[np.array(fake_targets.cpu())==self.class_idx[epoch%len(self.class_idx)]]).mean(axis=0),torch.from_numpy(self.prototype[self.class_idx[epoch%len(self.class_idx)]]))
+                else:
+                    loss_proto = F.mse_loss(torch.from_numpy(embedding_np[np.array(fake_targets.cpu())==self.class_idx[epoch%len(self.class_idx)]]).mean(axis=0),torch.from_numpy(self.prototype[self.class_idx[epoch%len(self.class_idx)]])) 
+                loss = loss+ loss_proto*3.0
+                '''
+                
+            loss_distr = sum([mod.r_feature for mod in self.loss_r_feature_layers])
+            loss = loss + self.r_feature_weight*loss_distr # best for noise before BN
+
+            #apply total variation regularization
+            diff1 = inputs_jit[:,:,:,:-1] - inputs_jit[:,:,:,1:]
+            diff2 = inputs_jit[:,:,:-1,:] - inputs_jit[:,:,1:,:]
+            diff3 = inputs_jit[:,:,1:,:-1] - inputs_jit[:,:,:-1,1:]
+            diff4 = inputs_jit[:,:,:-1,:-1] - inputs_jit[:,:,1:,1:]
+            loss_var = torch.norm(diff1) + torch.norm(diff2) + torch.norm(diff3) + torch.norm(diff4)
+            loss = loss + var_scale*loss_var
+
+            l2_loss = l2_coeff*torch.norm(inputs_jit,2)
+
+            #loss = loss + l2_loss
+
+            loss.backward()
+            self.gen_opt.step()
+
+            if epoch%1000 ==0:
+                print('Train Epoch: {} [{}/{} ({:.0f}%)]\ttotal_Loss: {:.4f} No CE_Loss: {:.4f} proto_loss: {:.4f} bn_loss: {:.4f} tv_loss: {:.4f} l2_loss: {:.4f}'.format(
+                    epoch, epoch, epochs, 100*float(epoch)/float(epochs), loss.item(), loss.item(), loss_proto.item(), loss_distr.item(), loss_var.item(),l2_loss.item())) 
+
+        # clear cuda cache
+        torch.cuda.empty_cache()
+        self.generator.eval()
 
     def get_images(self, bs=256, epochs=1000, idx=-1):
 
@@ -159,6 +257,35 @@ class Teacher(nn.Module):
         torch.cuda.empty_cache()
         self.generator.eval()
 
+
+class original_DeepInversionFeatureHook():
+    '''
+    Implementation of the forward hook to track feature statistics and compute a loss on them.
+    Will compute mean and variance, and will use l2 as a loss
+    '''
+
+    def __init__(self, module):
+        self.hook = module.register_forward_hook(self.hook_fn)
+
+    def hook_fn(self, module, input, output):
+        # hook co compute deepinversion's feature distribution regularization
+        nch = input[0].shape[1]
+
+        mean = input[0].mean([0, 2, 3])
+        var = input[0].permute(1, 0, 2, 3).contiguous().view([nch, -1]).var(1, unbiased=False)
+
+        # forcing mean and variance to match between two distributions
+        # other ways might work better, e.g. KL divergence
+        r_feature = torch.norm(module.running_var.data.type(var.type()) - var, 2) + torch.norm(
+            module.running_mean.data.type(var.type()) - mean, 2)
+
+        self.r_feature = r_feature
+        # must have no output
+
+    def close(self):
+        self.hook.remove()
+
+
 class DeepInversionFeatureHook():
     '''
     Implementation of the forward hook to track feature statistics and compute a loss on them.
@@ -181,7 +308,6 @@ class DeepInversionFeatureHook():
 
         self.r_feature = r_feature
 
-            
     def close(self):
         self.hook.remove()
 

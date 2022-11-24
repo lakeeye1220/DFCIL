@@ -6,7 +6,7 @@ import models
 from utils.metric import AverageMeter, Timer
 import numpy as np
 from .datafree_helper import Teacher
-from .default import NormalNN, weight_reset, accumulate_acc, loss_fn_kd
+from .default import NormalNN, bn_reset, weight_reset, accumulate_acc, loss_fn_kd
 import copy
 from torch.optim import Adam
 
@@ -21,11 +21,14 @@ class DeepInversionGenBN(NormalNN):
         self.power_iters = self.config['power_iters']
         self.deep_inv_params = self.config['deep_inv_params']
         self.kd_criterion = nn.MSELoss(reduction="none")
+        self.fakegt_idx = self.config['fakegt_idx']
 
         # gen parameters
         self.generator = self.create_generator()
         self.generator_optimizer = Adam(params=self.generator.parameters(), lr=self.deep_inv_params[0])
         self.beta = self.config['beta']
+        self.prototype =[]
+        self.prototype_set=[]
 
         # repeat call for generator network
         if self.gpu:
@@ -43,6 +46,7 @@ class DeepInversionGenBN(NormalNN):
         need_train = True
         if not self.overwrite:
             try:
+                #self.load_classifer(model_save_dir)
                 self.load_model(model_save_dir)
                 need_train = False
             except:
@@ -53,6 +57,7 @@ class DeepInversionGenBN(NormalNN):
             if self.reset_optimizer:  # Reset optimizer before learning each task
                 self.log('Optimizer is reset!')
                 self.init_optimizer()
+                #self.model.apply(bn_reset)
 
             # data weighting
             self.data_weighting(train_dataset)
@@ -69,6 +74,7 @@ class DeepInversionGenBN(NormalNN):
             batch_timer = Timer()
             self.save_gen = False
             self.save_gen_later = False
+            self.fakegt_idx = []
             for epoch in range(self.config['schedule'][-1]):
                 self.epoch=epoch
                 if epoch > 0: self.scheduler.step()
@@ -137,7 +143,6 @@ class DeepInversionGenBN(NormalNN):
                 acc = AverageMeter()
                 accg = AverageMeter()
 
-
         self.model.eval()
         self.last_last_valid_out_dim = self.last_valid_out_dim
         self.last_valid_out_dim = self.valid_out_dim
@@ -149,7 +154,50 @@ class DeepInversionGenBN(NormalNN):
         
         # new teacher
         if (self.out_dim == self.valid_out_dim): need_train = False
-        self.previous_teacher = Teacher(solver=copy.deepcopy(self.model), generator=self.generator, gen_opt = self.generator_optimizer, img_shape = (-1, train_dataset.nch,train_dataset.im_size, train_dataset.im_size), iters = self.power_iters, deep_inv_params = self.deep_inv_params, class_idx = np.arange(self.valid_out_dim), train = need_train, config = self.config)
+
+        if self.config['prototype']:
+            self.prototype.clear()
+            self.prototype_set.clear()
+            for i, (x, y, task)  in enumerate(train_loader):
+                if self.gpu:
+                    x =x.cuda()
+                    y = y.cuda()
+                # data replay
+                if self.inversion_replay:
+                    x_replay, y_replay, y_replay_hat = self.sample(self.previous_teacher, self.batch_size, self.device)
+                    if self.epoch == int(self.config['schedule'][-1]-1):
+                        self.fakegt_idx.append(y_replay.tolist())
+                else:
+                    x_replay = None
+                    y_replay = None
+                    #print("len of self.fake_idx datafree.py 98", len(self.fakegt_idx))
+
+                if self.inversion_replay:
+                    x_com, y_com = self.combine_data(((x, y),(x_replay, y_replay)))
+                else:
+                    x_com, y_com = x, y
+                #self.prototype[y_com.item()].append(x_com)
+                with torch.no_grad():
+                    if self.config['logit_proto']:
+                        logits_x_com=self.model(x_com)[:,:self.valid_out_dim]
+                    else:
+                        embedding=self.model(x_com,pen=True)
+                    #print("logits x com shape : ",logits_x_com.shape)
+                if self.config['logit_proto']:
+                    self.prototype.append((logits_x_com.tolist(),y_com.tolist()))
+                else:
+                    self.prototype.append((embedding.tolist(),y_com.tolist()))
+            #print("Before proto type : ",self.prototype)
+            #self.prototype = sorted(self.prototype, key=lambda x: x[1])
+            #print("proto type : ",self.prototype)
+            #print("length of prototype :",len(self.prototype))
+            #print("length of prototype : ",len(self.prototype))
+            #프로토타입 클래스당 평균값으로 저장하는거 내일
+            for i in range(self.valid_out_dim):
+                self._prototype_per_class(self.prototype,i)
+
+        ##generator reset
+        self.previous_teacher = Teacher(solver=copy.deepcopy(self.model), prototype=self.prototype_set,generator=self.generator, gen_opt = self.generator_optimizer, img_shape = (-1, train_dataset.nch,train_dataset.im_size, train_dataset.im_size), iters = self.power_iters, deep_inv_params = self.deep_inv_params, class_idx = np.arange(self.valid_out_dim), train = need_train, config = self.config)
         self.sample(self.previous_teacher, self.batch_size, self.device, return_scores=False)
         if len(self.config['gpuid']) > 1:
             self.previous_linear = copy.deepcopy(self.model.module.last)
@@ -161,6 +209,19 @@ class DeepInversionGenBN(NormalNN):
             return batch_time.avg
         except:
             return None
+
+
+    def _prototype_per_class(self, prototype, m):
+        prototype_per_class = []
+        for idx,i in enumerate(range(len(prototype))):
+            for cls in prototype[i][1]:
+                if cls == m:
+                    prototype_per_class.append(prototype[i][0][idx])
+        prototype_mean_by_class = np.mean(prototype_per_class, axis=0)
+        self.prototype_set.append(prototype_mean_by_class)
+
+        print("the size of prototype_set :%s" % (str(len(self.prototype_set))))
+        #print("prototype mean of class : ",self.prototype_set)
 
     def update_model(self, inputs, targets, target_scores = None, dw_force = None, kd_index = None):
 
@@ -226,11 +287,22 @@ class DeepInversionGenBN(NormalNN):
         self.generator.eval()
         super(DeepInversionGenBN, self).load_model(filename)
 
+    def load_classifer(self, filename):
+        self.model.load_state_dict(torch.load(filename + 'class.pth'))
+        self.log('=> Load Done')
+        if self.gpu:
+            self.model = self.model.cuda()
+        self.model.eval()
+
+
     def create_generator(self):
         cfg = self.config
 
         # Define the backbone (MLP, LeNet, VGG, ResNet ... etc) of model
-        generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']]()
+        if self.config['prototype']:
+            generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']](zdim=1000+int(self.config['num_classes']))
+        else:
+            generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']](zdim=1000)
         return generator
 
     def print_model(self):
