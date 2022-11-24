@@ -71,6 +71,8 @@ class Trainer:
             print('=============================================')
         self.tasks = []
         self.tasks_logits = []
+        self.fakegt_idx=[]
+
         p = 0
         while p < num_classes and (args.max_task == -1 or len(self.tasks) < args.max_task):
             inc = args.other_split_size if p > 0 else args.first_split_size
@@ -128,6 +130,10 @@ class Trainer:
                         'deep_inv_params': args.deep_inv_params,
                         'tasks': self.tasks_logits,
                         'top_k': self.top_k,
+                        'prototype':args.prototype,
+                        'fakegt_idx':self.fakegt_idx,
+                        'gt_idx':self.tasks,
+                        'logit_proto':args.logit_proto
                         }
         self.learner_type, self.learner_name = args.learner_type, args.learner_name
         self.learner = learners.__dict__[self.learner_type].__dict__[self.learner_name](self.learner_config)
@@ -153,6 +159,15 @@ class Trainer:
         for mkey in self.metric_keys: temp_table[mkey] = []
         temp_dir = self.log_dir + '/temp/'
         if not os.path.exists(temp_dir): os.makedirs(temp_dir)
+
+        visualize_path= os.path.join(self.log_dir,'visualize_weight')
+        if not os.path.exists(visualize_path): os.makedirs(visualize_path)
+        visualize_cm_path=os.path.join(self.log_dir,'visualize_confusion_matrix')
+        if not os.path.exists(visualize_cm_path): os.makedirs(visualize_cm_path)
+        visualize_class_path=os.path.join(self.log_dir,'accuracy and images per class')
+        if not os.path.exists(visualize_class_path): os.makedirs(visualize_class_path)
+        img_save_path=os.path.join(self.log_dir,'visualize_image')
+        if not os.path.exists(img_save_path): os.makedirs(img_save_path)
 
         # for each task
         for i in range(self.max_task):
@@ -204,6 +219,11 @@ class Trainer:
 
             # save model
             self.learner.save_model(model_save_dir)
+            self.learner.visualize_sample(img_save_path,self.current_t_index)
+            self.learner.visualize_weight(visualize_path, self.current_t_index)
+            self.learner.visualize_confusion_matrix(test_loader,visualize_cm_path, self.current_t_index)
+            self.learner.plot_per_class_accuracy(train_loader, self.train_dataset, test_loader, self.test_dataset, 100, visualize_class_path, self.current_t_index, None,device = 'cuda')
+            #self.learner.reset_Genmodel()
             
             # evaluate acc
             acc_table = []

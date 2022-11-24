@@ -65,6 +65,9 @@ def create_args():
     parser.add_argument('--temp', type=float, default=2., dest='temp', help="temperature for distillation")
     parser.add_argument('--mu', type=float, default=1.0, help="KD loss balancing weight")
     parser.add_argument('--beta', type=float, default=0.5, help="FT loss balancing weight")
+    parser.add_argument('--prototype',default=False,action='store_true',help='remain prototype for inversion')
+    parser.add_argument('--logit_proto',default=False,action='store_true',help='Use the logits as prototype')
+
 
     return parser
 
