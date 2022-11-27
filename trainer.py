@@ -156,7 +156,7 @@ class Trainer:
                         'supcon_temp':args.supcon_temp,
                         'supcon_weight':args.supcon_weight,
                         'dataroot_dataset':args.dataroot_dataset,
-                        'train_transform':gan_transform,
+                        'gan_transform':gan_transform,
                         }
         self.learner_type, self.learner_name = args.learner_type, args.learner_name
         self.learner = learners.__dict__[self.learner_type].__dict__[self.learner_name](self.learner_config,Dataset)

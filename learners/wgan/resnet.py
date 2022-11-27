@@ -7,7 +7,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+import sys
+sys.path.append('../..')
 import learners.wgan.ops as ops
 import learners.wgan.misc as misc
 

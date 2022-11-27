@@ -3,6 +3,8 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 import models
+import sys
+sys.path.append('../')
 from utils.metric import accuracy, AverageMeter, Timer
 import copy
 import numpy as np
