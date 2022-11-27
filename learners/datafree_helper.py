@@ -61,11 +61,12 @@ class Teacher(nn.Module):
         self.smoothing = Gaussiansmoothing(3,5,1)
 
         # Create hooks for feature statistics catching
-        loss_r_feature_layers = []
-        for module in self.solver.modules():
-            if isinstance(module, nn.BatchNorm2d) or isinstance(module, nn.BatchNorm1d):
-                loss_r_feature_layers.append(DeepInversionFeatureHook(module, 0, self.r_feature_weight))
-        self.loss_r_feature_layers = loss_r_feature_layers
+        if 'wgan' not in self.config['cgan']:
+            loss_r_feature_layers = []
+            for module in self.solver.modules():
+                if isinstance(module, nn.BatchNorm2d) or isinstance(module, nn.BatchNorm1d):
+                    loss_r_feature_layers.append(DeepInversionFeatureHook(module, 0, self.r_feature_weight))
+            self.loss_r_feature_layers = loss_r_feature_layers
 
 
     def sample(self, size, device, return_scores=False):
@@ -425,7 +426,7 @@ class Teacher(nn.Module):
                     self.discriminator_opt.zero_grad()
                     zs = sample_normal(batch_size=wgan_bsz, z_dim=128, truncation_factor=-1, device='cuda')
                     y_fake = torch.randint(low=0, high=self.num_k, size=(wgan_bsz, ), dtype=torch.long, device='cuda')
-                    fake_images = self.generator(zs,y_fake)
+                    fake_images = self.generator(zs,y_fake, eval=False)
                     real_dict = self.discriminator(real_images, real_labels)
                     with torch.no_grad():
                         fake_labels= torch.argmax(self.solver(fake_images)[:,:self.num_k],dim=1)
@@ -446,6 +447,7 @@ class Teacher(nn.Module):
                 for p in self.generator.parameters():
                     p.requires_grad = True
                 # train generator
+                self.generator.train()
                 self.gen_opt.zero_grad()
                 
                 zs = sample_normal(batch_size=wgan_bsz, z_dim=128, truncation_factor=-1, device='cuda')
