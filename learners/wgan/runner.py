@@ -33,7 +33,7 @@ def main(args):
                                                     weight_decay=0.0,
                                                     eps=eps_)
     
-    epochs=100000
+    epochs=10000
 
     dataset=torchvision.datasets.CIFAR100(root="/data/cifar100",train=True,download=True,transform=torchvision.transforms.Compose(
         [
@@ -102,6 +102,10 @@ def main(args):
             # save fake images
             grid_fake=torchvision.utils.make_grid(fake_images,normalize=True).cpu()
             torchvision.utils.save_image(grid_fake,f"fake_{epoch}.png")
+        
+        if epoch % 1000 == 0:
+            torch.save(generator.state_dict(),f"generator_{epoch}.pth")
+            torch.save(discriminator.state_dict(),f"discriminator_{epoch}.pth")
             
 
 if __name__ == "__main__":
