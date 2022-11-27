@@ -61,7 +61,7 @@ class Teacher(nn.Module):
         self.smoothing = Gaussiansmoothing(3,5,1)
 
         # Create hooks for feature statistics catching
-        if 'wgan' not in self.config['cgan']:
+        if self.config['cgan'] is None or 'wgan' not in self.config['cgan']:
             loss_r_feature_layers = []
             for module in self.solver.modules():
                 if isinstance(module, nn.BatchNorm2d) or isinstance(module, nn.BatchNorm1d):
@@ -472,7 +472,8 @@ class Teacher(nn.Module):
         # clear cuda cache
         torch.cuda.empty_cache()
         self.generator.eval()
-        self.discriminator.eval()
+        if self.config['cgan'] is not None:
+            self.discriminator.eval()
         self.gen_opt.zero_grad(set_to_none=True)
         with torch.no_grad():
             if self.config['cgan']:
