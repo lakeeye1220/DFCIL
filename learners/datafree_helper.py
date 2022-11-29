@@ -89,10 +89,31 @@ class Teacher(nn.Module):
                 elif 'latent' == self.config['cgan']:
                     x_i, y_i, z = self.generator.sample(size, self.solver)
                 elif 'wgan' == self.config['cgan']:
-                    zs = sample_normal(batch_size=size, z_dim=128, truncation_factor=-1, device='cuda')
                     y_fake = torch.randint(low=0, high=self.num_k, size=(size, ), dtype=torch.long, device='cuda')
-                    x_i = self.generator(zs,y_fake)
-                    y_i= torch.argmax(self.solver(x_i)[:,:self.num_k],dim=1)
+                    zs = sample_normal(batch_size=size, z_dim=128, truncation_factor=-1, device='cuda')
+                    xs = self.generator(zs,y_fake)
+                    ys= self.solver(xs)[:,:self.num_k]
+                    if self.config['gan_target'] in ['hard','soft']:
+                        y_i=torch.argmax(ys,dim=1)
+                        x_i=xs
+                    else: # pseudo
+                        x_i=[xs]
+                        y_i=[ys]
+                        condition=torch.nonzero(torch.softmax(ys ,dim=1).max(dim=1)[0]>0.8).tolist()
+                        while len(condition)<y_fake.shape[0]:
+                            y_fake = torch.randint(low=0, high=self.num_k, size=(size, ), dtype=torch.long, device='cuda')
+                            zs = sample_normal(batch_size=size, z_dim=128, truncation_factor=-1, device='cuda')
+                            xs = self.generator(zs,y_fake)
+                            ys= self.solver(xs)[:,:self.num_k]
+                            condition_list=torch.nonzero(torch.softmax(ys ,dim=1).max(dim=1)[0]>0.8).tolist()
+                            condition+=condition_list
+                            x_i.append(xs[condition_list])
+                            y_i.append(ys[condition_list])
+                        x_i=torch.cat(x_i,dim=0)
+                        y_i=torch.cat(y_i,dim=0)
+                        x_i=x_i[:size]
+                        y_i=torch.argmax(y_i[:size],dim=1)
+
             else:
                 x_i = self.generator.sample(size)
 

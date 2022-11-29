@@ -22,7 +22,7 @@ MAXTASK=-1
 
 # hard coded inputs
 REPEAT=1
-SCHEDULE="1 2"
+SCHEDULE="1"
 PI=2
 MODELNAME=resnet32
 BS=128
@@ -43,4 +43,4 @@ python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUI
     --learner_type datafree --learner_name AlwaysBeDreaming \
     --gen_model_name CIFAR_GEN --gen_model_type generator \
     --beta 1 --power_iters $PI --deep_inv_params 5e-4 5e1 1e-3 1e3 1 \
-    --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/abd --cgan wgan --dataroot ../data/dataset --wandb
+    --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/abd --cgan wgan --dataroot ../data/dataset --wandb --gan_target soft

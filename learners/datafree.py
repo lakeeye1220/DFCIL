@@ -126,6 +126,13 @@ class DeepInversionGenBN(NormalNN):
                     # data replay
                     if self.inversion_replay:
                         x_replay, y_replay, y_replay_hat = self.sample(self.previous_teacher, len(x), self.device)
+                        if self.config['gan_target']=='soft':
+                            fake_target=y_replay_hat
+                        else:
+                            fake_target=None
+                    else:
+                        fake_target=None
+
 
                     # if KD
                     if self.inversion_replay:
@@ -147,7 +154,7 @@ class DeepInversionGenBN(NormalNN):
                         dw_cls = None
 
                     # model update
-                    loss, loss_class, loss_kd, output= self.update_model(x_com, y_com, y_hat_com, dw_force = dw_cls, kd_index = np.arange(len(x), len(x_com)))
+                    loss, loss_class, loss_kd, output= self.update_model(x_com, y_com, y_hat_com, dw_force = dw_cls, kd_index = np.arange(len(x), len(x_com)),fake_target=fake_target)
 
                     # measure elapsed time
                     batch_time.update(batch_timer.toc()) 
@@ -220,7 +227,7 @@ class DeepInversionGenBN(NormalNN):
         except:
             return None
 
-    def update_model(self, inputs, targets, target_scores = None, dw_force = None, kd_index = None):
+    def update_model(self, inputs, targets, target_scores = None, dw_force = None, kd_index = None,fake_target=None):
 
         loss_kd = torch.zeros((1,), requires_grad=True).cuda()
 
@@ -340,7 +347,7 @@ class DeepInversionLWF(DeepInversionGenBN):
         super(DeepInversionLWF, self).__init__(learner_config,dataset_class)
         self.kl_loss = nn.KLDivLoss(reduction='batchmean').cuda()
 
-    def update_model(self, inputs, targets, target_scores = None, dw_force = None, kd_index = None):
+    def update_model(self, inputs, targets, target_scores = None, dw_force = None, kd_index = None,fake_target=None):
         
         loss_kd = torch.zeros((1,), requires_grad=True).cuda()
 
@@ -376,7 +383,7 @@ class AlwaysBeDreaming(DeepInversionGenBN):
         if self.config['supcon']:
             self.supcon_loss = SupConLoss(temperature=self.config['supcon_temp']).cuda()
 
-    def update_model(self, inputs, targets, target_scores = None, dw_force = None, kd_index = None):
+    def update_model(self, inputs, targets, target_scores = None, dw_force = None, kd_index = None,fake_target=None):
         
         # class balancing
         mappings = torch.ones(targets.size(), dtype=torch.float32)
@@ -404,10 +411,19 @@ class AlwaysBeDreaming(DeepInversionGenBN):
             # ft classification  
             with torch.no_grad():             
                 feat_class = self.model.forward(x=inputs, pen=True).detach()
+
             if len(self.config['gpuid']) > 1:
-                loss_class += self.criterion(self.model.module.last(feat_class), targets.long(), dw_cls)
+                if 'soft' !=self.config['gan_target']:
+                    loss_class += self.criterion(self.model.module.last(feat_class), targets.long(), dw_cls)
+                else:
+                    # indexing to soft
+                    prediction=self.model.module.last(feat_class)
+                    fake_idx = np.arange(self.last_valid_out_dim,self.valid_out_dim)
+                    loss_class += torch.mean(torch.sum(-fake_target * F.log_softmax(prediction[fake_idx]), dim=1)*dw_cls[fake_idx])
+                    loss_class += self.criterion(prediction[class_idx], targets.long(), dw_cls[class_idx])
             else:
-                loss_class += self.criterion(self.model.last(feat_class), targets.long(), dw_cls)
+                if 'soft' !=self.config['gan_target']:
+                    loss_class += self.criterion(self.model.last(feat_class), targets.long(), dw_cls)
             
         else:
             loss_class = self.criterion(logits[class_idx], targets[class_idx].long(), dw_cls[class_idx])
