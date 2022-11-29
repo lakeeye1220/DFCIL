@@ -419,7 +419,7 @@ class AlwaysBeDreaming(DeepInversionGenBN):
                     # indexing to soft
                     prediction=self.model.module.last(feat_class)
                     fake_idx = np.arange(self.last_valid_out_dim,self.valid_out_dim)
-                    loss_class += torch.mean(torch.sum(-fake_target * F.log_softmax(prediction[fake_idx]), dim=1)*dw_cls[fake_idx])
+                    loss_class += torch.mean(torch.sum(-torch.softmax(fake_target/2.,dim=1) * F.log_softmax(prediction[fake_idx]/2.), dim=1)*dw_cls[fake_idx])
                     loss_class += self.criterion(prediction[class_idx], targets.long(), dw_cls[class_idx])
             else:
                 if 'soft' !=self.config['gan_target']:
