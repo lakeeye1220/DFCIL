@@ -97,21 +97,21 @@ class Teacher(nn.Module):
                         y_i=torch.argmax(ys,dim=1)
                         x_i=xs
                     else: # pseudo
-                        condition=torch.nonzero(torch.softmax(ys ,dim=1).max(dim=1)[0]>0.8)
+                        condition=torch.nonzero(torch.softmax(ys ,dim=1).max(dim=1)[0]>0.8).squeeze(1)
                         if condition.shape[0]!=0:
                             y_i=[ys.index_select(0,condition)]
                             x_i=[xs.index_select(0,condition)]
-                            condition.tolist()
+                            condition=condition.to_list()
                         else:
                             condition=[]
-                        while len(condition)<y_fake.shape[0]:
+                        while len(condition)<size:
                             y_fake = torch.randint(low=0, high=self.num_k, size=(size, ), dtype=torch.long, device='cuda')
                             zs = sample_normal(batch_size=size, z_dim=128, truncation_factor=-1, device='cuda')
                             xs = self.generator(zs,y_fake)
                             ys= self.solver(xs)[:,:self.num_k]
-                            condition_list=torch.nonzero(torch.softmax(ys ,dim=1).max(dim=1)[0]>0.8).tolist()
+                            condition_list=torch.nonzero(torch.softmax(ys ,dim=1).max(dim=1)[0]>0.8).squeeze(1)
                             if len(condition_list)!=0:
-                                condition+=condition_list
+                                condition+=condition_list.to_list()
 
                                 x_i.append(xs.index_select(0,condition_list))
                                 y_i.append(ys.index_select(0,condition_list))
