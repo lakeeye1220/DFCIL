@@ -57,7 +57,7 @@ class DeepInversionGenBN(NormalNN):
         self.config['model_save_dir']=model_save_dir
         self.pre_steps()
         # cgan generator training
-        if self.config['cgan'] and ('disc' in self.config['cgan'] or 'wgan'==self.config['cgan']) and self.inversion_replay:
+        if self.config['cgan'] and ('disc' in self.config['cgan'] or 'wgan'==self.config['cgan']) and self.inversion_replay and self.config['gan_training']=='before':
             if self.config['cgan']=='disc':
                 self.previous_teacher.train_dataloader = train_loader
             elif self.config['cgan']=='disc_test':
@@ -214,7 +214,23 @@ class DeepInversionGenBN(NormalNN):
         if (self.out_dim == self.valid_out_dim): need_train = False
         self.previous_teacher = Teacher(solver=copy.deepcopy(self.model), generator=self.generator, gen_opt = self.generator_optimizer, img_shape = (-1, train_dataset.nch,train_dataset.im_size, train_dataset.im_size), iters = self.power_iters, deep_inv_params = self.deep_inv_params, class_idx = np.arange(self.valid_out_dim), train = need_train, task_num=task_num, config = self.config)
 
-        if not self.config['cgan']:
+        if not self.config['cgan'] or self.config['gan_training']=='after':
+            if self.config['cgan']=='disc':
+                self.previous_teacher.train_dataloader = train_loader
+            elif self.config['cgan']=='disc_test':
+                test_dataset  = self.dataset_class(self.config['dataroot_dataset'], train=False, tasks=self.tasks,
+                                        download_flag=False, transform=self.config['gan_transform'], 
+                                        seed=self.seed, validation=False)
+                test_dataset.load_dataset(task_num, train=False)
+                test_loader  = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False, drop_last=False, num_workers=self.workers)
+                self.previous_teacher.train_dataloader = test_loader
+            elif self.config['cgan']=='wgan':
+                test_dataset  = self.dataset_class(self.config['dataroot_dataset'], train=False, tasks=self.tasks,
+                                        download_flag=False, transform=self.config['gan_transform'], 
+                                        seed=0, validation=False)
+                test_dataset.load_dataset(task_num, train=False)
+                test_loader  = DataLoader(test_dataset, batch_size=64, shuffle=False, drop_last=True, num_workers=2)
+                self.previous_teacher.train_dataloader = test_loader
             self.sample(self.previous_teacher, self.batch_size, self.device, return_scores=False)
         if len(self.config['gpuid']) > 1:
             self.previous_linear = copy.deepcopy(self.model.module.last)
