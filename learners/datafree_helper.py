@@ -101,7 +101,7 @@ class Teacher(nn.Module):
                         if condition.shape[0]!=0:
                             y_i=[ys.index_select(0,condition)]
                             x_i=[xs.index_select(0,condition)]
-                            condition=condition.to_list()
+                            condition=condition.tolist()
                         else:
                             condition=[]
                         while len(condition)<size:
@@ -111,7 +111,7 @@ class Teacher(nn.Module):
                             ys= self.solver(xs)[:,:self.num_k]
                             condition_list=torch.nonzero(torch.softmax(ys ,dim=1).max(dim=1)[0]>0.8).squeeze(1)
                             if len(condition_list)!=0:
-                                condition+=condition_list.to_list()
+                                condition+=condition_list.tolist()
 
                                 x_i.append(xs.index_select(0,condition_list))
                                 y_i.append(ys.index_select(0,condition_list))
