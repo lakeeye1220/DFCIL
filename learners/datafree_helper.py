@@ -483,11 +483,27 @@ class Teacher(nn.Module):
                 fake_labels= torch.argmax(self.solver(fake_images)[:,:self.num_k],dim=1)
                 fake_dict = self.discriminator(fake_images, fake_labels)
                 gen_acml_loss = g_wasserstein(fake_dict["adv_output"])
+
+                ## cnt loss
+                
+                self.solver.zero_grad()
+
+                # content
+                if self.config['wgan_ce']:
+                    outputs = self.solver(fake_images)[:,:self.num_k]
+                    cnt_loss = self.criterion(outputs / self.content_temp, torch.argmax(outputs, dim=1)) * self.content_weight
+                    with torch.no_grad():
+                        ce_loss = self.criterion(outputs,torch.argmax(outputs,dim=1))
+                    gen_acml_loss+=cnt_loss
+
                 gen_acml_loss.backward()
                 self.gen_opt.step()
                 self.discriminator_opt.zero_grad()
                 if epoch % 1000 == 0:
-                    print(f"Epoch: {epoch:5d}, G Loss: {gen_acml_loss:.3e} D gp_loss:{gp_loss:.3e} D Loss: {dis_loss:.3e}")
+                    if self.config['wgan_ce']:
+                        print(f"Epoch: {epoch:5d}, G Loss: {gen_acml_loss:.3e} D gp_loss:{gp_loss:.3e} D Loss: {dis_loss:.3e} CNT Loss: {ce_loss:.3e}")
+                    else:
+                        print(f"Epoch: {epoch:5d}, G Loss: {gen_acml_loss:.3e} D gp_loss:{gp_loss:.3e} D Loss: {dis_loss:.3e}")
                     save_images.append(fake_images.detach().cpu())
                 
 
