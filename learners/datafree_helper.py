@@ -431,6 +431,7 @@ class Teacher(nn.Module):
             plot_save(distrs_loss_list, 'distrs_loss')
             
         elif self.config['cgan']=='wgan':
+            self.solver.eval()
             self.generator.train()
             self.discriminator.train()
             wgan_bsz=64
