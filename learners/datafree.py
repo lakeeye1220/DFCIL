@@ -113,6 +113,8 @@ class DeepInversionGenBN(NormalNN):
                 for param_group in self.optimizer.param_groups:
                     self.log('LR:', param_group['lr'])
                 batch_timer.tic()
+                if self.inversion_replay:
+                    y_fake_list=[]
                 for i, (x, y, task)  in enumerate(train_loader):
 
                     # verify in train mode
@@ -126,6 +128,7 @@ class DeepInversionGenBN(NormalNN):
                     # data replay
                     if self.inversion_replay:
                         x_replay, y_replay, y_replay_hat = self.sample(self.previous_teacher, len(x), self.device)
+                        y_fake_list.append(y_replay_hat.cpu().detach())
                         if self.config['gan_target']=='soft':
                             fake_target=y_replay_hat
                         else:
@@ -173,7 +176,16 @@ class DeepInversionGenBN(NormalNN):
                 self.log(' * Loss {loss.avg:.3f} | CE Loss {lossb.avg:.3f} | KD Loss {lossc.avg:.3f}'.format(loss=losses[0],lossb=losses[1],lossc=losses[2]))
                 self.log(' * Train Acc {acc.avg:.3f} | Train Acc Gen {accg.avg:.3f}'.format(acc=acc,accg=accg))
                 if self.config['wandb']:
-                    wandb.log({ '{}task Train Acc'.format(task_num): acc.avg, '{}task Train Acc Gen'.format(task_num): accg.avg, '{}task CE Loss'.format(task_num): losses[1].avg, '{}task KD Loss'.format(task_num): losses[2].avg, '{}task Loss'.format(task_num): losses[0].avg}, step=self.epoch+self.config['schedule'][-1]*task_num,commit=True)
+                    log_dict={ '{}task Train Acc'.format(task_num): acc.avg, '{}task Train Acc Gen'.format(task_num): accg.avg, '{}task CE Loss'.format(task_num): losses[1].avg, '{}task KD Loss'.format(task_num): losses[2].avg, '{}task Loss'.format(task_num): losses[0].avg}
+                    if self.inversion_replay:
+                        histogram_for_fake=wandb.Histogram(np.concatenate(y_fake_list,axis=0),bins=self.last_valid_out_dim)
+                        log_dict.update({'{}task histogram for fake'.format(task_num): histogram_for_fake})
+                    wandb.log(log_dict, step=self.epoch+self.config['schedule'][-1]*task_num,commit=True)
+                else:
+                    # save histogram of fake y
+                    if self.inversion_replay:
+                        y_fake_list=torch.cat(y_fake_list)
+                        np.histogram(y_fake_list.cpu().detach().numpy(),bins=range(self.last_valid_out_dim+1))
 
                 # Evaluate the performance of current task
                 if val_loader is not None:
