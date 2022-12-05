@@ -13,6 +13,9 @@ from torch.optim import Adam
 import wandb 
 from learners.wgan.resnet import Generator
 from torch.utils.data.dataloader import DataLoader
+import os 
+import matplotlib.pyplot as plt
+
 
 class DeepInversionGenBN(NormalNN):
 
@@ -181,11 +184,17 @@ class DeepInversionGenBN(NormalNN):
                         histogram_for_fake=wandb.Histogram(np.concatenate(y_fake_list,axis=0),bins=self.last_valid_out_dim)
                         log_dict.update({'{}task histogram for fake'.format(task_num): histogram_for_fake})
                     wandb.log(log_dict, step=self.epoch+self.config['schedule'][-1]*task_num,commit=True)
-                else:
-                    # save histogram of fake y
-                    if self.inversion_replay:
-                        y_fake_list=torch.cat(y_fake_list)
-                        np.histogram(y_fake_list.cpu().detach().numpy(),bins=range(self.last_valid_out_dim+1))
+                # save histogram of fake y
+                if self.inversion_replay and epoch % 10==0:
+                    y_fake_list=torch.cat(y_fake_list)
+                    plt.hist(y_fake_list.cpu().detach().numpy(),bins=self.last_valid_out_dim)
+                    plt.title('Histogram of fake y {}epochs'.format(epoch))
+                    plt.savefig(os.path.join(self.config['model_save_dir'],'histogram_for_fake_{}task_{}epoch.png'.format(task_num,epoch)))
+                    plt.clf()
+                    plt.cla()
+                    plt.close()
+                        
+                        
 
                 # Evaluate the performance of current task
                 if val_loader is not None:
