@@ -131,7 +131,7 @@ class DeepInversionGenBN(NormalNN):
                     # data replay
                     if self.inversion_replay:
                         x_replay, y_replay, y_replay_hat = self.sample(self.previous_teacher, len(x), self.device)
-                        y_fake_list.append(y_replay_hat.cpu().detach())
+                        y_fake_list.append(y_replay.cpu().detach())
                         if self.config['gan_target']=='soft':
                             fake_target=y_replay_hat
                         else:
