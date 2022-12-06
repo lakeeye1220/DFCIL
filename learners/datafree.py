@@ -181,7 +181,7 @@ class DeepInversionGenBN(NormalNN):
                 if self.config['wandb']:
                     log_dict={ '{}task Train Acc'.format(task_num): acc.avg, '{}task Train Acc Gen'.format(task_num): accg.avg, '{}task CE Loss'.format(task_num): losses[1].avg, '{}task KD Loss'.format(task_num): losses[2].avg, '{}task Loss'.format(task_num): losses[0].avg}
                     if self.inversion_replay:
-                        histogram_for_fake=wandb.Histogram(np.concatenate(y_fake_list,axis=0),bins=self.last_valid_out_dim)
+                        histogram_for_fake=wandb.Histogram(np.concatenate(y_fake_list,axis=0))
                         log_dict.update({'{}task histogram for fake'.format(task_num): histogram_for_fake})
                     wandb.log(log_dict, step=self.epoch+self.config['schedule'][-1]*task_num,commit=True)
                 # save histogram of fake y
