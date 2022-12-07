@@ -43,4 +43,4 @@ python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUI
     --learner_type datafree --learner_name AlwaysBeDreaming \
     --gen_model_name CIFAR_GEN --gen_model_type generator \
     --beta 1 --power_iters $PI --deep_inv_params 5e-4 5e1 1e-3 1e3 1 \
-    --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/abd --cgan wgan --dataroot ../data/dataset --wandb --gan_target pseudo --wgan_ce True
+    --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/abd --cgan sagan --dataroot ../data/dataset --wandb --gan_target pseudo
