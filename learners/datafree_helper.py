@@ -528,6 +528,7 @@ class Teacher(nn.Module):
                     gen_acml_loss+=cnt_loss
                 else:
                     with torch.no_grad():
+                        outputs = self.solver(fake_images)[:,:self.num_k]
                         ce_loss = self.criterion(outputs,torch.argmax(outputs,dim=1))
 
                 gen_acml_loss.backward()
