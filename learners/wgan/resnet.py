@@ -14,18 +14,24 @@ import learners.wgan.misc as misc
 
 
 class GenBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, g_cond_mtd, g_info_injection, affine_input_dim):
+    def __init__(self, in_channels, out_channels, g_cond_mtd, g_info_injection, affine_input_dim, MODULES):
         super(GenBlock, self).__init__()
         self.g_cond_mtd = g_cond_mtd
         self.g_info_injection = g_info_injection
 
-        self.bn1 = ops.batchnorm_2d(in_features=in_channels)
-        self.bn2 = ops.batchnorm_2d(in_features=out_channels)
+        if self.g_cond_mtd == "W/O" and self.g_info_injection in ["N/A", "concat"]:
+            self.bn1 = MODULES.g_bn(in_features=in_channels)
+            self.bn2 = MODULES.g_bn(in_features=out_channels)
+        elif self.g_cond_mtd == "cBN" or self.g_info_injection == "cBN":
+            self.bn1 = MODULES.g_bn(affine_input_dim, in_channels, MODULES)
+            self.bn2 = MODULES.g_bn(affine_input_dim, out_channels, MODULES)
+        else:
+            raise NotImplementedError
 
-        self.activation = nn.ReLU(inplace=True)
-        self.conv2d0 = ops.conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=1, stride=1, padding=0)
-        self.conv2d1 = ops.conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=3, stride=1, padding=1)
-        self.conv2d2 = ops.conv2d(in_channels=out_channels, out_channels=out_channels, kernel_size=3, stride=1, padding=1)
+        self.activation = MODULES.g_act_fn
+        self.conv2d0 = MODULES.g_conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=1, stride=1, padding=0)
+        self.conv2d1 = MODULES.g_conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=3, stride=1, padding=1)
+        self.conv2d2 = MODULES.g_conv2d(in_channels=out_channels, out_channels=out_channels, kernel_size=3, stride=1, padding=1)
 
     def forward(self, x, affine):
         x0 = x
@@ -56,7 +62,7 @@ class GenBlock(nn.Module):
 
 class Generator(nn.Module):
     def __init__(self, z_dim, g_shared_dim, img_size, g_conv_dim, apply_attn, attn_g_loc, g_cond_mtd, num_classes, g_init, g_depth,
-                 mixed_precision=False):
+                 mixed_precision, MODULES,g_info_injection='N/A'):
         super(Generator, self).__init__()
         g_in_dims_collection = {
             "32": [g_conv_dim * 4, g_conv_dim * 4, g_conv_dim * 4],
@@ -97,19 +103,19 @@ class Generator(nn.Module):
                 GenBlock(in_channels=self.in_dims[index],
                          out_channels=self.out_dims[index],
                          g_cond_mtd=self.g_cond_mtd,
-                         g_info_injection="N/A",
+                         g_info_injection=g_info_injection,
                          affine_input_dim=self.affine_input_dim,
-                         )
+                         MODULES=MODULES)
             ]]
 
             if index + 1 in attn_g_loc and apply_attn:
-                self.blocks += [[ops.SelfAttention(self.out_dims[index], is_generator=True, )]]
+                self.blocks += [[ops.SelfAttention(self.out_dims[index], is_generator=True, MODULES=MODULES)]]
 
         self.blocks = nn.ModuleList([nn.ModuleList(block) for block in self.blocks])
 
         self.bn4 = ops.batchnorm_2d(in_features=self.out_dims[-1])
-        self.activation = nn.ReLU(inplace=True)
-        self.conv2d5 = ops.conv2d(in_channels=self.out_dims[-1], out_channels=3, kernel_size=3, stride=1, padding=1)
+        self.activation = MODULES.g_act_fn
+        self.conv2d5 = MODULES.g_conv2d(in_channels=self.out_dims[-1], out_channels=3, kernel_size=3, stride=1, padding=1)
         self.tanh = nn.Tanh()
 
         ops.init_weights(self.modules, g_init)
@@ -144,19 +150,19 @@ class Generator(nn.Module):
 
 
 class DiscOptBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, apply_d_sn, ):
+    def __init__(self, in_channels, out_channels, apply_d_sn, MODULES):
         super(DiscOptBlock, self).__init__()
         self.apply_d_sn = apply_d_sn
 
-        self.conv2d0 = ops.deconv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=1, stride=1, padding=0)
-        self.conv2d1 = ops.deconv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=3, stride=1, padding=1)
-        self.conv2d2 = ops.deconv2d(in_channels=out_channels, out_channels=out_channels, kernel_size=3, stride=1, padding=1)
+        self.conv2d0 = MODULES.d_conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=1, stride=1, padding=0)
+        self.conv2d1 = MODULES.d_conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=3, stride=1, padding=1)
+        self.conv2d2 = MODULES.d_conv2d(in_channels=out_channels, out_channels=out_channels, kernel_size=3, stride=1, padding=1)
 
         if not apply_d_sn:
-            self.bn0 = ops.batchnorm_2d(in_features=in_channels)
-            self.bn1 = ops.batchnorm_2d(in_features=out_channels)
+            self.bn0 = MODULES.d_bn(in_features=in_channels)
+            self.bn1 = MODULES.d_bn(in_features=out_channels)
 
-        self.activation = nn.ReLU(inplace=True)
+        self.activation = MODULES.d_act_fn
 
         self.average_pooling = nn.AvgPool2d(2)
 
@@ -179,28 +185,28 @@ class DiscOptBlock(nn.Module):
 
 
 class DiscBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, apply_d_sn, downsample=True):
+    def __init__(self, in_channels, out_channels, apply_d_sn, MODULES, downsample=True):
         super(DiscBlock, self).__init__()
         self.apply_d_sn = apply_d_sn
         self.downsample = downsample
 
-        self.activation = nn.ReLU(inplace=True)
+        self.activation = MODULES.d_act_fn
 
         self.ch_mismatch = False
         if in_channels != out_channels:
             self.ch_mismatch = True
 
         if self.ch_mismatch or downsample:
-            self.conv2d0 = ops.deconv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=1, stride=1, padding=0)
+            self.conv2d0 = MODULES.d_conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=1, stride=1, padding=0)
             if not apply_d_sn:
-                self.bn0 = ops.batchnorm_2d(in_features=in_channels)
+                self.bn0 = MODULES.d_bn(in_features=in_channels)
 
-        self.conv2d1 = ops.deconv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=3, stride=1, padding=1)
-        self.conv2d2 = ops.deconv2d(in_channels=out_channels, out_channels=out_channels, kernel_size=3, stride=1, padding=1)
+        self.conv2d1 = MODULES.d_conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=3, stride=1, padding=1)
+        self.conv2d2 = MODULES.d_conv2d(in_channels=out_channels, out_channels=out_channels, kernel_size=3, stride=1, padding=1)
 
         if not apply_d_sn:
-            self.bn1 = ops.batchnorm_2d(in_features=in_channels)
-            self.bn2 = ops.batchnorm_2d(in_features=out_channels)
+            self.bn1 = MODULES.d_bn(in_features=in_channels)
+            self.bn2 = MODULES.d_bn(in_features=out_channels)
 
         self.average_pooling = nn.AvgPool2d(2)
 
@@ -230,7 +236,7 @@ class DiscBlock(nn.Module):
 
 class Discriminator(nn.Module):
     def __init__(self, img_size, d_conv_dim, apply_d_sn, apply_attn, attn_d_loc, d_cond_mtd, aux_cls_type, d_embed_dim, normalize_d_embed,
-                 num_classes, d_init, d_depth, mixed_precision):
+                 num_classes, d_init, d_depth, mixed_precision, MODULES):
         super(Discriminator, self).__init__()
         d_in_dims_collection = {
             "32": [3] + [d_conv_dim * 2, d_conv_dim * 2, d_conv_dim * 2],
@@ -270,30 +276,31 @@ class Discriminator(nn.Module):
         for index in range(len(self.in_dims)):
             if index == 0:
                 self.blocks += [[
-                    DiscOptBlock(in_channels=self.in_dims[index], out_channels=self.out_dims[index], apply_d_sn=apply_d_sn, )
+                    DiscOptBlock(in_channels=self.in_dims[index], out_channels=self.out_dims[index], apply_d_sn=apply_d_sn, MODULES=MODULES)
                 ]]
             else:
                 self.blocks += [[
                     DiscBlock(in_channels=self.in_dims[index],
                               out_channels=self.out_dims[index],
                               apply_d_sn=apply_d_sn,
+                              MODULES=MODULES,
                               downsample=down[index])
                 ]]
 
             if index + 1 in attn_d_loc and apply_attn:
-                self.blocks += [[ops.SelfAttention(self.out_dims[index], is_generator=False, )]]
+                self.blocks += [[ops.SelfAttention(self.out_dims[index], is_generator=False, MODULES=MODULES)]]
 
         self.blocks = nn.ModuleList([nn.ModuleList(block) for block in self.blocks])
 
-        self.activation = nn.ReLU(inplace=True)
+        self.activation = MODULES.d_act_fn
 
         # linear layer for adversarial training
         if self.d_cond_mtd == "MH":
-            self.linear1 = ops.linear(in_features=self.out_dims[-1], out_features=1 + num_classes, bias=True)
+            self.linear1 = MODULES.d_linear(in_features=self.out_dims[-1], out_features=1 + num_classes, bias=True)
         elif self.d_cond_mtd == "MD":
-            self.linear1 = ops.linear(in_features=self.out_dims[-1], out_features=num_classes, bias=True)
+            self.linear1 = MODULES.d_linear(in_features=self.out_dims[-1], out_features=num_classes, bias=True)
         else:
-            self.linear1 = ops.linear(in_features=self.out_dims[-1], out_features=1, bias=True)
+            self.linear1 = MODULES.d_linear(in_features=self.out_dims[-1], out_features=1, bias=True)
 
         # double num_classes for Auxiliary Discriminative Classifier
         if self.aux_cls_type == "ADC":
@@ -301,22 +308,22 @@ class Discriminator(nn.Module):
 
         # linear and embedding layers for discriminator conditioning
         if self.d_cond_mtd == "AC":
-            self.linear2 = ops.linear(in_features=self.out_dims[-1], out_features=num_classes, bias=False)
+            self.linear2 = MODULES.d_linear(in_features=self.out_dims[-1], out_features=num_classes, bias=False)
         elif self.d_cond_mtd == "PD":
-            self.embedding = ops.embedding(num_classes, self.out_dims[-1])
+            self.embedding = MODULES.d_embedding(num_classes, self.out_dims[-1])
         elif self.d_cond_mtd in ["2C", "D2DCE"]:
-            self.linear2 = ops.linear(in_features=self.out_dims[-1], out_features=d_embed_dim, bias=True)
-            self.embedding = ops.embedding(num_classes, d_embed_dim)
+            self.linear2 = MODULES.d_linear(in_features=self.out_dims[-1], out_features=d_embed_dim, bias=True)
+            self.embedding = MODULES.d_embedding(num_classes, d_embed_dim)
         else:
             pass
 
         # linear and embedding layers for evolved classifier-based GAN
         if self.aux_cls_type == "TAC":
             if self.d_cond_mtd == "AC":
-                self.linear_mi = ops.linear(in_features=self.out_dims[-1], out_features=num_classes, bias=False)
+                self.linear_mi = MODULES.d_linear(in_features=self.out_dims[-1], out_features=num_classes, bias=False)
             elif self.d_cond_mtd in ["2C", "D2DCE"]:
-                self.linear_mi = ops.linear(in_features=self.out_dims[-1], out_features=d_embed_dim, bias=True)
-                self.embedding_mi = ops.embedding(num_classes, d_embed_dim)
+                self.linear_mi = MODULES.d_linear(in_features=self.out_dims[-1], out_features=d_embed_dim, bias=True)
+                self.embedding_mi = MODULES.d_embedding(num_classes, d_embed_dim)
             else:
                 raise NotImplementedError
 

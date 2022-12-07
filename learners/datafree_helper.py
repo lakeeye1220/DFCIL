@@ -7,7 +7,7 @@ import torchvision
 import os
 import wandb
 import matplotlib.pyplot as plt
-from learners.wgan.utils import cal_grad_penalty, d_wasserstein, g_wasserstein, sample_normal
+from learners.wgan.utils import cal_grad_penalty, d_hinge, g_hinge, d_wasserstein, g_wasserstein, sample_normal
 from utils.metric import AverageMeter
 """
 Some content adapted from the following:
@@ -28,7 +28,7 @@ Some content adapted from the following:
 
 class Teacher(nn.Module):
 
-    def __init__(self, solver, generator, gen_opt, img_shape, iters, class_idx, deep_inv_params, train = True, task_num=-1, config=None):
+    def __init__(self, solver, generator, gen_opt, img_shape, iters, class_idx, deep_inv_params, train = True, task_num=-1, config=None,gen_module=None):
 
         super().__init__()
         self.solver = solver #classifier
@@ -40,6 +40,7 @@ class Teacher(nn.Module):
         self.iters = iters
         self.config = config
         self.task_num = task_num
+        self.gen_MODULE = gen_module
 
         # hyperparameters for image synthesis
         self.di_lr = deep_inv_params[0]
@@ -61,7 +62,7 @@ class Teacher(nn.Module):
         self.smoothing = Gaussiansmoothing(3,5,1)
 
         # Create hooks for feature statistics catching
-        if self.config['cgan'] is None or 'wgan' not in self.config['cgan']:
+        if self.config['cgan'] is None or self.config['cgan'] not in ['wgan','sagan']:
             loss_r_feature_layers = []
             for module in self.solver.modules():
                 if isinstance(module, nn.BatchNorm2d) or isinstance(module, nn.BatchNorm1d):
@@ -119,7 +120,11 @@ class Teacher(nn.Module):
                         y_i=torch.cat(y_i,dim=0)
                         x_i=x_i[:size]
                         y_i=torch.argmax(y_i[:size],dim=1)
-
+                elif 'sagan' == self.config['cgan']:
+                    y_fake = torch.randint(low=0, high=self.num_k, size=(size, ), dtype=torch.long, device='cuda')
+                    zs = sample_normal(batch_size=size, z_dim=128, truncation_factor=-1, device='cuda')
+                    xs = self.generator(zs,y_fake)
+                    y_i=y_fake
             else:
                 x_i = self.generator.sample(size)
 
@@ -175,7 +180,7 @@ class Teacher(nn.Module):
         save_images=[]
         
         # cgan setup
-        if self.config['cgan'] and 'disc' in self.config['cgan']:
+        if 'disc' in self.config['cgan']:
             self.generator.update_num_classes(self.num_k)
             if 'CIFAR' in self.config['dataset']:
                 n_dim=64
@@ -190,13 +195,27 @@ class Teacher(nn.Module):
                 nn.Sigmoid())
             self.discriminator.cuda()
             self.discriminator_opt = torch.optim.Adam(self.discriminator.parameters(), lr=self.config['disc_lr'], betas=(0.5, 0.999))
+        if self.config['cgan']:
             try:
                 train_iter = iter(self.train_dataloader)
             except:
                 raise NotImplementedError("No train dataloader provided for cgan")
         elif self.config['cgan'] and 'wgan' == self.config['cgan']:
             from learners.wgan.resnet import Discriminator
-            self.discriminator = Discriminator(32,64,False,False,["N/A"],"W/O","W/O","N/A",False,self.num_k,"ortho","N/A",False)
+            self.discriminator = Discriminator(32,64,False,False,["N/A"],"W/O","W/O","N/A",False,self.num_k,"ortho","N/A",False,self.gen_MODULE)
+            self.discriminator.cuda()
+            beta1=0.5
+            beta2=0.999
+            betas_g = [beta1, beta2]
+            eps_ = 1e-6
+            self.discriminator_opt = torch.optim.Adam(params=self.discriminator.parameters(),
+                                                            lr=0.0002,
+                                                            betas=betas_g,
+                                                            weight_decay=0.0,
+                                                            eps=eps_)
+        elif self.config['cgan'] and 'sagan' == self.config['cgan']:
+            from learners.wgan.resnet import Discriminator
+            self.discriminator = Discriminator(32,64,True,True,[1],"W/O","W/O","N/A",False,self.num_k+1,"ortho","N/A",False,self.gen_MODULE)
             self.discriminator.cuda()
             beta1=0.5
             beta2=0.999
@@ -430,7 +449,7 @@ class Teacher(nn.Module):
             plot_save(uni_loss_list, 'uni_loss')
             plot_save(distrs_loss_list, 'distrs_loss')
             
-        elif self.config['cgan']=='wgan':
+        elif self.config['cgan'] in ['wgan','sagan']:
             self.solver.eval()
             self.generator.train()
             self.discriminator.train()
@@ -453,19 +472,28 @@ class Teacher(nn.Module):
                     # train discriminator
                     self.discriminator_opt.zero_grad()
                     zs = sample_normal(batch_size=wgan_bsz, z_dim=128, truncation_factor=-1, device='cuda')
-                    y_fake = torch.randint(low=0, high=self.num_k, size=(wgan_bsz, ), dtype=torch.long, device='cuda')
-                    fake_images = self.generator(zs,y_fake, eval=False)
+                    fake_labels = torch.randint(low=0, high=self.num_k, size=(wgan_bsz, ), dtype=torch.long, device='cuda')
+                    fake_images = self.generator(zs,fake_labels, eval=False)
+                    if 'sagan' == self.config['cgan']:
+                        real_indices=real_labels>=self.num_k
+                        real_labels[~real_indices]=self.num_k
                     real_dict = self.discriminator(real_images, real_labels)
-                    with torch.no_grad():
-                        fake_labels= torch.argmax(self.solver(fake_images)[:,:self.num_k],dim=1)
+                    if 'wgan' == self.config['cgan']:
+                        with torch.no_grad():
+                            fake_labels= torch.argmax(self.solver(fake_images)[:,:self.num_k],dim=1)
                     fake_dict = self.discriminator(fake_images, fake_labels, adc_fake=False)
-                    dis_loss = d_wasserstein(real_dict["adv_output"], fake_dict["adv_output"])
-
-                    gp_loss = cal_grad_penalty(real_images=real_images,
-                                                        real_labels=real_labels,
-                                                        fake_images=fake_images,
-                                                        discriminator=self.discriminator,
-                                                        device='cuda')
+                    if 'wgan' == self.config['cgan']:
+                        dis_loss = d_wasserstein(real_dict["adv_output"], fake_dict["adv_output"])
+                        gp_loss = cal_grad_penalty(real_images=real_images,
+                                                            real_labels=real_labels,
+                                                            fake_images=fake_images,
+                                                            discriminator=self.discriminator,
+                                                            device='cuda')
+                    elif 'sagan' == self.config['cgan']:
+                        dis_loss = d_hinge(real_dict["adv_output"], fake_dict["adv_output"])
+                        gp_loss = 0
+                    else:
+                        raise NotImplementedError
                     dis_acml_loss=dis_loss + 10.0 * gp_loss
                     dis_acml_loss.backward()
                     self.discriminator_opt.step()
@@ -483,10 +511,12 @@ class Teacher(nn.Module):
                 fake_images = self.generator(zs,y_fake)
                 fake_labels= torch.argmax(self.solver(fake_images)[:,:self.num_k],dim=1)
                 fake_dict = self.discriminator(fake_images, fake_labels)
-                gen_acml_loss = g_wasserstein(fake_dict["adv_output"])
+                if 'wgan' == self.config['cgan']:
+                    gen_acml_loss = g_wasserstein(fake_dict["adv_output"])
+                elif 'sagan' == self.config['cgan']:
+                    gen_acml_loss = g_hinge(fake_dict["adv_output"])
 
                 ## cnt loss
-                
                 self.solver.zero_grad()
 
                 # content
@@ -496,15 +526,15 @@ class Teacher(nn.Module):
                     with torch.no_grad():
                         ce_loss = self.criterion(outputs,torch.argmax(outputs,dim=1))
                     gen_acml_loss+=cnt_loss
+                else:
+                    with torch.no_grad():
+                        ce_loss = self.criterion(outputs,torch.argmax(outputs,dim=1))
 
                 gen_acml_loss.backward()
                 self.gen_opt.step()
                 self.discriminator_opt.zero_grad()
                 if epoch % 1000 == 0:
-                    if self.config['wgan_ce']:
-                        print(f"Epoch: {epoch:5d}, G Loss: {gen_acml_loss:.3e} D gp_loss:{gp_loss:.3e} D Loss: {dis_loss:.3e} CNT Loss: {ce_loss:.3e}")
-                    else:
-                        print(f"Epoch: {epoch:5d}, G Loss: {gen_acml_loss:.3e} D gp_loss:{gp_loss:.3e} D Loss: {dis_loss:.3e}")
+                    print(f"Epoch: {epoch:5d}, G Loss: {gen_acml_loss:.3e} D gp_loss:{gp_loss:.3e} D Loss: {dis_loss:.3e}")
                     save_images.append(fake_images.detach().cpu())
                 
 
