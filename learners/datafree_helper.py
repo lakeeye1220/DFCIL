@@ -558,10 +558,14 @@ class Teacher(nn.Module):
                     samples, y_i, z = self.generator.sample(self.num_k*10, self.solver)
                 elif self.config['cgan']=='wgan':
                     zs = sample_normal(batch_size=self.num_k*10, z_dim=128, truncation_factor=-1, device='cuda')
-                    y_fake = torch.randint(low=0, high=self.num_k, size=(self.num_k*10, ), dtype=torch.long, device='cuda')
+                    y_fake = torch.randint(low=0, high=self.num_k, size=(self.num_k*5, ), dtype=torch.long, device='cuda')
                     samples = self.generator(zs,y_fake)
                     y_i= torch.argmax(self.solver(samples)[:,:self.num_k],dim=1)
-                    
+                elif 'sagan' == self.config['cgan']:
+                    y_fake = torch.randint(low=0, high=self.num_k, size=(self.num_k*5, ), dtype=torch.long, device='cuda')
+                    zs = sample_normal(batch_size=self.num_k*5, z_dim=128, truncation_factor=-1, device='cuda')
+                    samples = self.generator(zs,y_fake)
+                    y_i=y_fake
             else:
                 samples = self.generator.sample(self.num_k*10)
                 logits = self.solver(samples)
