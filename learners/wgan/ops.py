@@ -10,7 +10,6 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-
 class ConditionalBatchNorm2d(nn.Module):
     # https://github.com/voletiv/self-attention-GAN-pytorch
     def __init__(self, in_features, out_features, MODULES):

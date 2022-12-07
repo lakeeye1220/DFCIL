@@ -2,10 +2,10 @@
 
 # process inputs
 DEFAULTGPU=0
-GPUID=5
+GPUID=1
 
 # benchmark settings
-DATE=WGAN_CE1_T1_TEST
+DATE=SAGAN
 SPLIT=20
 OUTDIR=outputs/${DATE}/DFCIL-fivetask/CIFAR100
 
@@ -36,11 +36,11 @@ LR=0.1
 #########################
 
 # Full Method
-python3 -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
+python -u run_dfcil.py --dataset CIFAR100 --train_aug --rand_split --gpuid $GPUID --repeat $REPEAT \
     --first_split_size $SPLIT --other_split_size $SPLIT --schedule $SCHEDULE --schedule_type decay --batch_size $BS \
     --optimizer $OPT --lr $LR --momentum $MOM --weight_decay $WD \
     --mu 1e-1 --memory 0 --model_name $MODELNAME --model_type resnet \
     --learner_type datafree --learner_name AlwaysBeDreaming \
     --gen_model_name CIFAR_GEN --gen_model_type generator \
-    --beta 1 --power_iters $PI --deep_inv_params 5e-4 5e1 1e-3 1 1 \
-    --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/abd --cgan wgan --wgan_ce True
+    --beta 1 --power_iters $PI --deep_inv_params 5e-4 5e1 1e-3 1e3 1 \
+    --overwrite $OVERWRITE --max_task $MAXTASK --log_dir ${OUTDIR}/abd --cgan sagan

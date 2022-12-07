@@ -2,10 +2,10 @@
 
 # process inputs
 DEFAULTGPU=0
-GPUID=1
+GPUID=2
 
 # benchmark settings
-DATE=ICCV2021
+DATE=ICCV2021_0.5
 SPLIT=20
 OUTDIR=outputs/${DATE}/DFCIL-fivetask/CIFAR100
 

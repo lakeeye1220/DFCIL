@@ -32,9 +32,46 @@ class DeepInversionGenBN(NormalNN):
         self.dataset_class=dataset_class
 
         # gen parameters
+        if self.config['cgan'] in ['wgan','sagan']:
+            if self.config['cgan'] =='sagan':
+                cfg={
+                    'apply_g_sn':True,
+                    'apply_d_sn':True,
+                    'apply_attn':True,
+                    'g_cond_mtd':'W/O',
+                    'd_cond_mtd':'W/O',
+                    'g_act_fn':'ReLU',
+                    'd_act_fn':'ReLU',
+                    'g_info_injection':'N/A',
+                }
+            elif self.config['cgan'] =='wgan':
+                cfg={
+                    'apply_g_sn':False,
+                    'apply_d_sn':False,
+                    'apply_attn':False,
+                    'g_cond_mtd':'W/O',
+                    'd_cond_mtd':'W/O',
+                    'g_act_fn':'ReLU',
+                    'd_act_fn':'ReLU',
+                    'g_info_injection':'N/A',
+                }
+            else: raise NotImplementedError
+            self.gen_MODULE=self.def_MODULE(cfg)
+        else:
+            self.gen_MODULE=None
         self.generator = self.create_generator()
         self.cuda_gen()
         if self.config['cgan']=='wgan':
+            beta1=0.5
+            beta2=0.999
+            betas_g = [beta1, beta2]
+            eps_ = 1e-6
+            self.generator_optimizer = torch.optim.Adam(params=self.generator.parameters(),
+                                                                lr=0.0002,
+                                                                betas=betas_g,
+                                                                weight_decay=0.0,
+                                                                eps=eps_)
+        if self.config['cgan']=='sagan':
             beta1=0.5
             beta2=0.999
             betas_g = [beta1, beta2]
@@ -51,6 +88,73 @@ class DeepInversionGenBN(NormalNN):
         # repeat call for generator network
         if self.gpu:
             self.cuda_gen()
+
+    def def_MODULE(self,cfg):
+        class make_empty_object(object):
+            pass
+        from learners.wgan import ops
+        MODULES=make_empty_object()
+        if cfg['apply_g_sn']:
+            MODULES.g_conv2d = ops.snconv2d
+            MODULES.g_deconv2d = ops.sndeconv2d
+            MODULES.g_linear = ops.snlinear
+            MODULES.g_embedding = ops.sn_embedding
+        else:
+            MODULES.g_conv2d = ops.conv2d
+            MODULES.g_deconv2d = ops.deconv2d
+            MODULES.g_linear = ops.linear
+            MODULES.g_embedding = ops.embedding
+
+        if cfg['apply_d_sn']:
+            MODULES.d_conv2d = ops.snconv2d
+            MODULES.d_deconv2d = ops.sndeconv2d
+            MODULES.d_linear = ops.snlinear
+            MODULES.d_embedding = ops.sn_embedding
+        else:
+            MODULES.d_conv2d = ops.conv2d
+            MODULES.d_deconv2d = ops.deconv2d
+            MODULES.d_linear = ops.linear
+            MODULES.d_embedding = ops.embedding
+
+        if cfg['g_cond_mtd'] == "cBN" or cfg['g_info_injection'] == "cBN":# or cfg['backbone'] == "big_resnet":
+            MODULES.g_bn = ops.ConditionalBatchNorm2d
+        elif cfg['g_cond_mtd'] == "W/O":
+            MODULES.g_bn = ops.batchnorm_2d
+        elif cfg['g_cond_mtd'] == "cAdaIN":
+            pass
+        else:
+            raise NotImplementedError
+
+        if not cfg['apply_d_sn']:
+            MODULES.d_bn = ops.batchnorm_2d
+
+        if cfg['g_act_fn'] == "ReLU":
+            MODULES.g_act_fn = nn.ReLU(inplace=True)
+        elif cfg['g_act_fn'] == "Leaky_ReLU":
+            MODULES.g_act_fn = nn.LeakyReLU(negative_slope=0.1, inplace=True)
+        elif cfg['g_act_fn'] == "ELU":
+            MODULES.g_act_fn = nn.ELU(alpha=1.0, inplace=True)
+        elif cfg['g_act_fn'] == "GELU":
+            MODULES.g_act_fn = nn.GELU()
+        elif cfg['g_act_fn'] == "Auto":
+            pass
+        else:
+            raise NotImplementedError
+
+        if cfg['d_act_fn'] == "ReLU":
+            MODULES.d_act_fn = nn.ReLU(inplace=True)
+        elif cfg['d_act_fn'] == "Leaky_ReLU":
+            MODULES.d_act_fn = nn.LeakyReLU(negative_slope=0.1, inplace=True)
+        elif cfg['d_act_fn'] == "ELU":
+            MODULES.d_act_fn = nn.ELU(alpha=1.0, inplace=True)
+        elif cfg['d_act_fn'] == "GELU":
+            MODULES.d_act_fn = nn.GELU()
+        elif cfg['g_act_fn'] == "Auto":
+            pass
+        else:
+            raise NotImplementedError
+        return MODULES
+
         
     ##########################################
     #           MODEL TRAINING               #
@@ -60,7 +164,7 @@ class DeepInversionGenBN(NormalNN):
         self.config['model_save_dir']=model_save_dir
         self.pre_steps()
         # cgan generator training
-        if self.config['cgan'] and ('disc' in self.config['cgan'] or 'wgan'==self.config['cgan']) and self.inversion_replay and self.config['gan_training']=='before':
+        if self.config['cgan'] and ('disc' in self.config['cgan'] or self.config['cgan'] in ['cgan','sagan']) and self.inversion_replay and self.config['gan_training']=='before':
             if self.config['cgan']=='disc':
                 self.previous_teacher.train_dataloader = train_loader
             elif self.config['cgan']=='disc_test':
@@ -77,6 +181,15 @@ class DeepInversionGenBN(NormalNN):
                 test_dataset.load_dataset(task_num, train=False)
                 test_loader  = DataLoader(test_dataset, batch_size=64, shuffle=False, drop_last=True, num_workers=2)
                 self.previous_teacher.train_dataloader = test_loader
+            elif self.config['cgan']=='sagan':
+                test_dataset  = self.dataset_class(self.config['dataroot_dataset'], train=False, tasks=self.tasks,
+                                        download_flag=False, transform=self.config['gan_transform'], 
+                                        seed=0, validation=False)
+                test_dataset.load_dataset(task_num, train=False)
+                test_loader  = DataLoader(test_dataset, batch_size=64, shuffle=False, drop_last=True, num_workers=2)
+                self.previous_teacher.train_dataloader = test_loader
+                print("WORK")
+
             self.sample(self.previous_teacher, self.batch_size, self.device, return_scores=False)
 
 
@@ -218,7 +331,7 @@ class DeepInversionGenBN(NormalNN):
         # reset generator
         if self.config['init_generator']:
             self.reset_generator()
-            if self.config['cgan'] != 'wgan':
+            if self.config['cgan'] not in ['wgan','sagan']:
                 self.generator_optimizer = Adam(params=self.generator.parameters(), lr=self.deep_inv_params[0])
             else:
                 beta1=0.5
@@ -233,7 +346,7 @@ class DeepInversionGenBN(NormalNN):
         
         # new teacher
         if (self.out_dim == self.valid_out_dim): need_train = False
-        self.previous_teacher = Teacher(solver=copy.deepcopy(self.model), generator=self.generator, gen_opt = self.generator_optimizer, img_shape = (-1, train_dataset.nch,train_dataset.im_size, train_dataset.im_size), iters = self.power_iters, deep_inv_params = self.deep_inv_params, class_idx = np.arange(self.valid_out_dim), train = need_train, task_num=task_num, config = self.config)
+        self.previous_teacher = Teacher(solver=copy.deepcopy(self.model), generator=self.generator, gen_opt = self.generator_optimizer, img_shape = (-1, train_dataset.nch,train_dataset.im_size, train_dataset.im_size), iters = self.power_iters, deep_inv_params = self.deep_inv_params, class_idx = np.arange(self.valid_out_dim), train = need_train, task_num=task_num, config = self.config,gen_module=self.gen_MODULE)
 
         if not self.config['cgan'] or self.config['gan_training']=='after':
             if self.config['cgan']=='disc':
@@ -246,6 +359,14 @@ class DeepInversionGenBN(NormalNN):
                 test_loader  = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False, drop_last=False, num_workers=self.workers)
                 self.previous_teacher.train_dataloader = test_loader
             elif self.config['cgan']=='wgan':
+                test_dataset  = self.dataset_class(self.config['dataroot_dataset'], train=False, tasks=self.tasks,
+                                        download_flag=False, transform=self.config['gan_transform'], 
+                                        seed=0, validation=False)
+                test_dataset.load_dataset(task_num, train=False)
+                test_loader  = DataLoader(test_dataset, batch_size=64, shuffle=False, drop_last=True, num_workers=2)
+                self.previous_teacher.train_dataloader = test_loader
+            elif self.config['cgan']=='sagan':
+                print("WORK")
                 test_dataset  = self.dataset_class(self.config['dataroot_dataset'], train=False, tasks=self.tasks,
                                         download_flag=False, transform=self.config['gan_transform'], 
                                         seed=0, validation=False)
@@ -325,7 +446,9 @@ class DeepInversionGenBN(NormalNN):
         if num_class is not None:
             cfg = self.config
             if cfg['cgan']=='wgan':
-                self.generator = Generator(128,"N/A",32,64,False,["N/A"],"W/O",self.config['num_classes'],"ortho","N/A",False)
+                self.generator = Generator(128,"N/A",32,64,False,["N/A"],"W/O",self.config['num_classes'],"ortho","N/A",False, MODULES=self.gen_MODULE)
+            elif cfg['cgan']=='sagan':
+                self.generator = Generator(128,"N/A",32,64,True,[2],"W/O",self.config['num_classes'],"ortho","N/A",False, MODULES=self.gen_MODULE)
             elif cfg['cgan'] is not None:
                 self.generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']](bn=False,cgan=self.config['cgan'],num_classes=num_class)#,num_classes=self.valid_out_dim) # update 하면 self.valid_out_dim
             else:
@@ -341,11 +464,12 @@ class DeepInversionGenBN(NormalNN):
         cfg = self.config
 
         # Define the backbone (MLP, LeNet, VGG, ResNet ... etc) of model
-        if cfg['cgan'] is not None:
-            if cfg['cgan']!='wgan':
-                generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']](bn=False,cgan=self.config['cgan'],num_classes=cfg['num_classes'])#,num_classes=self.valid_out_dim) # update 하면 self.valid_out_dim
-            else:
-                generator = Generator(128,"N/A",32,64,False,["N/A"],"W/O",cfg['num_classes'],"ortho","N/A",False)
+        if cfg['cgan']=='wgan':
+            generator = Generator(128,"N/A",32,64,False,["N/A"],"W/O",self.config['num_classes'],"ortho","N/A",False, MODULES=self.gen_MODULE)
+        elif cfg['cgan']=='sagan':
+            generator = Generator(128,"N/A",32,64,True,[2],"W/O",self.config['num_classes'],"ortho","N/A",False, MODULES=self.gen_MODULE)
+        elif cfg['cgan'] is not None:
+            generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']](bn=False,cgan=self.config['cgan'],num_classes=cfg['num_class'])#,num_classes=self.valid_out_dim) # update 하면 self.valid_out_dim
         else:
             generator = models.__dict__[cfg['gen_model_type']].__dict__[cfg['gen_model_name']]()
         return generator
@@ -356,11 +480,11 @@ class DeepInversionGenBN(NormalNN):
         self.log('#parameter of generator:', self.count_parameter_gen())
     
     def reset_model(self):
-        if self.config['cgan']!='wgan':
+        if self.config['cgan'] not in ['wgan','sagan']:
             super(DeepInversionGenBN, self).reset_model()
             self.reset_generator()
         else:
-            self.generator = Generator(128,"N/A",32,64,False,["N/A"],"W/O",self.config['num_classes'],"ortho","N/A",False).cuda()
+            self.generator = Generator(128,"N/A",32,64,False,["N/A"],"W/O",self.config['num_classes'],"ortho","N/A",False, MODULES=self.gen_MODULE).cuda()
 
     def reset_generator(self):
         self.generator.apply(weight_reset)

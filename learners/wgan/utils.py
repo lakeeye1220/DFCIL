@@ -56,3 +56,10 @@ def g_wasserstein(d_logit_fake, DDP=None):
 
 def d_wasserstein(d_logit_real, d_logit_fake, DDP=None):
         return torch.mean(d_logit_fake - d_logit_real)
+
+def d_hinge(d_logit_real, d_logit_fake, DDP=None):
+    return torch.mean(F.relu(1. - d_logit_real)) + torch.mean(F.relu(1. + d_logit_fake))
+
+
+def g_hinge(d_logit_fake, DDP=None):
+    return -torch.mean(d_logit_fake)
