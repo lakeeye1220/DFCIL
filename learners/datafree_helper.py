@@ -200,7 +200,7 @@ class Teacher(nn.Module):
                 train_iter = iter(self.train_dataloader)
             except:
                 raise NotImplementedError("No train dataloader provided for cgan")
-        elif self.config['cgan'] and 'wgan' == self.config['cgan']:
+        if self.config['cgan'] and 'wgan' == self.config['cgan']:
             from learners.wgan.resnet import Discriminator
             self.discriminator = Discriminator(32,64,False,False,["N/A"],"W/O","W/O","N/A",False,self.num_k,"ortho","N/A",False,self.gen_MODULE)
             self.discriminator.cuda()
