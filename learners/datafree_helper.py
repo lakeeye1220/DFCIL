@@ -97,7 +97,7 @@ class Teacher(nn.Module):
                         y_i=torch.argmax(ys,dim=1)
                         x_i=xs
                     else: # pseudo
-                        condition=torch.nonzero(torch.softmax(ys ,dim=1).max(dim=1)[0]>0.8).squeeze(1)
+                        condition=torch.nonzero(torch.softmax(ys ,dim=1).max(dim=1)[0]>0.5).squeeze(1)
                         if condition.shape[0]!=0:
                             y_i=[ys.index_select(0,condition)]
                             x_i=[xs.index_select(0,condition)]
