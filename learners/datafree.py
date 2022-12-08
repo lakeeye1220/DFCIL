@@ -164,7 +164,7 @@ class DeepInversionGenBN(NormalNN):
         self.config['model_save_dir']=model_save_dir
         self.pre_steps()
         # cgan generator training
-        if self.config['cgan'] and ('disc' in self.config['cgan'] or self.config['cgan'] in ['cgan','sagan']) and self.inversion_replay and self.config['gan_training']=='before':
+        if self.config['cgan'] and ('disc' in self.config['cgan'] or self.config['cgan'] in ['wgan','sagan']) and self.inversion_replay and self.config['gan_training']=='before':
             if self.config['cgan']=='disc':
                 self.previous_teacher.train_dataloader = train_loader
             elif self.config['cgan']=='disc_test':
@@ -188,7 +188,6 @@ class DeepInversionGenBN(NormalNN):
                 test_dataset.load_dataset(task_num, train=False)
                 test_loader  = DataLoader(test_dataset, batch_size=64, shuffle=False, drop_last=True, num_workers=2)
                 self.previous_teacher.train_dataloader = test_loader
-                print("WORK")
 
             self.sample(self.previous_teacher, self.batch_size, self.device, return_scores=False)
 
@@ -366,7 +365,6 @@ class DeepInversionGenBN(NormalNN):
                 test_loader  = DataLoader(test_dataset, batch_size=64, shuffle=False, drop_last=True, num_workers=2)
                 self.previous_teacher.train_dataloader = test_loader
             elif self.config['cgan']=='sagan':
-                print("WORK")
                 test_dataset  = self.dataset_class(self.config['dataroot_dataset'], train=False, tasks=self.tasks,
                                         download_flag=False, transform=self.config['gan_transform'], 
                                         seed=0, validation=False)
