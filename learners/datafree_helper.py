@@ -123,7 +123,7 @@ class Teacher(nn.Module):
                 elif 'sagan' == self.config['cgan']:
                     y_fake = torch.randint(low=0, high=self.num_k, size=(size, ), dtype=torch.long, device='cuda')
                     zs = sample_normal(batch_size=size, z_dim=128, truncation_factor=-1, device='cuda')
-                    xs = self.generator(zs,y_fake)
+                    x_i = self.generator(zs,y_fake)
                     y_i=y_fake
             else:
                 x_i = self.generator.sample(size)
