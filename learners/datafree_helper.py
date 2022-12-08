@@ -468,15 +468,25 @@ class Teacher(nn.Module):
                         train_iter = iter(self.train_dataloader)
                         (real_images, real_labels, task) = next(train_iter)
                     real_images = real_images.cuda()
-                    real_labels = real_labels.cuda()
+                    real_labels = real_labels.cuda() # it does not use in wgan
                     # train discriminator
                     self.discriminator_opt.zero_grad()
                     zs = sample_normal(batch_size=wgan_bsz, z_dim=128, truncation_factor=-1, device='cuda')
                     fake_labels = torch.randint(low=0, high=self.num_k, size=(wgan_bsz, ), dtype=torch.long, device='cuda')
                     fake_images = self.generator(zs,fake_labels, eval=False)
                     if 'sagan' == self.config['cgan']:
-                        real_indices=real_labels>=self.num_k
-                        real_labels[~real_indices]=self.num_k
+                        # real_indices=real_labels>=self.num_k
+                        # real_labels[~real_indices]=self.num_k
+                        with torch.no_grad():
+                            real_logits=self.solver(real_images)[:,:self.num_k]
+                            real_labels= torch.argmax(real_logits,dim=1)
+                            cut_labels=torch.nonzero(torch.softmax(real_logits,dim=1)>0.75).squeeze(1)
+                            real_labels=real_labels[cut_labels]
+                            real_images=real_images[cut_labels]
+                            duplicate_indices=torch.randint(0,real_images.shape[0],wgan_bsz).to(real_images.device)
+                            real_images=real_images[duplicate_indices]
+                            real_labels=real_labels[duplicate_indices]
+
                     real_dict = self.discriminator(real_images, real_labels)
                     if 'wgan' == self.config['cgan']:
                         with torch.no_grad():
