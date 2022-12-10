@@ -160,6 +160,7 @@ class Trainer:
                         'gan_target':args.gan_target,
                         'gan_training':args.gan_training,
                         'wgan_ce':args.wgan_ce,
+                        'wgan_bnc':args.wgan_bnc,
                         }
         self.learner_type, self.learner_name = args.learner_type, args.learner_name
         self.learner = learners.__dict__[self.learner_type].__dict__[self.learner_name](self.learner_config,Dataset)
