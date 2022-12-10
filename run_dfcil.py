@@ -74,6 +74,7 @@ def create_args():
     parser.add_argument('--gan_target', default='hard', type=str, help="use gan target",choices=['hard','soft','pseudo'])
     parser.add_argument('--gan_training', default='before', type=str, help="use gan target",choices=['before','after'])
     parser.add_argument('--wgan_ce', default=False, type=bool, help="use wgan with ce loss")
+    parser.add_argument('--wgan_bnc', default=False, type=bool, help="use wgan with bnc loss")
 
     parser.add_argument('--wandb', action='store_false', help="use wandb")
     parser.add_argument('--wandb_name', default=None, type=str, help="wandb name")

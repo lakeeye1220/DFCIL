@@ -536,6 +536,10 @@ class Teacher(nn.Module):
                     with torch.no_grad():
                         ce_loss = self.criterion(outputs,torch.argmax(outputs,dim=1))
                     gen_acml_loss+=cnt_loss
+                    if self.config['wgan_bnc']:
+                        softmax_o_T = F.softmax(outputs, dim = 1).mean(dim = 0)
+                        bnc_loss= (1.0 + (softmax_o_T * torch.log(softmax_o_T) / math.log(self.num_k)).sum())
+                        gen_acml_loss+=bnc_loss
                 else:
                     with torch.no_grad():
                         outputs = self.solver(fake_images)[:,:self.num_k]
