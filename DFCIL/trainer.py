@@ -45,15 +45,26 @@ class Trainer:
             num_classes = 100
             self.dataset_size = [32,32,3]
             args.dataroot=os.path.join(args.dataroot, 'cifar100')
-        elif args.dataset == 'ImageNet' or args.dataset == 'ImageNet50':
+        elif args.dataset == 'ImageNet':
             Dataset = dataloaders.iIMAGENET
             num_classes = 1000
             self.dataset_size = [224,224,3]
             self.top_k = 5
             args.dataroot=os.path.join(args.dataroot, 'imagenet')
-        elif args.dataset == 'TinyImageNet' or args.dataset == 'TinyImageNet100':
+        elif args.dataset == 'ImageNet50':
+            Dataset = dataloaders.iIMAGENET
+            num_classes = 50
+            self.dataset_size = [224,224,3]
+            self.top_k = 5
+            args.dataroot=os.path.join(args.dataroot, 'imagenet')
+        elif args.dataset == 'TinyImageNet':
             Dataset = dataloaders.iTinyIMNET
             num_classes = 200
+            self.dataset_size = [64,64,3]
+            args.dataroot=os.path.join(args.dataroot, 'tiny-imagenet')
+        elif args.dataset == 'TinyImageNet100':
+            Dataset = dataloaders.iTinyIMNET
+            num_classes = 100
             self.dataset_size = [64,64,3]
             args.dataroot=os.path.join(args.dataroot, 'tiny-imagenet')
         else:
