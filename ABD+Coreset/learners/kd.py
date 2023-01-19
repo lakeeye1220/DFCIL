@@ -831,6 +831,48 @@ class CoresetDataset(data.Dataset):
         return len(self.data)
 
 
+class DI_Coreset(LWF):
+    def __init__(self, learner_config):
+        super(DI_Coreset, self).__init__(learner_config)
+    
+    def update_model(self, inputs, targets, target_scores = None):
+
+        loss_kd = torch.zeros((1,), requires_grad=True).cuda()
+        dw_force=None
+
+        if dw_force is not None:
+            dw_cls = dw_force
+        elif self.dw:
+            dw_cls = self.dw_k[targets.long()]
+        else:
+            dw_cls = self.dw_k[-1 * torch.ones(targets.size()).long()]
+
+        # forward pass
+        logits = self.forward(inputs)
+
+        # classification 
+        class_idx = np.arange(self.batch_size)
+        loss_class = self.criterion(logits[class_idx], targets[class_idx].long(), dw_cls[class_idx])
+
+        # KD old
+        if target_scores is not None:
+            loss_kd = self.mu * loss_fn_kd(logits[class_idx], target_scores[class_idx], dw_cls[class_idx], np.arange(self.last_valid_out_dim).tolist(), self.DTemp)
+
+        # KD new
+        if target_scores is not None:
+            target_scores = F.softmax(target_scores[:, :self.last_valid_out_dim] / self.DTemp, dim=1)
+            target_scores = [target_scores]
+            target_scores.append(torch.zeros((len(targets),self.valid_out_dim-self.last_valid_out_dim), requires_grad=True).cuda())
+            target_scores = torch.cat(target_scores, dim=1)
+            kd_index=np.arange(len(targets)) # DI
+            loss_kd += self.mu * loss_fn_kd(logits[kd_index], target_scores[kd_index], dw_cls[kd_index], np.arange(self.valid_out_dim).tolist(), self.DTemp, soft_t = True)
+
+        total_loss = loss_class + loss_kd
+        self.optimizer.zero_grad()
+        total_loss.backward()
+        self.optimizer.step()
+        return total_loss.detach(), loss_class.detach(), loss_kd.detach(), logits
+
 
 class ABD_Coreset(LWF):
 

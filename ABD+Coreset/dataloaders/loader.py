@@ -365,7 +365,7 @@ class iDataset(data.Dataset):
 
     # naive coreset appending
     def append_coreset(self, only=False, interp=False,learner_name='none'):
-        if learner_name!='ABD_Coreset':
+        if learner_name not in ['ABD_Coreset','DI_Coreset']:
             len_core = len(self.coreset[0])
             if self.train and (len_core > 0):
                 if only:

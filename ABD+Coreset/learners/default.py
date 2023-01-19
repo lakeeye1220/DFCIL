@@ -311,7 +311,7 @@ class NormalNN(nn.Module):
                 labels = [int(dataset[i][1]) for i in range(len(dataset))]
                 labels = np.asarray(labels, dtype=np.int64)
                 num_seen = np.asarray([len(labels[labels==k]) for k in range(self.valid_out_dim)], dtype=np.float32)
-            if coreset is not None and self.config['name'] != 'ABD_Coreset':
+            if coreset is not None and self.config['name'] not in ['ABD_Coreset','DI_Coreset']:
                 add_labels = [int(coreset.targets[i]) for i in range(len(coreset))] #q
                 add_labels = np.asarray(add_labels, dtype=np.int64)
                 add_num_seen = np.asarray([len(add_labels[add_labels==k]) for k in range(self.valid_out_dim)], dtype=np.float32)
