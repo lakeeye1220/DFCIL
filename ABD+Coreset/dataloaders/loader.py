@@ -391,6 +391,7 @@ class iDataset(data.Dataset):
         # coreset selection without affecting RNG state
         state = np.random.get_state()
         np.random.seed(self.seed*10000+self.t)
+        print("update coreset")
         for k in reversed(seen):
             mapped_targets = [self.class_mapping[self.targets[i]] for i in range(len(self.targets))]
             locs = (mapped_targets == k).nonzero()[0]
@@ -400,10 +401,19 @@ class iDataset(data.Dataset):
             else:
                 num_data_k = min(len(locs), num_data_per)
             locs_chosen = locs[np.random.choice(len(locs), num_data_k, replace=False)]
-            data.append([self.data[loc] for loc in locs_chosen])
-            targets.append([self.targets[loc] for loc in locs_chosen])
-        self.coreset = (np.concatenate(list(reversed(data)), axis=0), np.concatenate(list(reversed(targets)), axis=0))
+            available_len=0
+            for loc in locs_chosen:
+                available_len+=len(self.data[loc])
+            if available_len>0: 
+                data.append([self.data[loc] for loc in locs_chosen])
+                targets.append([self.targets[loc] for loc in locs_chosen])
+        if len(self.coreset[0].shape)==4:
+            self.coreset = (np.concatenate( (self.coreset[0],np.concatenate(list(reversed(data)), axis=0)), axis=0), \
+                np.concatenate( (self.coreset[1], np.concatenate(list(reversed(targets)), axis=0)),axis=0))
+        else:
+            self.coreset = (np.concatenate(list(reversed(data)), axis=0),np.concatenate(list(reversed(targets)), axis=0))
         np.random.set_state(state)
+        print(len(self.coreset[0]), "coreset len")
 
     def load(self):
         pass

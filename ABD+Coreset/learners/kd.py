@@ -800,10 +800,11 @@ def get_one_hot(target,num_class):
 
 
 class CoresetDataset(data.Dataset):
-    def __init__(self,data,target,transform=None):
+    def __init__(self,data,target,class_mapping,transform=None):
         self.data=data
         self.targets=target
         self.transform=transform
+        self.class_mapping=class_mapping
     def __getitem__(self, index, simple = False):
         """
         Args:
@@ -824,7 +825,7 @@ class CoresetDataset(data.Dataset):
             else:
                 img = self.transform(img)
 
-        return img, self.class_mapping[target], self.t
+        return img, self.class_mapping[target]
     
     def __len__(self):
         return len(self.data)
@@ -836,6 +837,7 @@ class ABD_Coreset(LWF):
     def __init__(self, learner_config):
         super(ABD_Coreset, self).__init__(learner_config)
         self.kl_loss = nn.KLDivLoss(reduction='batchmean').cuda()
+        self.kd_criterion = nn.MSELoss(reduction="none")
         
     def update_model(self, inputs, targets, target_KD = None):
 
@@ -900,7 +902,7 @@ class ABD_Coreset(LWF):
     def learn_batch(self, train_loader, train_dataset, model_save_dir, val_loader=None):
         if len(train_dataset.coreset[0])>0:
             print(len(train_dataset.coreset[0]),len(train_dataset.coreset[1]))
-            coreset_dataset=CoresetDataset(train_dataset.coreset[0],train_dataset.coreset[1],transform=train_dataset.transform)
+            coreset_dataset=CoresetDataset(train_dataset.coreset[0],train_dataset.coreset[1],train_dataset.class_mapping,transform=train_dataset.transform)
             coreset_train_loader = data.DataLoader(coreset_dataset, batch_size=self.batch_size, shuffle=True, drop_last=True, num_workers=int(1))
         else:
             coreset_train_loader=None
@@ -960,9 +962,14 @@ class ABD_Coreset(LWF):
                     if coreset_train_loader is not None:
                         try:
                             old_data, old_label = next(train_iter)
+                            old_data=old_data.to(x.device)
+                            old_label=old_label.to(y.device)
                         except:
                             train_iter = iter(coreset_train_loader)
                             old_data, old_label = next(train_iter)
+                            old_data=old_data.to(x.device)
+                            old_label=old_label.to(y.device)
+                        print(old_label.unique())
                         x=torch.cat((x,old_data),0)
                         y=torch.cat((y,old_label),0)
                     # model update - training data
