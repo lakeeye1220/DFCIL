@@ -100,10 +100,7 @@ class NormalNN(nn.Module):
             if len(gen_pen[0])>0:
                 gen_mid_score=torch.from_numpy((cur_pen[0]-gen_pen[0])/cur_pen[1]).to(self.device).norm()
                 self.gen_midscore.append(gen_mid_score)
-                
-
-
-        
+                       
     
     def get_MID(self):
         # real data
