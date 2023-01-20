@@ -69,10 +69,93 @@ class NormalNN(nn.Module):
 
         # initialize optimizer
         self.init_optimizer()
+        self.gen_midscore=[]
+        self.midscore=[]
+        self.previous_teacher=None
+        self.close_MID()
 
     ##########################################
     #           MODEL TRAINING               #
     ##########################################
+
+    def visualize_ready_MID(self, train_loader, prev_train_loader ,file_path):
+        #plot the confusion matrix
+        # real data
+        self.mid_path=file_path
+        self.mid_trainloader=train_loader
+        self.mid_prev_trainloader=prev_train_loader
+
+    def save_mid_score(self,cur_pen,prev_pen,gen_pen,epoch):
+        if self.mid_path is not None:
+            np.save(os.path.join(self.mid_path,'{}e_cur_pen_mean.npy'.format(epoch)),cur_pen[0].cpu().numpy())
+            np.save(os.path.join(self.mid_path,'{}e_cur_pen_std.npy'.format(epoch)),cur_pen[1].cpu().numpy())
+            np.save(os.path.join(self.mid_path,'{}e_prev_pen_mean.npy'.format(epoch)),prev_pen[0].cpu().numpy())
+            np.save(os.path.join(self.mid_path,'{}e_prev_pen_std.npy'.format(epoch)),prev_pen[1].cpu().numpy())
+            if len(gen_pen[0])>0:
+                np.save(os.path.join(self.mid_path,'{}e_gen_pen_mean.npy'.format(epoch)),gen_pen[0].cpu().numpy())
+                np.save(os.path.join(self.mid_path,'{}e_gen_pen_std.npy'.format(epoch)),gen_pen[1].cpu().numpy())
+
+            mid_score=torch.from_numpy((cur_pen[0]-prev_pen[0])/cur_pen[1]).to(self.device).norm()
+            self.midscore.append(mid_score)
+            if len(gen_pen[0])>0:
+                gen_mid_score=torch.from_numpy((cur_pen[0]-gen_pen[0])/cur_pen[1]).to(self.device).norm()
+                self.gen_midscore.append(gen_mid_score)
+                
+
+
+        
+    
+    def get_MID(self):
+        # real data
+        self.model.eval()
+        with torch.no_grad():
+            cur_pen=[]
+            cur_pen_std=[]
+            for batch_idx, values in enumerate(self.mid_trainloader):
+                if len(values)==3:
+                    inputs, targets, _ = values
+                else:
+                    inputs, targets = values
+
+                if self.gpu:
+                    inputs, targets = inputs.cuda(), targets.cuda()
+                logits_pen = self.model(inputs,pen=True)
+                cur_pen.append(logits_pen.mean(dim=[-1]))
+                cur_pen_std.append(logits_pen.std(dim=[-1]))
+            cur_pen=torch.cat(cur_pen,dim=0)
+            cur_pen_std=torch.cat(cur_pen_std,dim=0)
+            prev_pen=[]
+            prev_pen_std=[]
+            for batch_idx, values in enumerate(self.mid_prev_trainloader):
+                if len(values)==3:
+                    inputs, targets, _ = values
+                else:
+                    inputs, targets = values
+                if self.gpu:
+                    inputs, targets = inputs.cuda(), targets.cuda()
+                logits_pen = self.model(inputs,pen=True)
+                prev_pen.append(logits_pen.mean(dim=[-1]))
+                prev_pen_std.append(logits_pen.std(dim=[-1]))
+            prev_pen=torch.cat(prev_pen,dim=0)
+            # generate the data
+            gen_pen=[]
+            gen_pen_std=[]
+            if self.previous_teacher is not None:
+                for i in range(batch_idx+1):
+                    x_replay, y_replay, y_replay_hat = self.sample(self.previous_teacher, len(inputs), self.device)
+                    logits_pen = self.model(x_replay,pen=True)
+                    gen_pen.append(logits_pen.mean(dim=[-1]))
+                    gen_pen_std.append(logits_pen.std(dim=[-1]))
+                gen_pen=torch.cat(gen_pen,dim=0)
+            # calculate the score
+        self.model.train()
+
+        return (cur_pen,cur_pen_std),(prev_pen,prev_pen_std),(gen_pen,gen_pen_std)
+    
+    def close_MID(self):
+        self.mid_path=None
+        self.mid_trainloader=None
+        self.mid_prev_trainloader=None
 
     def visualize_confusion_matrix(self, val_loader,file_path,task_num):
         #plot the confusion matrix

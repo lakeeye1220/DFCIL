@@ -6,6 +6,8 @@ from collections import OrderedDict
 import dataloaders
 from torch.utils.data import DataLoader
 import learners
+import copy
+
 
 class Trainer:
 
@@ -184,12 +186,20 @@ class Trainer:
         if not os.path.exists(visualize_cm_path): os.makedirs(visualize_cm_path)
         visualize_ml_path=os.path.join(self.log_dir,'visualize_marginal_likelihood','repeat-{}'.format(repeat_idx))
         if not os.path.exists(visualize_ml_path): os.makedirs(visualize_ml_path)
+        visualize_mid_path=os.path.join(self.log_dir,'record_mid','repeat-{}'.format(repeat_idx))
+        if not os.path.exists(visualize_mid_path): os.makedirs(visualize_mid_path)
+
 
         # for each task
         for i in range(self.max_task):
 
             # save current task index
             self.current_t_index = i
+            if self.current_t_index==1:
+                self.learner.visualize_ready_MID(train_loader,prev_loader,visualize_mid_path)
+                
+            # learner task num
+            self.learner.config['task_idx']=self.current_t_index
 
             # set seeds
             random.seed(self.seed*100 + i)
@@ -261,6 +271,10 @@ class Trainer:
                 break
             else:
                 pass
+            
+            if self.current_t_index==0:
+                prev_loader = DataLoader(copy.deepcopy(self.train_dataset), batch_size=self.batch_size, shuffle=True, drop_last=True, num_workers=int(self.workers))
+                self.learner.visualize_mid_path=visualize_mid_path
 
         return avg_metrics 
     

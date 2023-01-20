@@ -9,6 +9,7 @@ from .default import NormalNN,  accumulate_acc, loss_fn_kd, Teacher
 import copy
 import torch.utils.data as data
 from PIL import Image
+import os
 class LWF(NormalNN):
 
     def __init__(self, learner_config):
@@ -102,7 +103,15 @@ class LWF(NormalNN):
                 # reset
                 losses = [AverageMeter() for l in range(3)]
                 acc = AverageMeter()
-
+                if self.config['task_idx']==1 and 'Coreset' in self.config['name']:
+                    # calculate mid score
+                    mid_scores = self.get_MID()
+                    # save mid score
+                    self.save_mid_score(mid_scores,epoch=epoch)
+        if self.config['task_idx']==1 and 'Coreset' in self.config['name']:
+            np.save(os.path.join(self.mid_path,'real_real.npy'),self.midscore)
+            if len(self.gen_midscore)>0:
+                np.save(os.path.join(self.mid_path,'real_fake.npy'),self.gen_midscore)
         self.model.eval()
         self.past_tasks.append(np.arange(self.last_valid_out_dim,self.valid_out_dim))
         self.last_valid_out_dim = self.valid_out_dim
@@ -159,7 +168,6 @@ class LWF(NormalNN):
             self.task_count += 1
             if self.memory_size > 0:
                 train_dataset.update_coreset_ic(self.memory_size, np.arange(self.last_valid_out_dim), teacher)
-
         self.replay = True
         try:
             return batch_time.avg

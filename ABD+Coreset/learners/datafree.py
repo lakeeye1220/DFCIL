@@ -7,7 +7,7 @@ from utils.metric import AverageMeter, Timer
 import numpy as np
 from .datafree_helper import Teacher
 from .default import NormalNN, weight_reset, accumulate_acc, loss_fn_kd
-import copy
+import copy, os
 from torch.optim import Adam
 from learners.sp import SP
 
@@ -146,7 +146,15 @@ class ISCF(NormalNN):
                 losses = [AverageMeter() for i in range(5)]
                 acc = AverageMeter()
                 accg = AverageMeter()
-
+                if self.config['task_idx']==1 and 'Coreset' in self.config['name']:
+                    # calculate mid score
+                    mid_scores = self.get_MID()
+                    # save mid score
+                    self.save_mid_score(mid_scores,epoch=epoch)
+        if self.config['task_idx']==1 and 'Coreset' in self.config['name']:
+            np.save(os.path.join(self.mid_path,'real_real.npy'),self.midscore)
+            if len(self.gen_midscore)>0:
+                np.save(os.path.join(self.mid_path,'real_fake.npy'),self.gen_midscore)
 
         self.model.eval()
         self.last_last_valid_out_dim = self.last_valid_out_dim
