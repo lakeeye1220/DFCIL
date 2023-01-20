@@ -137,7 +137,7 @@ class NormalNN(nn.Module):
             # generate the data
             gen_pen=[]
             gen_pen_std=[]
-            if self.previous_teacher is not None:
+            if hasattr(self,'sample'):
                 for i in range(batch_idx+1):
                     x_replay, y_replay, y_replay_hat = self.sample(self.previous_teacher, len(inputs), self.device)
                     logits_pen = self.model(x_replay,pen=True)
