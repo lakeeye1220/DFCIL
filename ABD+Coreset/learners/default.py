@@ -141,8 +141,8 @@ class NormalNN(nn.Module):
                 for i in range(batch_idx+1):
                     x_replay, y_replay, y_replay_hat = self.sample(self.previous_teacher, len(inputs), self.device)
                     logits_pen = self.model(x_replay,pen=True)
-                    gen_pen.append(logits_pen.mean(dim=[-1]))
-                    gen_pen_std.append(logits_pen.std(dim=[-1]))
+                    gen_pen.append(logits_pen.mean(dim=0))
+                    gen_pen_std.append(logits_pen.std(dim=0))
                 gen_pen=torch.cat(gen_pen,dim=0)
             # calculate the score
         self.model.train()
