@@ -95,10 +95,10 @@ class NormalNN(nn.Module):
                 np.save(os.path.join(self.mid_path,'{}e_gen_pen_mean.npy'.format(epoch)),gen_pen[0].cpu().numpy())
                 np.save(os.path.join(self.mid_path,'{}e_gen_pen_std.npy'.format(epoch)),gen_pen[1].cpu().numpy())
 
-            mid_score=torch.from_numpy((cur_pen[0]-prev_pen[0])/cur_pen[1]).to(self.device).norm()
+            mid_score=((cur_pen[0]-prev_pen[0])/cur_pen[1]).to(self.device).norm()
             self.midscore.append(mid_score)
             if len(gen_pen[0])>0:
-                gen_mid_score=torch.from_numpy((cur_pen[0]-gen_pen[0])/cur_pen[1]).to(self.device).norm()
+                gen_mid_score=((cur_pen[0]-gen_pen[0])/cur_pen[1]).to(self.device).norm()
                 self.gen_midscore.append(gen_mid_score)
                        
     
@@ -107,7 +107,6 @@ class NormalNN(nn.Module):
         self.model.eval()
         with torch.no_grad():
             cur_pen=[]
-            cur_pen_std=[]
             for batch_idx, values in enumerate(self.mid_trainloader):
                 if len(values)==3:
                     inputs, targets, _ = values
@@ -117,12 +116,11 @@ class NormalNN(nn.Module):
                 if self.gpu:
                     inputs, targets = inputs.cuda(), targets.cuda()
                 logits_pen = self.model(inputs,pen=True)
-                cur_pen.append(logits_pen.mean(dim=[-1]))
-                cur_pen_std.append(logits_pen.std(dim=[-1]))
+                cur_pen.append(logits_pen.cpu())
             cur_pen=torch.cat(cur_pen,dim=0)
-            cur_pen_std=torch.cat(cur_pen_std,dim=0)
+            cur_pen_std=cur_pen.std(dim=0)
+            cur_pen=cur_pen.mean(dim=0)
             prev_pen=[]
-            prev_pen_std=[]
             for batch_idx, values in enumerate(self.mid_prev_trainloader):
                 if len(values)==3:
                     inputs, targets, _ = values
@@ -131,9 +129,10 @@ class NormalNN(nn.Module):
                 if self.gpu:
                     inputs, targets = inputs.cuda(), targets.cuda()
                 logits_pen = self.model(inputs,pen=True)
-                prev_pen.append(logits_pen.mean(dim=[-1]))
-                prev_pen_std.append(logits_pen.std(dim=[-1]))
+                prev_pen.append(logits_pen.cpu())
             prev_pen=torch.cat(prev_pen,dim=0)
+            prev_pen_std=prev_pen.std(dim=0)
+            prev_pen=prev_pen.mean(dim=0)
             # generate the data
             gen_pen=[]
             gen_pen_std=[]
@@ -141,9 +140,10 @@ class NormalNN(nn.Module):
                 for i in range(batch_idx+1):
                     x_replay, y_replay, y_replay_hat = self.sample(self.previous_teacher, len(inputs), self.device)
                     logits_pen = self.model(x_replay,pen=True)
-                    gen_pen.append(logits_pen.mean(dim=0))
-                    gen_pen_std.append(logits_pen.std(dim=0))
+                    gen_pen.append(logits_pen.cpu())
                 gen_pen=torch.cat(gen_pen,dim=0)
+                gen_pen_std=gen_pen.std(dim=0)
+                gen_pen=gen_pen.mean(dim=0)
             # calculate the score
         self.model.train()
 
