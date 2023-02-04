@@ -206,11 +206,11 @@ class NormalNN(nn.Module):
                 self.log('Epoch:{epoch:.0f}/{total:.0f}'.format(epoch=self.epoch+1,total=self.config['schedule'][-1]))
                 self.log(' * Loss {loss.avg:.3f} | Train Acc {acc.avg:.3f}'.format(loss=losses,acc=acc))
                 if self.config['wandb']:
-                    wandb.log({ '{}task train_loss'.format(task_num):losses.avg, '{}task train_acc'.format(task_num):acc.avg},epoch=self.epoch)
+                    wandb.log({ '{}task train_loss'.format(task_num):losses.avg, '{}task train_acc'.format(task_num):acc.avg},step=self.epoch)
 
                 # Evaluate the performance of current task
                 if val_loader is not None:
-                    self.validation(val_loader,task_num)
+                    self.validation(val_loader,task_num=task_num)
 
                 # reset
                 losses = AverageMeter()

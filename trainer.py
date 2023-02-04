@@ -57,6 +57,12 @@ class Trainer:
             self.dataset_size = [224,224,3]
             self.top_k = 5
             args.dataroot_dataset=os.path.join(args.dataroot, 'imagenet')
+        elif args.dataset == 'ImageNet100':
+            Dataset = dataloaders.iIMAGENET
+            num_classes = 100
+            self.dataset_size = [224,224,3]
+            self.top_k = 5
+            args.dataroot_dataset=os.path.join(args.dataroot, 'imagenet')
         elif args.dataset == 'TinyImageNet':
             Dataset = dataloaders.iTinyIMNET
             num_classes = 200
@@ -265,7 +271,9 @@ class Trainer:
             avg_metrics['mem']['global'][:] = self.learner.count_memory(self.dataset_size)
             if (self.learner_config['dataset']== 'TinyImageNet100' and (self.current_t_index+1)*self.task_step_size==100):
                 break
-            elif self.learner_config['dataset']== 'ImageNet50' and ((self.current_t_index+1)*self.task_step_size==100):
+            elif self.learner_config['dataset']== 'ImageNet50' and ((self.current_t_index+1)*self.task_step_size==50):
+                break
+            elif self.learner_config['dataset']== 'ImageNet100' and ((self.current_t_index+1)*self.task_step_size==100):
                 break
             else:
                 pass
