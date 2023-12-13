@@ -9,6 +9,7 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 import tensorflow as tf
+from learners.ce_loss import LargeMarginLoss
 class NormalNN(nn.Module):
     """
     consider citing the benchmarking environment this was built on top of
@@ -49,6 +50,12 @@ class NormalNN(nn.Module):
 
         # supervised criterion
         self.criterion_fn = nn.CrossEntropyLoss(reduction="none")
+        self.large_margin_criterion = LargeMarginLoss(
+                                                gamma=1000, #10000
+                                                alpha_factor=4,
+                                                top_k=1,
+                                                dist_norm=np.inf
+                                            )
         
         # cuda gpu
         if learner_config['gpuid'][0] >= 0:
@@ -76,8 +83,7 @@ class NormalNN(nn.Module):
 
     def visualize_confusion_matrix(self, val_loader,file_path,task_num):
         #plot the confusion matrix
-        y_true,y_pred=self.validation(val_loader,need_logits=True)
-        cm = tf.math.confusion_matrix(y_true, y_pred.argmax(dim=1))
+        cm=self.validation(val_loader,confusion_mat=True)
         if cm.shape[0]<self.config['num_classes']:
             cm1 = np.pad(cm, ((0,self.config['num_classes']-cm.shape[0]),(0,self.config['num_classes']-cm.shape[1])), 'constant', constant_values=0)
         else:
@@ -88,20 +94,6 @@ class NormalNN(nn.Module):
         plt.matshow(cm1, cmap='viridis')
         #plt.colorbar()
         plt.savefig(os.path.join(file_path,'{}task_confusion_mat.pdf'.format(task_num)),bbox_inches='tight')
-        plt.close()
-    
-    def visualize_marginal_likelihood(self, val_loader,file_path,task_num):
-        y_true,y_pred=self.validation(val_loader,need_logits=True)
-        softened_y_pred=torch.softmax(y_pred[:,:self.valid_out_dim],dim=1)
-        classes=np.arange(self.valid_out_dim)
-        marginal_likelihood=softened_y_pred.mean(dim=0)
-        plt.figure()
-        plt.plot(classes,marginal_likelihood.detach().numpy())
-        plt.xlabel('Class Index')
-        plt.ylabel('Marginal Likelihood')
-        plt.xlim(0,self.valid_out_dim)
-        plt.savefig(os.path.join(file_path,'{}task_marginal_likelihood.pdf'.format(task_num)),bbox_inches='tight')
-        np.savetxt(os.path.join(file_path,'{}task_marginal_likelihood.csv'.format(task_num)), marginal_likelihood, delimiter=",", fmt='%.2f')
         plt.close()
 
     def visualize_weight(self,file_path,task_num):
@@ -209,8 +201,8 @@ class NormalNN(nn.Module):
             train_dataset.update_coreset(self.memory_size, np.arange(self.last_valid_out_dim))
 
         # for eval
-        # if self.previous_teacher is not None:
-        #     self.previous_previous_teacher = self.previous_teacher
+        if self.previous_teacher is not None:
+            self.previous_previous_teacher = self.previous_teacher
 
         # new teacher
         teacher = Teacher(solver=self.model)
@@ -247,7 +239,7 @@ class NormalNN(nn.Module):
         self.optimizer.step()
         return total_loss.detach(), logits
 
-    def validation(self, dataloader, model=None, task_in = None,  verbal = True, need_logits=False):
+    def validation(self, dataloader, model=None, task_in = None,  verbal = True, confusion_mat=False):
         #evaluation the model performance, print the top-1 accuracy per each task
         if model is None:
             model = self.model
@@ -283,15 +275,16 @@ class NormalNN(nn.Module):
                     output = model.forward(input)[:, task_in]
                     acc = accumulate_acc(output, target-task_in[0], task, acc, topk=(self.top_k,))
             
-            if need_logits:
+            if confusion_mat:
                 y_true.append(target.detach().cpu())
-                y_pred.append(output.detach().cpu())
+                y_pred.append(output.argmax(dim=1).detach().cpu())
         model.train(orig_mode)
 
-        if need_logits:
+        if confusion_mat:
             y_true=torch.cat(y_true, dim=0)
             y_pred=torch.cat(y_pred, dim=0)
-            return y_true, y_pred
+            cm = tf.math.confusion_matrix(y_true, y_pred).cuda()
+            return cm
         if verbal:
             self.log(' * Val Acc {acc.avg:.3f}, Total time {time:.2f}'
                     .format(acc=acc, time=batch_timer.toc()))
@@ -437,6 +430,7 @@ class NormalNN(nn.Module):
         return self.count_parameter() + self.memory_size * dataset_size[0]*dataset_size[1]*dataset_size[2]
 
     def cuda(self):
+        #print("gpunid : ,",self.config['gpuid'])
         torch.cuda.set_device(self.config['gpuid'][0])
         self.model = self.model.cuda()
         self.criterion_fn = self.criterion_fn.cuda()
