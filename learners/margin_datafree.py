@@ -244,9 +244,10 @@ class ISCF(NormalNN):
         fake_class_idx = np.arange(self.batch_size,2*self.batch_size)
         # forward pass
         logits_pen,m = self.model.forward(inputs, middle=True)
-        r_logits_pen,r_m = self.model.forward(inputs[class_idx],middle=True)
-        f_logits_pen,f_m = self.model.forward(inputs[fake_class_idx],middle=True)
-        #f_logits_pen,f_m = self.model.forward(x_replay,middle=True)
+        if self.inversion_replay:
+            r_logits_pen,r_m = self.model.forward(inputs[class_idx],middle=True)
+            f_logits_pen,f_m = self.model.forward(inputs[fake_class_idx],middle=True)
+            #f_logits_pen,f_m = self.model.forward(x_replay,middle=True)
 
         if len(self.config['gpuid']) > 1:
             logits = self.model.module.last(logits_pen)
@@ -274,7 +275,7 @@ class ISCF(NormalNN):
         else:
             #one_hot = torch.nn.functional.one_hot(targets,num_classes = 100).cuda()
             #loss_class = self.criterion(self.model.last(logits_pen), targets[class_idx].long(), dw_cls[class_idx])
-            loss_class = self.criterion(self.model.last(r_logits_pen), targets[class_idx].long(), dw_cls[class_idx])
+            loss_class = self.criterion(self.model.last(logits_pen), targets.long(), dw_cls)
 
         #SPKD - Intermediate KD
         if self.previous_teacher: # after 2nd task
