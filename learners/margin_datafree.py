@@ -244,11 +244,8 @@ class ISCF(NormalNN):
         fake_class_idx = np.arange(self.batch_size,2*self.batch_size)
         # forward pass
         logits_pen,m = self.model.forward(inputs, middle=True)
-        if self.inversion_replay:
-            r_logits_pen,r_m = self.model.forward(inputs[class_idx],middle=True)
-            f_logits_pen,f_m = self.model.forward(inputs[fake_class_idx],middle=True)
-            #f_logits_pen,f_m = self.model.forward(x_replay,middle=True)
 
+        
         if len(self.config['gpuid']) > 1:
             logits = self.model.module.last(logits_pen)
         else:
@@ -269,8 +266,10 @@ class ISCF(NormalNN):
                 loss_class += self.criterion(self.model.module.last(r_logits_pen.detach()), targets[class_idx].long(), dw_cls[class_idx])
             else:
                 #loss_class += self.criterion(self.model.last(logits_pen.detach()), targets.long(), dw_cls)
-                loss_class += 0.1*(100-self.last_valid_out_dim)*self.large_margin_criterion(self.model.last(f_logits_pen),one_hot[fake_class_idx],f_m,dw_cls[fake_class_idx])
-                loss_class += self.criterion(self.model.last(r_logits_pen), targets[class_idx].long(), dw_cls[class_idx])
+                loss_class += 0.1*(100-self.last_valid_out_dim)*self.large_margin_criterion(self.model.last(logits_pen), one_hot,f_m,dw_cls)[fake_class_idx].mean()
+                # 여쭤보고 싶은 것은 one_hot이랑 logit_pen의 forward부분도 안배운 곳은 잘라서 해야되지 않나요??
+                # loss_class += 0.1*(100-self.last_valid_out_dim)*self.large_margin_criterion(self.model.last(logits_pen), one_hot[fake_class_idx],f_m,dw_cls)
+                loss_class += self.criterion(self.model.last(logits_pen[class_idx].detach()), targets[class_idx].long(), dw_cls[class_idx]) # 유진님이 재량껏 수정
         #first task local classification when we do not use any synthetic data     
         else:
             #one_hot = torch.nn.functional.one_hot(targets,num_classes = 100).cuda()
