@@ -54,7 +54,8 @@ class NormalNN(nn.Module):
                                                 gamma=1000, #10000
                                                 alpha_factor=4,
                                                 top_k=1,
-                                                dist_norm=np.inf
+                                                dist_norm=np.inf,
+                                                reduction='none',
                                             )
         
         # cuda gpu
