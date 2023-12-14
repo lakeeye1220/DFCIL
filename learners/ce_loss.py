@@ -41,7 +41,8 @@ class LargeMarginLoss:
                  dist_norm=2,
                  epsilon=1e-8,
                  use_approximation=True,
-                 loss_type="all_top_k"):
+                 loss_type="all_top_k",
+                 reduction='mean'):
         
         self.dist_upper = gamma
         self.dist_lower = gamma * (1.0 - alpha_factor)
@@ -53,6 +54,8 @@ class LargeMarginLoss:
         
         self.use_approximation = use_approximation
         self.loss_type = loss_type
+
+        self.reduction = reduction
 
     def __call__(self, logits, onehot_labels, feature_maps, data_weight):
         """Getting Large Margin loss
@@ -102,4 +105,9 @@ class LargeMarginLoss:
             loss_layer = _max_with_relu(dist_to_boundary, self.dist_lower)
             loss_layer = _max_with_relu(0, self.dist_upper - loss_layer) - self.dist_upper
             loss = torch.cat([loss, loss_layer])
-        return loss.mean()
+        if self.reduction =='none':
+            return loss
+        elif self.reduction == 'mean':
+            return loss.mean()
+        else:
+            raise NotImplementedError
