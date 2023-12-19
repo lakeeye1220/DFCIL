@@ -288,11 +288,16 @@ class ISCF(NormalNN):
         # Logit KD for maintaining the output probability 
         if self.previous_teacher:
             kd_index= np.arange(2*self.batch_size)
+            real_index = np.arange(self.batch_size)
+            fake_index = np.arange(self.batch_size,2*self.batch_size)
             with torch.no_grad():
                 logits_prevpen = self.previous_teacher.solver.forward(inputs[kd_index],pen=True)
                 logits_prev=self.previous_linear(logits_prevpen)[:,:self.last_valid_out_dim].detach()
-
-            loss_lkd=(F.mse_loss(logits[kd_index,:self.last_valid_out_dim],logits_prev,reduction='none').sum(dim=1)) * self.mu / task_step
+            norm = torch.norm(logits[kd_index,:self.last_valid_out_dim],p=2,dim=-1,keepdim=True) + 1e-7
+            norm_prev = torch.norm(logits_prev,p=2,dim=-1,keepdim=True) + 1e-7
+            #loss_lkd=(F.mse_loss(logits[kd_index,:self.last_valid_out_dim]/(1.-self.last_valid_out_dim*0.01),logits_prev/(1.-self.last_valid_out_dim*0.01),reduction='none').sum(dim=1)) * self.mu / task_step
+            #loss_lkd = (F.mse_loss(torch.div(logits[kd_index,:self.last_valid_out_dim],norm)/0.03,torch.div(logits_prev,norm_prev)/0.03,reduction='none')).sum(dim=1) * self.mu/task_step
+            loss_lkd = ((F.mse_loss(logits[real_index,:self.last_valid_out_dim]/2.0,logits_prev[real_index,:]/2.0,reduction='none')).sum(dim=1) + (F.mse_loss(logits[fake_index,:self.last_valid_out_dim]/0.8,logits_prev[fake_index,:]/0.8,reduction='none')).sum(dim=1))*self.mu/task_step
             loss_lkd=loss_lkd.mean()
         else:
             loss_lkd = torch.zeros((1,), requires_grad=True).cuda()
@@ -475,4 +480,4 @@ class DeepInversionGenBN(ISCF):
         loss_balancing=torch.zeros((1,), requires_grad=True).cuda()
         
         return total_loss.detach(), loss_class.detach(), loss_kd.detach(), loss_middle.detach(), loss_balancing.detach(), logits
-        
+
