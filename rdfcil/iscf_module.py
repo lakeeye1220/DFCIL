@@ -25,6 +25,7 @@ import torch.nn as nn
 
 import torch.nn.functional as F
 from cl_lite.backbone.resnet_cifar import CifarResNet
+from cl_lite.backbone.resnet import ResNet
 
 class ISCF_ResNet(CifarResNet):
     def __init__(self, n=5, nf=16, channels=3, preact=False, zero_residual=True, pooling_config=..., downsampling="stride", final_layer=False, all_attentions=False, last_relu=False, **kwargs):
@@ -40,6 +41,32 @@ class ISCF_ResNet(CifarResNet):
 
         return x4,[x1, x2, x3]
 
+class ISCF_ResNet18(ResNet):
+    def __init__(
+        self,
+        block,
+        layers,
+        zero_init_residual=True,
+        nf=64,
+        last_relu=False,
+        initial_kernel=3,
+        **kwargs
+    ):
+        super(ISCF_ResNet18, self).__init__(block, layers,zero_init_residual,nf,last_relu,initial_kernel, **kwargs)
+
+    def forward_feat(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+
+        x_1 = self.layer1(x)
+        x_2 = self.layer2(self.end_relu(x_1))
+        x_3 = self.layer3(self.end_relu(x_2))
+        x_4 = self.layer4(self.end_relu(x_3))
+
+        return x_4, [x_1, x_2, x_3]
+        
 class SP(nn.Module):
     def __init__(self,reduction='mean'):
         super(SP,self).__init__()
@@ -166,7 +193,9 @@ class ISCFModule(FeatureHookMixin, FinetuningMixin, cl.Module):
 
     def init_setup(self, stage=None):
         if self.datamodule.dataset.startswith("imagenet"):
-            self.backbone = B.resnet.resnet18()
+            from cl_lite.backbone.resnet import BasicBlock
+            self.backbone = ISCF_ResNet18(BasicBlock, [2, 2, 2, 2])
+            # self.backbone = B.resnet.resnet18()
         else:
             self.backbone = ISCF_ResNet()
         kwargs = dict(num_features=self.backbone.num_features, bias=self.hparams.fc_bias)
