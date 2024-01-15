@@ -1,4 +1,4 @@
-mkdir data # create data folder (if not delete it)
+# mkdir data # create data folder (if not delete it)
 mkdir data/tiny-imagenet200 # create tiny-imagenet200 folder (if not delete it)
 mkdir data/tiny-imagenet200/val
 # create symbolic links
